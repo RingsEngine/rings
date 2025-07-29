@@ -1,0 +1,41 @@
+import { IBound } from "../core/bound/IBound";
+import { Triangle } from "./Triangle";
+import { Matrix4 } from "./Matrix4";
+import { Vector3 } from "./Vector3";
+export declare class Ray {
+    origin: Vector3;
+    length: number;
+    private static _rayl;
+    private static _smallnum;
+    private _vector;
+    private _dir;
+    constructor(origin?: Vector3, dir?: Vector3);
+    get direction(): Vector3;
+    set direction(dir: Vector3);
+    clone(): Ray;
+    intersectBox(box: IBound, target?: Vector3): Vector3;
+    pointAt(t: number, target?: Vector3): Vector3;
+    copy(src: Ray): this;
+    setApproxDirection(dir: Vector3): void;
+    setOrigin(origin: Vector3): void;
+    getOrigin(): Vector3;
+    getPoint(t: number): Vector3;
+    sqrDistToPoint(P: Vector3): number;
+    applyMatrix(mat4: Matrix4): void;
+    private _v0;
+    private _v1;
+    private _v2;
+    pointInTriangle(P: Vector3, A: Vector3, B: Vector3, C: Vector3): boolean;
+    private _E1;
+    private _E2;
+    private _P;
+    private _T;
+    private _Q;
+    intersectTriangle(orig: Vector3, dir: Vector3, face: Triangle): Vector3;
+    intersectSphere(o: Vector3, dir: Vector3, center: Vector3, radius: number): Vector3;
+    intersectionSegment(sega: Vector3, segb: Vector3, threshold: number): {
+        out: Vector3;
+        length: number;
+    };
+    private get_vec;
+}

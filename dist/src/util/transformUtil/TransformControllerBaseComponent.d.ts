@@ -1,0 +1,48 @@
+import { ColliderComponent } from "../../components/ColliderComponent";
+import { ComponentBase } from "../../components/ComponentBase";
+import { View3D } from "../../core/View3D";
+import { Object3D } from "../../core/entities/Object3D";
+import { PointerEvent3D } from "../../event/eventConst/PointerEvent3D";
+import { UnLitMaterial } from "../../materials/UnLitMaterial";
+import { Color } from "../../math/Color";
+import { Vector3 } from "../../math/Vector3";
+import { TransformAxisEnum } from "./TransformAxisEnum";
+import { TransformSpaceMode } from "./TransformSpaceMode";
+export declare class TransformControllerBaseComponent extends ComponentBase {
+    protected mAxis: Object3D[];
+    protected mAxisColor: Color[];
+    protected mContainer: Object3D;
+    protected mAxisMaterial: UnLitMaterial[];
+    protected mAxisCollider: ColliderComponent[];
+    constructor();
+    get target(): Object3D;
+    get mX(): Object3D;
+    get mY(): Object3D;
+    get mZ(): Object3D;
+    get transformSpaceMode(): TransformSpaceMode;
+    init(param?: any): void;
+    start(): void;
+    onEnable(view?: View3D): void;
+    onDisable(view?: View3D): void;
+    reset(): void;
+    protected pickAxis(): {
+        intersectPoint?: Vector3;
+        distance: number;
+        obj: Object3D;
+        axis: TransformAxisEnum;
+    };
+    protected currentAxis: TransformAxisEnum;
+    protected beginPoint: Vector3;
+    protected beginMousePos: Vector3;
+    protected currentPoint: Vector3;
+    onMouseDown(e: PointerEvent3D): void;
+    protected lastMoveObj: Object3D;
+    protected lastMoveAxis: TransformAxisEnum;
+    onMouseMove(e: PointerEvent3D): void;
+    onMouseUp(e: PointerEvent3D): void;
+    onUpdate(view?: View3D): void;
+    protected applyLocalTransform(currentAxis: TransformAxisEnum, offset: Vector3, distance: number): void;
+    protected applyGlobalTransform(currentAxis: TransformAxisEnum, offset: Vector3, distance: number): void;
+    protected createCustomAxis(axis: TransformAxisEnum): Object3D;
+    protected createAxis(axis: TransformAxisEnum): Object3D;
+}

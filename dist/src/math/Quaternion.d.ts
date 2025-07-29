@@ -1,0 +1,42 @@
+import { FloatArray } from "@rings/wasm-matrix/WasmMatrix";
+import { Vector3 } from "./Vector3";
+export declare class Quaternion {
+    static HELP_0: Quaternion;
+    static HELP_1: Quaternion;
+    static HELP_2: Quaternion;
+    static _zero: Quaternion;
+    static CALCULATION_QUATERNION: Quaternion;
+    x: number;
+    y: number;
+    z: number;
+    w: number;
+    constructor(x?: number, y?: number, z?: number, w?: number);
+    static identity(): Quaternion;
+    static quaternionToMatrix(q: Quaternion, m: any): void;
+    get magnitude(): number;
+    set(x?: number, y?: number, z?: number, w?: number): Quaternion;
+    divide(v: any): Quaternion;
+    setFromArray(d: Float32Array | number[]): this;
+    multiply(qa: Quaternion, qb: Quaternion): void;
+    multiplyVector(vector: Vector3, target?: Quaternion): Quaternion;
+    fromAxisAngle(axis: Vector3, angle: number): void;
+    toAxisAngle(axis: Vector3): number;
+    slerp(qa: Quaternion, qb: Quaternion, t: number): void;
+    lerp(qa: Quaternion, qb: Quaternion, t: number): void;
+    fromEulerAngles(ax: number, ay: number, az: number): Quaternion;
+    setFromRotationMatrix(m: {
+        rawData: FloatArray;
+    }): this;
+    getEulerAngles(eulers?: Vector3): Vector3;
+    normalize(val?: number): void;
+    toString(): string;
+    fromMatrix(matrix: any): void;
+    inverse(target?: Quaternion): Quaternion;
+    clone(): Quaternion;
+    transformVector(vector: Vector3, target?: Vector3): Vector3;
+    copyFrom(q: Quaternion | Vector3): this;
+    mul(lhs: Quaternion, rhs: Quaternion, target?: Quaternion): Quaternion;
+    private clampf;
+    static serialize(value: Quaternion): Quaternion;
+}
+export declare function rotateVectorByQuat(lhs: Quaternion, rhs: Vector3, target: Vector3): Vector3;

@@ -1,0 +1,32 @@
+import { CEventDispatcher } from "../event/CEventDispatcher";
+import { Ray } from "../math/Ray";
+import { ColliderComponent } from "../components/ColliderComponent";
+import { View3D } from "../core/View3D";
+export declare class PickFire extends CEventDispatcher {
+    ray: Ray;
+    isTouching: boolean;
+    private _mouseCode;
+    private _pickEvent;
+    private _outEvent;
+    private _overEvent;
+    private _upEvent;
+    private _downEvent;
+    private _mouseMove;
+    private _pickCompute;
+    private _lastDownTarget;
+    mouseEnableMap: Map<number, ColliderComponent>;
+    private _view;
+    constructor(view: View3D);
+    private init;
+    start(): void;
+    stop(): void;
+    private onTouchStart;
+    private onTouchEnd;
+    private _lastFocus;
+    private getPickInfo;
+    private onTouchMove;
+    private onTouchOnce;
+    private findNearestObj;
+    private _interestList;
+    private pick;
+}

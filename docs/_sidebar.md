@@ -1,0 +1,33 @@
+<!-- docs/_sidebar.md -->
+
+- [首页](/)
+- [快速入门](/quick-start)
+- [核心概念](/core)
+- [组件系统](/components)
+  - [组件概述](/components)
+  - [基础组件 API](/basic-components-api)
+  - [扩展组件](/extensions)
+  - [自定义组件](/custom-components)
+- [扩展功能](/enhancements)
+  - [多媒体支持](/enhancements#多媒体支持)
+- [工具集](/tools)
+- [Shader 开发](/shaders)
+- [后处理效果](/post-processing)
+- [模块](modules.md)
+- 类
+  - [Engine3D](classes/Engine3D.md)
+  - [Scene3D](classes/Scene3D.md)
+  - [View3D](classes/View3D.md)
+  - [Camera3D](classes/Camera3D.md)
+  - [Object3D](classes/Object3D.md)
+  - [Entity](classes/Entity.md)
+  - [Material](classes/Material.md)
+  - [LitMaterial](classes/LitMaterial.md)
+  - [UnLitMaterial](classes/UnLitMaterial.md)
+- 枚举
+  - [RenderLayer](enums/RenderLayer.md)
+  - [LightType](enums/LightType.md)
+  - [BlendMode](enums/BlendMode.md)
+- 接口
+  - [IComponent](interfaces/IComponent.md)
+  - [ILight](interfaces/ILight.md)

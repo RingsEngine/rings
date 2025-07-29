@@ -1,0 +1,48 @@
+import { ILight } from "../../../components/lights/ILight";
+import { Reflection } from "../../../components/renderer/Reflection";
+import { RenderNode } from "../../../components/renderer/RenderNode";
+import { Camera3D } from "../../../core/Camera3D";
+import { Scene3D } from "../../../core/Scene3D";
+import { View3D } from "../../../core/View3D";
+import { Probe } from "../passRenderer/ddgi/Probe";
+import { CollectInfo } from "./CollectInfo";
+import { EntityBatchCollect } from "./EntityBatchCollect";
+export declare class EntityCollect {
+    private static _instance;
+    private _sceneLights;
+    private _sceneGIProbes;
+    private _op_RenderNodes;
+    private _tr_RenderNodes;
+    private _octreeRenderNodes;
+    private _reflections;
+    private _graphics;
+    private _op_renderGroup;
+    private _tr_renderGroup;
+    private _renderShaderCollect;
+    state: {
+        giLightingChange: boolean;
+    };
+    sky: RenderNode;
+    private _collectInfo;
+    private rendererOctree;
+    static get instance(): EntityCollect;
+    constructor();
+    private getPashList;
+    private sortRenderNode;
+    addRenderNode(root: Scene3D, renderNode: RenderNode): void;
+    private getOctree;
+    removeRenderNode(root: Scene3D, renderNode: RenderNode): void;
+    addLight(root: Scene3D, light: ILight): void;
+    removeLight(root: Scene3D, light: ILight): void;
+    getLights(root: Scene3D): ILight[];
+    addGIProbe(root: Scene3D, probe: Probe): void;
+    removeGIProbe(root: Scene3D, probe: Probe): void;
+    getProbes(root: Scene3D): Probe[];
+    getReflections(root: Scene3D): Reflection[];
+    autoSortRenderNodes(scene: Scene3D): this;
+    getRenderNodes(scene: Scene3D, camera: Camera3D): CollectInfo;
+    getOpRenderGroup(scene: Scene3D): EntityBatchCollect;
+    getTrRenderGroup(scene: Scene3D): EntityBatchCollect;
+    getGraphicList(): RenderNode[];
+    getRenderShaderCollect(view: View3D): import("./RenderShaderCollect").RenderShaderList;
+}

@@ -1,0 +1,63 @@
+import { GUIHitInfo } from "../../components/gui/uiComponents/IUIInteractive";
+import { Vector2 } from "../../math/Vector2";
+import { Vector3 } from "../../math/Vector3";
+import { CEvent } from "../CEvent";
+type pickResult = {
+    meshID: number;
+    worldPos: Vector3;
+    worldNormal: Vector3;
+    screenUv?: Vector2;
+    distance?: number;
+};
+export declare class PointerEvent3D extends CEvent {
+    static PICK_OVER: string;
+    static PICK_CLICK: string;
+    static PICK_OUT: string;
+    static PICK_MOVE: string;
+    static PICK_UP: string;
+    static PICK_DOWN: string;
+    static POINTER_RIGHT_CLICK: string;
+    static POINTER_MID_UP: string;
+    static POINTER_MID_DOWN: string;
+    static POINTER_CLICK: string;
+    static POINTER_MOVE: string;
+    static POINTER_DOWN: string;
+    static POINTER_UP: string;
+    static POINTER_OUT: string;
+    static POINTER_OVER: string;
+    static POINTER_WHEEL: string;
+    pointerId: number;
+    pointerType: string;
+    isPrimary: boolean;
+    pressure: number;
+    mouseX: number;
+    mouseY: number;
+    movementX: number;
+    movementY: number;
+    deltaX: number;
+    deltaY: number;
+    data: pickResult;
+    deltaZ: number;
+    reset(): void;
+}
+export declare class PickGUIEvent3D extends CEvent {
+    static PICK_OVER_GUI: string;
+    static PICK_CLICK_GUI: string;
+    static PICK_OUT_GUI: string;
+    static PICK_UP_GUI: string;
+    static PICK_DOWN_GUI: string;
+    pointerId: number;
+    pointerType: string;
+    isPrimary: boolean;
+    pressure: number;
+    mouseX: number;
+    mouseY: number;
+    movementX: number;
+    movementY: number;
+    deltaX: number;
+    deltaY: number;
+    data: GUIHitInfo;
+    deltaZ: number;
+    reset(): void;
+}
+export {};

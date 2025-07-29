@@ -1,0 +1,32 @@
+import { Camera3D } from "../../core/Camera3D";
+import { GeometryBase } from "../../core/geometry/GeometryBase";
+import { Texture } from "../graphics/webGpu/core/texture/Texture";
+import { ComputeShader } from "../graphics/webGpu/shader/ComputeShader";
+import { RenderShaderPass } from "../graphics/webGpu/shader/RenderShaderPass";
+import { RendererPassState } from "./passRenderer/state/RendererPassState";
+export declare class GPUContext {
+    static lastGeometry: GeometryBase;
+    static lastPipeline: GPURenderPipeline | null;
+    static lastShader: RenderShaderPass;
+    static drawCount: number;
+    static renderPassCount: number;
+    static geometryCount: number;
+    static pipelineCount: number;
+    static matrixCount: number;
+    static lastRenderPassState: RendererPassState;
+    static LastCommand: GPUCommandEncoder | null;
+    static bindPipeline(encoder: GPURenderPassEncoder | GPURenderBundleEncoder, renderShader: RenderShaderPass): boolean;
+    static bindCamera(encoder: GPURenderPassEncoder | GPURenderBundleEncoder, camera: Camera3D): void;
+    static bindGeometryBuffer(encoder: GPURenderPassEncoder | GPURenderBundleEncoder, geometry: GeometryBase): void;
+    static cleanCache(): void;
+    static createPipeline(gpuRenderPipeline: GPURenderPipelineDescriptor): GPURenderPipeline;
+    static beginCommandEncoder(): GPUCommandEncoder | null;
+    static endCommandEncoder(command: GPUCommandEncoder): void;
+    static recordBundleEncoder(des: GPURenderBundleEncoderDescriptor): GPURenderBundleEncoder;
+    static beginRenderPass(command: GPUCommandEncoder, renderPassState: RendererPassState): GPURenderPassEncoder;
+    static drawIndexed(encoder: GPURenderPassEncoder, indexCount: GPUSize32, instanceCount?: GPUSize32, firstIndex?: GPUSize32, baseVertex?: GPUSignedOffset32, firstInstance?: GPUSize32): void;
+    static draw(encoder: GPURenderPassEncoder, vertexCount: GPUSize32, instanceCount?: GPUSize32, firstVertex?: GPUSize32, firstInstance?: GPUSize32): void;
+    static endPass(encoder: GPURenderPassEncoder): void;
+    static computeCommand(command: GPUCommandEncoder, computes: ComputeShader[]): void;
+    static copyTexture(command: GPUCommandEncoder, source: Texture, dest: Texture): void;
+}

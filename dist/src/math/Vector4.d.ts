@@ -1,0 +1,34 @@
+export declare class Vector4 {
+    static X_AXIS: Vector4;
+    static Y_AXIS: Vector4;
+    static Z_AXIS: Vector4;
+    static HELP_0: Vector4;
+    static HELP_1: Vector4;
+    static HELP_2: Vector4;
+    static EPSILON: number;
+    static HELP_3: Vector4;
+    static HELP_4: Vector4;
+    static HELP_5: Vector4;
+    static HELP_6: Vector4;
+    static ZERO: Vector4;
+    static ONE: Vector4;
+    static LEFT: Vector4;
+    static RIGHT: Vector4;
+    static UP: Vector4;
+    static DOWN: Vector4;
+    static BACK: Vector4;
+    static FORWARD: Vector4;
+    x: number;
+    y: number;
+    z: number;
+    w: number;
+    constructor(x?: number, y?: number, z?: number, w?: number);
+    get width(): number;
+    get height(): number;
+    static crossVectors(a: Vector4, b: Vector4, target?: Vector4): Vector4;
+    static distance(pt1: Vector4, pt2: Vector4): number;
+    set(x: number, y: number, z: number, w: number): this;
+    multiplyScalar(scalar: number): this;
+    copyFrom(v: Vector4): this;
+    clone(): Vector4;
+}

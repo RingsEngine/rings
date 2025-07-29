@@ -1,0 +1,17 @@
+{
+  "name": "@rings/wasm-matrix",
+  "version": "0.8.3",
+  "author": "Rings",
+  "description": "Update matrix by WASM",
+  "main": "matrix.js",
+  "types": "matrix.d.ts",
+  "files": [
+    "matrix.js",
+    "matrix.d.ts"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rings/rings.git"
+  }
+}

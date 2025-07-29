@@ -1,0 +1,31 @@
+{
+  "name": "@rings/physics",
+  "version": "0.3.4",
+  "author": "rings",
+  "description": "rings Physics Plugin, Powerd by Ammo.js",
+  "main": "./dist/physics.umd.js",
+  "module": "./dist/physics.es.js",
+  "module:dev": "./index.ts",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build && npm run build:types && npm run build:clean",
+    "build:types": "tsc --emitDeclarationOnly -p tsconfig.json",
+    "build:clean": "mv dist/packages/physics/* dist && rm -rf dist/src && rm -rf dist/packages",
+    "docs": "npm run docs:typedoc ../../docs/physics index.ts",
+    "docs:typedoc": "npx typedoc --plugin typedoc-plugin-markdown --tsconfig tsconfig.json --gitRevision main --hideBreadcrumbs true --allReflectionsHaveOwnDocument true --readme none --excludeInternal --excludePrivate --excludeProtected --sort source-order --out"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rings/rings.git"
+  },
+  "dependencies": {
+    "@rings/ammo": ">=0.2.1"
+  },
+  "peerDependencies": {
+    "@rings/core": ">=0.8.0"
+  }
+}

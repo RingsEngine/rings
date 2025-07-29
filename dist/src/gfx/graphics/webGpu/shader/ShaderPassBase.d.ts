@@ -1,0 +1,60 @@
+import { GPUBufferBase } from "../core/buffer/GPUBufferBase";
+import { Color } from "../../../../math/Color";
+import { Vector2 } from "../../../../math/Vector2";
+import { Vector3 } from "../../../../math/Vector3";
+import { Vector4 } from "../../../../math/Vector4";
+import { Struct } from "../../../../util/struct/Struct";
+import { StorageGPUBuffer } from "../core/buffer/StorageGPUBuffer";
+import { StructStorageGPUBuffer } from "../core/buffer/StructStorageGPUBuffer";
+import { UniformGPUBuffer } from "../core/buffer/UniformGPUBuffer";
+import { UniformNode } from "../core/uniforms/UniformNode";
+import { ShaderReflection } from "./value/ShaderReflectionInfo";
+import { UniformValue } from "./value/UniformValue";
+import { MaterialDataUniformGPUBuffer } from "../core/buffer/MaterialDataUniformGPUBuffer";
+export declare class ShaderPassBase {
+    readonly instanceID: string;
+    shaderVariant: string;
+    vsEntryPoint: string;
+    fsEntryPoint: string;
+    bindGroups: GPUBindGroup[];
+    shaderReflection: ShaderReflection;
+    defineValue: {
+        [name: string]: any;
+    };
+    constValues: {
+        [name: string]: any;
+    };
+    uniforms: {
+        [name: string]: UniformNode;
+    };
+    materialDataUniformBuffer: MaterialDataUniformGPUBuffer;
+    protected _bufferDic: Map<string, GPUBufferBase>;
+    protected _shaderChange: boolean;
+    protected _valueChange: boolean;
+    constructor();
+    noticeShaderChange(): void;
+    noticeValueChange(): void;
+    setStorageBuffer(name: string, buffer: StorageGPUBuffer): void;
+    setStructStorageBuffer<T extends Struct>(name: string, buffer: StructStorageGPUBuffer<T>): void;
+    setUniformBuffer(name: string, buffer: UniformGPUBuffer): void;
+    setDefine(defineName: string, value: any): void;
+    hasDefine(defineName: string): boolean;
+    deleteDefine(defineName: string): void;
+    setUniformFloat(name: string, value: number): void;
+    setUniformVector2(name: string, value: Vector2): void;
+    setUniformVector3(name: string, value: Vector3): void;
+    setUniformVector4(name: string, value: Vector4): void;
+    setUniformColor(name: string, value: Color): void;
+    setUniformArray(name: string, value: Float32Array): void;
+    setUniform(name: string, value: UniformValue): void;
+    getUniform(name: string): UniformValue;
+    getUniformFloat(name: string): number;
+    getUniformVector2(name: string): Vector2;
+    getUniformVector3(name: string): Vector3;
+    getUniformVector4(name: string): Vector4;
+    getUniformColor(name: string): Color;
+    getBuffer(name: string): GPUBufferBase;
+    protected noticeBufferChange(name: string): void;
+    applyUniform(): void;
+    destroy(force?: boolean): void;
+}
