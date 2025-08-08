@@ -16,7 +16,8 @@
       "../*": ["src/*"],
       "@rings/*": ["packages/*"],
       "@rings/core": ["src"],
-      "@samples/*": ["samples/*"],
+      // "@samples/*": ["samples/*"],
+      "@docs/*": ["docs/*"],
       "dat.gui": ["packages/debug/dat.gui.module"]
     },
     "types": ["vite/client", "@webgpu/types"],
@@ -24,6 +25,6 @@
     "strict": false,
     "experimentalDecorators": true
   },
-  "include": ["src", "test", "samples"],
+  "include": ["src", "test", "docs"],
   "exclude": ["node_modules", "dist", "public"]
 }

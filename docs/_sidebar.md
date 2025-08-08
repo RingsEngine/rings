@@ -9,7 +9,7 @@
   - [扩展组件](/extensions)
   - [自定义组件](/custom-components)
 - [扩展功能](/enhancements)
-  - [多媒体支持](/enhancements#多媒体支持)
+  - [多媒体支持](/enhancements)
 - [工具集](/tools)
 - [Shader 开发](/shaders)
 - [后处理效果](/post-processing)

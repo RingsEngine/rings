@@ -8,12 +8,12 @@ export default defineConfig((option) => ({
     port: 8000,
     hmr: false, // open this line if no auto hot-reload required
   },
-  publicDir: option.command === "build" ? false : "public",
+  publicDir: option.command === "build" ? false : ["public", "docs"],
   resolve: {
     alias: {
       "@rings/core": resolve(__dirname, "./src/index.ts"),
       "@rings": resolve(__dirname, "./packages"),
-      // '@samples': resolve(__dirname, './samples'),
+      "@docs": resolve(__dirname, "./docs"),
     },
     mainFields: ["module:dev", "module"],
   },
@@ -21,6 +21,19 @@ export default defineConfig((option) => ({
     option.command === "build"
       ? undefined
       : [
+          {
+            name: "redirectToDocs",
+            configureServer(server) {
+              server.middlewares.use((req, res, next) => {
+                if (req.url === '/') {
+                  res.writeHead(302, { 'Location': '/docs/' });
+                  res.end();
+                } else {
+                  next();
+                }
+              });
+            },
+          },
           {
             name: "autoIndex",
             configureServer(server) {

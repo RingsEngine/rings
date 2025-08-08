@@ -581,42 +581,230 @@ console.log(animator.currentClip); // 当前播放的动画
 console.log(animator.isPlaying); // 是否正在播放
 ```
 
-**AnimatorComponent 核心功能**：
+#### 属性列表
 
-1. 多动画剪辑管理
-2. 平滑过渡和混合
-3. 精确的动画事件系统
-4. 播放控制（暂停/恢复/速度调节）
-5. 支持 GLTF/GLB、FBX 等主流动画格式
-6. 动画遮罩和分层控制
+1. **`timeScale: number`**
+
+   - **描述**：全局动画播放速度的缩放因子。
+   - **默认值**：`1.0`。
+   - **用法**：
+     ```typescript
+     animator.timeScale = 2.0; // 以双倍速度播放动画
+     ```
+
+2. **`avatar: string`**
+
+   - **描述**：绑定骨骼数据的名称（`PrefabAvatarData`）。
+   - **用法**：
+     ```typescript
+     animator.avatar = "character_avatar"; // 绑定骨骼数据
+     ```
+
+3. **`clips: PropertyAnimationClip[]`**
+
+   - **描述**：动画剪辑列表，用于管理骨骼动画。
+   - **用法**：
+     ```typescript
+     animator.clips = [walkClip, runClip]; // 设置动画剪辑
+     ```
+
+4. **`playBlendShapeLoop: boolean`**
+
+   - **描述**：控制 BlendShape 动画是否循环播放。
+   - **默认值**：`false`。
+   - **用法**：
+     ```typescript
+     animator.playBlendShapeLoop = true; // 启用循环播放
+     ```
+
+5. **`jointMatrixIndexTableBuffer: StorageGPUBuffer`**
+   - **描述**：骨骼矩阵索引表，用于 GPU 计算。
+   - **注意**：通常由系统自动生成，无需手动设置。
+
+##### 方法列表
+
+1. **`playAnim(anim: string, time?: number, speed?: number)`**
+
+   - **描述**：播放指定的骨骼动画。
+   - **参数**：
+     - `anim`：动画剪辑名称。
+     - `time`：起始时间（秒），默认为 `0`。
+     - `speed`：播放速度，默认为 `1`。
+   - **用法**：
+     ```typescript
+     animator.playAnim("walk", 0, 1.5); // 以1.5倍速度播放行走动画
+     ```
+
+2. **`crossFade(anim: string, crossTime: number)`**
+
+   - **描述**：交叉淡入淡出到另一个动画。
+   - **参数**：
+     - `anim`：目标动画剪辑名称。
+     - `crossTime`：淡入淡出时间（秒）。
+   - **用法**：
+     ```typescript
+     animator.crossFade("run", 0.5); // 在0.5秒内淡入跑步动画
+     ```
+
+3. **`playBlendShape(shapeName: string, time?: number, speed?: number)`**
+
+   - **描述**：播放指定的 BlendShape 动画。
+   - **参数**：
+     - `shapeName`：BlendShape 名称。
+     - `time`：起始时间（秒），默认为 `0`。
+     - `speed`：播放速度，默认为 `1`。
+   - **用法**：
+     ```typescript
+     animator.playBlendShape("smile", 0, 0.5); // 以0.5倍速度播放微笑动画
+     ```
+
+4. **`getJointIndexTable(skinJointsName: string[])`**
+
+   - **描述**：获取骨骼索引表。
+   - **参数**：
+     - `skinJointsName`：骨骼名称数组。
+   - **返回值**：骨骼索引数组。
+   - **用法**：
+     ```typescript
+     let indices = animator.getJointIndexTable(["arm_L", "arm_R"]);
+     ```
+
+5. 多动画剪辑管理
+6. 平滑过渡和混合
+7. 精确的动画事件系统
+8. 播放控制（暂停/恢复/速度调节）
+9. 支持 GLTF/GLB、FBX 等主流动画格式
+10. 动画遮罩和分层控制
 
 ### 2.2 属性动画
 
-用于对象属性变化的简单动画：
+`PropertyAnimator` 是用于驱动属性动画的核心组件，支持对任意对象的属性进行插值动画。
 
-```javascript
-import { PropertyAnimator } from "@rings/animation";
+```typescript
+import { PropertyAnimation } from "@rings/core";
+```
 
-const box = new Mesh();
-const animator = new PropertyAnimator(box);
+**功能**：
 
-// 动画位置变化
-animator.animate({
-  target: box.position,
-  to: { x: 10, y: 5, z: 0 },
-  duration: 2,
-  easing: "easeInOutQuad",
-});
+- 通过关键帧动画控制对象的属性变化（如位置、旋转、缩放、颜色等）。
+- 支持数值、向量、颜色等属性的插值动画。
+- 提供事件系统（完成、循环、关键帧触发）。
 
-// 动画颜色变化
-animator.animate({
-  target: box.material.color,
-  to: new Color(0xff0000),
-  duration: 1.5,
-});
+**核心属性**：
+
+| 属性       | 类型             | 默认值 | 描述                         |
+| ---------- | ---------------- | ------ | ---------------------------- |
+| `clip`     | PropertyAnimClip | null   | 动画剪辑资源，包含关键帧数据 |
+| `speed`    | number           | 1.0    | 播放速度（1.0 为正常速度）   |
+| `loop`     | boolean          | false  | 是否循环播放                 |
+| `autoPlay` | boolean          | true   | 是否自动播放                 |
+
+**常用方法**：
+
+```typescript
+play(): void;    // 开始播放
+pause(): void;   // 暂停动画
+stop(): void;    // 停止并重置动画
+seek(time: number): void; // 跳转到指定时间点
+```
+
+**事件系统**：
+
+```typescript
+// 动画播放完成时触发
+onComplete: () => void;
+
+// 每次循环时触发（仅当loop=true）
+onLoop: () => void;
+
+// 到达关键帧时触发
+onFrame: (frameIndex: number) => void;
+```
+
+**示例代码**：
+
+```typescript
+// 创建属性动画组件
+const anim = obj.addComponent(PropertyAnimation);
+
+// 加载动画剪辑
+anim.clip = await Engine3D.res.load("anim/scaleAnim.json");
+
+// 配置动画参数
+anim.speed = 1.5;
+anim.loop = true;
+
+// 监听事件
+anim.onComplete = () => console.log("动画播放完成");
+anim.onFrame = (idx) => console.log(`到达关键帧: ${idx}`);
+
+// 手动播放
+anim.play();
 ```
 
 ### 2.3 口型动画
+
+```typescript
+import { MorphTargetBlender } from "@rings/core";
+```
+
+**MorphTargetBlender 口型混合器**
+
+**功能**：
+
+- 用于混合多个 MorphTarget（变形目标）的权重，实现平滑过渡效果。
+- 支持动态调整权重，适用于口型同步、表情动画等场景。
+
+**核心属性**：
+
+| 属性         | 类型              | 默认值 | 描述                 |
+| ------------ | ----------------- | ------ | -------------------- |
+| `targets`    | MorphTargetData[] | []     | 绑定的变形目标数据   |
+| `blendSpeed` | number            | 0.1    | 权重混合速度（0-1）  |
+| `isPlaying`  | boolean           | false  | 是否正在播放混合动画 |
+
+**常用方法**：
+
+```typescript
+// 添加变形目标
+addTarget(target: MorphTargetData): void;
+
+// 移除变形目标
+removeTarget(name: string): void;
+
+// 设置目标权重
+setWeight(name: string, weight: number): void;
+
+// 开始混合动画
+play(): void;
+
+// 停止混合动画
+stop(): void;
+
+// 更新混合状态（每帧调用）
+update(deltaTime: number): void;
+```
+
+**示例代码**：
+
+```typescript
+// 创建混合器
+const blender = new MorphTargetBlender();
+
+// 添加口型目标
+blender.addTarget({ name: "A", weight: 0 });
+blender.addTarget({ name: "B", weight: 0 });
+
+// 设置权重并播放
+blender.setWeight("A", 1.0);
+blender.setWeight("B", 0.5);
+blender.play();
+
+// 每帧更新
+function update() {
+  blender.update(deltaTime);
+}
+```
 
 用于语音同步的嘴部动画：
 
@@ -643,18 +831,6 @@ lipSync.stopSync();
 entity.addComponent(AnimationComponent, {
   clips: ["walk", "run", "jump"],
   default: "idle",
-});
-```
-
-## 3. 音频组件
-
-处理 3D 空间音效
-
-```javascript
-entity.addComponent(AudioComponent, {
-  source: "footsteps.wav",
-  loop: true,
-  volume: 0.8,
 });
 ```
 
