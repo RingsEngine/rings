@@ -67,6 +67,8 @@ class MyCustomPass extends PostProcessPass {
 ## 完整示例
 
 ```javascript
+import { Scene3D, PostProcessing, BloomPass, FXAAPass } from '@rings/core';
+
 // 创建带后处理的场景
 const scene = new Scene3D();
 scene.postProcessing = new PostProcessing()

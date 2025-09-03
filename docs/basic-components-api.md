@@ -1,1196 +1,1617 @@
-# 基础组件 API 参考
+# 基础组件
 
-## 渲染核心组件
+## 相机系统
 
-### 1. 相机组件(Camera3D)
+### Camera3D 相机组件
 
 `Camera3D` 类表示 3D 场景中的相机组件，支持透视投影和正交投影，并提供视锥体裁剪、阴影计算、坐标转换等功能。
 
 #### 属性说明
 
-| 属性名           | 类型       | 默认值        | 描述                                 |
-| ---------------- | ---------- | ------------- | ------------------------------------ |
-| `fov`            | number     | 60            | 视野角度（度），用于透视投影         |
-| `name`           | string     | ""            | 相机名称                             |
-| `aspect`         | number     | 1             | 视口宽高比（宽度/高度）              |
-| `near`           | number     | 1             | 近裁剪面距离                         |
-| `far`            | number     | 5000          | 远裁剪面距离                         |
-| `left`           | number     | -100          | 正交投影左边界                       |
-| `right`          | number     | 100           | 正交投影右边界                       |
-| `top`            | number     | 100           | 正交投影上边界                       |
-| `bottom`         | number     | -100          | 正交投影下边界                       |
-| `frustumSize`    | number     | 100           | 正交投影视锥体大小                   |
-| `isShadowCamera` | boolean    | false         | 标记是否为阴影相机                   |
-| `type`           | CameraType | `perspective` | 相机类型（`perspective` 或 `ortho`） |
-| `enableCSM`      | boolean    | false         | 是否启用级联阴影映射（CSM）          |
+| 属性名 | 类型 | 默认值 | 描述 |
+|--------|------|--------|------|
+| **基础投影参数** |
+| `fov` | number | 60 | 视野角度（度），仅用于透视投影 |
+| `aspect` | number | 1 | 视口宽高比（宽度/高度） |
+| `near` | number | 1 | 近裁剪面距离 |
+| `far` | number | 5000 | 远裁剪面距离 |
+| **正交投影参数** |
+| `left` | number | -100 | 正交投影左边界 |
+| `right` | number | 100 | 正交投影右边界 |
+| `top` | number | 100 | 正交投影上边界 |
+| `bottom` | number | -100 | 正交投影下边界 |
+| `frustumSize` | number | 100 | 正交投影视锥体大小 |
+| **相机设置** |
+| `type` | CameraType | CameraType.perspective | 投影类型（perspective或ortho） |
+| `viewPort` | Rect | new Rect() | 相机视口矩形 |
+| `isShadowCamera` | boolean | false | 是否为阴影相机 |
+| **级联阴影** |
+| `enableCSM` | boolean | false | 是否启用级联阴影映射 |
+| `csm` | FrustumCSM | null | 级联阴影映射实例 |
 
 #### 方法说明
 
-| 方法名                                                | 描述                                       |
-| ----------------------------------------------------- | ------------------------------------------ |
-| `init()`                                              | 初始化相机，创建射线、视锥体和观察目标     |
-| `updateProjection()`                                  | 根据当前相机类型更新投影矩阵（透视或正交） |
-| `perspective(fov, aspect, near, far)`                 | 设置透视投影参数                           |
-| `ortho(frustumSize, near, far)`                       | 设置正交投影参数（基于尺寸）               |
-| `orthoOffCenter(left, right, bottom, top, near, far)` | 设置正交投影参数（基于边界）               |
-| `getShadowBias(depthTexSize)`                         | 计算阴影偏移值，用于阴影贴图采样           |
-| `getShadowWorldExtents()`                             | 获取阴影世界空间范围                       |
-| `object3DToScreenRay(n, target)`                      | 将 3D 对象坐标转换为屏幕坐标               |
-| `screenRayToObject3D(n, target)`                      | 将屏幕坐标转换为 3D 对象坐标               |
-| `viewMatrix`                                          | 获取视图矩阵（相机世界矩阵的逆矩阵）       |
-| `shadowViewMatrix`                                    | 获取阴影视图矩阵                           |
-| `pvMatrix`                                            | 获取投影-视图组合矩阵                      |
+| 方法名 | 描述 |
+|--------|------|
+| `perspective(fov, aspect, near, far)` | 设置透视投影参数 |
+| `ortho(frustumSize, near, far)` | 设置正交投影参数 |
+| `orthoOffCenter(left, right, bottom, top, near, far)` | 设置正交投影边界 |
+| `lookAt(pos, target, up)` | 使相机朝向指定目标点 |
+| `worldToScreenPoint(point)` | 将世界坐标转换为屏幕坐标 |
+| `screenPointToRay(x, y)` | 从屏幕坐标创建射线 |
+| `screenPointToWorld(x, y, z)` | 将屏幕坐标转换为世界坐标 |
 
-#### 示例代码
+#### 使用示例
 
 ```typescript
-import { Camera3D, CameraType } from "@rings/core";
+import { Object3D, Scene3D, Camera3D, Vector3 } from '@rings/core';
 
-// 创建相机实例
-const camera = new Camera3D();
-camera.name = "MainCamera";
+// 创建场景
+const scene = new Scene3D();
+
+// 创建相机对象
+const cameraObj = new Object3D();
+const camera = cameraObj.addComponent(Camera3D);
 
 // 设置透视投影
-camera.perspective(60, 1.0, 0.1, 1000);
+camera.perspective(60, window.innerWidth / window.innerHeight, 0.1, 1000);
 
-// 设置正交投影（可选）
-// camera.ortho(100, 0.1, 1000);
+// 设置相机位置
+cameraObj.transform.position = new Vector3(0, 5, 10);
+cameraObj.transform.lookAt(new Vector3(0, 0, 0));
 
-// 初始化相机
-camera.init();
-
-// 更新投影矩阵（例如窗口大小变化时）
-camera.updateProjection();
-
-// 获取视图矩阵
-const viewMatrix = camera.viewMatrix;
-console.log("View Matrix:", viewMatrix);
+// 添加到场景
+scene.addChild(cameraObj);
 ```
 
-### 1.1 自由相机(FlyCameraController)
+### 相机控制器
 
-`FlyCameraController` 是一个基于 `Camera3D` 的控制器，用于实现自由飞行相机效果，支持键盘和鼠标控制相机的移动和旋转。
+#### 自由相机控制器 (FlyCameraController)
 
-##### 属性说明
+用于实现第一人称自由飞行相机，支持WASD键移动和鼠标控制视角。
 
-| 属性名      | 类型    | 默认值                     | 描述                                                               |
-| ----------- | ------- | -------------------------- | ------------------------------------------------------------------ |
-| `moveSpeed` | number  | 2                          | 相机移动速度。                                                     |
-| `targetPos` | Vector3 | (0,0,10)                   | 相机目标位置。                                                     |
-| `lookAtPos` | Vector3 | (0,0,0)                    | 相机看向的位置。                                                   |
-| `config`    | object  | `{ shiftMoveScale: 20.0 }` | 配置对象，包含 `shiftMoveScale`（按住 Shift 键时的移动速度倍数）。 |
+**属性说明**
 
-##### 方法说明
+| 属性名 | 类型 | 默认值 | 描述 |
+|--------|------|--------|------|
+| `moveSpeed` | number | 2.0 | 移动速度 |
+| `lookSpeed` | number | 0.1 | 视角转动速度 |
 
-| 方法名                                           | 描述                                         |
-| ------------------------------------------------ | -------------------------------------------- |
-| `setCamera(cameraPos: Vector3, lookAt: Vector3)` | 设置相机初始位置和目标位置。                 |
-| `start()`                                        | 初始化相机控制器，绑定键盘和鼠标事件。       |
-| `onUpdate()`                                     | 每帧更新相机位置和旋转，处理键盘和鼠标输入。 |
-| `destroy(force?: boolean)`                       | 销毁控制器，移除事件监听。                   |
-
-##### 示例代码
+**使用示例**
 
 ```typescript
-import { Scene3D, Camera3D, FlyCameraController } from "@rings/core";
+import { Object3D, Scene3D, Camera3D, FlyCameraController, Vector3 } from '@rings/core';
 
-// 创建场景和相机
+// 创建场景
 const scene = new Scene3D();
-const camera = new Camera3D();
-camera.perspective(60, 1.0, 0.1, 1000);
 
-// 创建自由相机控制器
-const flyController = new FlyCameraController();
-flyController.moveSpeed = 5.0; // 设置移动速度
-flyController.setCamera(new Vector3(0, 0, 10), new Vector3(0, 0, 0)); // 设置初始位置和目标
-flyController.start(); // 启动控制器
+// 创建相机对象
+const cameraObj = new Object3D();
+const camera = cameraObj.addComponent(Camera3D);
+const controller = cameraObj.addComponent(FlyCameraController);
 
-// 在渲染循环中更新控制器
-function update() {
-  requestAnimationFrame(update);
-  flyController.onUpdate(); // 更新相机状态
-}
-update();
+// 设置相机参数
+camera.perspective(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+controller.moveSpeed = 5.0;
+
+// 设置初始位置
+cameraObj.transform.position = new Vector3(0, 5, 10);
+scene.addChild(cameraObj);
 ```
 
-### 1.2 悬浮相机(HoverCameraController)
+#### 悬浮相机控制器 (HoverCameraController)
 
-`HoverCameraController` 是一个基于 `Camera3D` 的控制器，用于实现悬浮相机效果，支持鼠标控制相机的旋转和平移。
+实现围绕目标点的轨道控制，支持鼠标拖拽旋转和滚轮缩放。
 
-#### 属性说明
+**属性说明**
 
-| 属性名             | 类型    | 默认值 | 描述                               |
-| ------------------ | ------- | ------ | ---------------------------------- |
-| `minDistance`      | number  | 0.1    | 相机与目标点的最小距离。           |
-| `maxDistance`      | number  | 500    | 相机与目标点的最大距离。           |
-| `rollSmooth`       | number  | 15.0   | 旋转平滑系数。                     |
-| `dragSmooth`       | number  | 20     | 平移平滑系数。                     |
-| `wheelSmooth`      | number  | 10     | 滚轮平滑系数。                     |
-| `wheelStep`        | number  | 0.002  | 滚轮步长。                         |
-| `mouseRightFactor` | number  | 0.25   | 鼠标右键移动系数。                 |
-| `mouseLeftFactor`  | number  | 20     | 鼠标左键移动系数。                 |
-| `smooth`           | boolean | true   | 是否启用平滑过渡效果。             |
-| `distance`         | number  | 10     | 相机与目标点的当前距离。           |
-| `roll`             | number  | 0      | 相机的当前水平旋转角度（偏航角）。 |
-| `pitch`            | number  | 0      | 相机的当前垂直旋转角度（俯仰角）。 |
+| 属性名 | 类型 | 默认值 | 描述 |
+|--------|------|--------|------|
+| `distance` | number | 10 | 与目标的距离 |
+| `minDistance` | number | 1 | 最小距离限制 |
+| `maxDistance` | number | 100 | 最大距离限制 |
 
-#### 方法说明
-
-| 方法名                                                                       | 描述                                     |
-| ---------------------------------------------------------------------------- | ---------------------------------------- |
-| `setCamera(roll: number, pitch: number, distance: number, target?: Vector3)` | 设置相机的初始旋转角度、距离和目标位置。 |
-| `start()`                                                                    | 初始化相机控制器，绑定鼠标事件。         |
-| `onBeforeUpdate(view?: View3D)`                                              | 每帧更新相机位置和旋转，处理鼠标输入。   |
-| `destroy(force?: boolean)`                                                   | 销毁控制器，移除事件监听。               |
-| `flowTarget(target: Object3D, offset: Vector3)`                              | 设置相机跟随的目标对象和偏移量。         |
-| `focusByBounds(obj: Object3D)`                                               | 根据对象的包围盒自动调整相机位置和目标。 |
-
-#### 示例代码
+**使用示例**
 
 ```typescript
-import { Scene3D, Camera3D, HoverCameraController } from "@rings/core";
+import { Object3D, Scene3D, Camera3D, HoverCameraController, Vector3 } from '@rings/core';
 
-// 创建场景和相机
+// 创建场景
 const scene = new Scene3D();
-const camera = new Camera3D();
-camera.perspective(60, 1.0, 0.1, 1000);
 
-// 创建悬浮相机控制器
-const hoverController = new HoverCameraController();
-hoverController.distance = 10.0; // 设置初始距离
-hoverController.setCamera(0, 0, 10, new Vector3(0, 0, 0)); // 设置初始旋转和目标
-hoverController.start(); // 启动控制器
+// 创建相机对象
+const cameraObj = new Object3D();
+const camera = cameraObj.addComponent(Camera3D);
+const controller = cameraObj.addComponent(HoverCameraController);
 
-// 在渲染循环中更新控制器
-function update() {
-  requestAnimationFrame(update);
-  hoverController.onBeforeUpdate(); // 更新相机状态
-}
-update();
+// 设置相机参数
+camera.perspective(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+controller.distance = 15;
+controller.minDistance = 2;
+controller.maxDistance = 50;
+
+// 设置初始位置
+cameraObj.transform.position = new Vector3(0, 10, 15);
+scene.addChild(cameraObj);
 ```
 
-### 1.3 轨道相机(OrbitController)
+#### 轨道相机控制器 (OrbitController)
 
-`OrbitController` 是一个基于 `Camera3D` 的控制器，用于实现围绕目标点的轨道运动效果，支持鼠标控制相机的旋转、平移和缩放。
+实现围绕目标点的轨道控制，支持鼠标拖拽旋转、缩放和平移。
 
-#### 属性说明
+**属性说明**
 
-| 属性名            | 类型    | 默认值 | 描述                                 |
-| ----------------- | ------- | ------ | ------------------------------------ |
-| `autoRotate`      | boolean | false  | 是否启用自动旋转。                   |
-| `autoRotateSpeed` | number  | 0.1    | 自动旋转速度系数。                   |
-| `rotateFactor`    | number  | 0.5    | 旋转速度系数。                       |
-| `zoomFactor`      | number  | 0.1    | 缩放速度系数。                       |
-| `panFactor`       | number  | 0.25   | 平移速度系数。                       |
-| `smooth`          | number  | 5      | 平滑过渡系数。                       |
-| `minDistance`     | number  | 1      | 相机与目标点的最小距离。             |
-| `maxDistance`     | number  | 100000 | 相机与目标点的最大距离。             |
-| `minPolarAngle`   | number  | -90    | 相机的最低俯仰角（相对于 xz 平面）。 |
-| `maxPolarAngle`   | number  | 90     | 相机的最高俯仰角（相对于 xz 平面）。 |
+| 属性名 | 类型 | 默认值 | 描述 |
+|--------|------|--------|------|
+| `target` | Vector3 | (0,0,0) | 轨道中心点 |
+| `distance` | number | 10 | 与目标的距离 |
+| `autoRotate` | boolean | false | 是否自动旋转 |
 
-#### 方法说明
-
-| 方法名                     | 描述                                   |
-| -------------------------- | -------------------------------------- |
-| `start()`                  | 初始化相机控制器，绑定鼠标事件。       |
-| `onUpdate()`               | 每帧更新相机位置和旋转，处理鼠标输入。 |
-| `destroy(force?: boolean)` | 销毁控制器，移除事件监听。             |
-
-#### 示例代码
+**使用示例**
 
 ```typescript
-import { Scene3D, Camera3D, OrbitController } from "@rings/core";
+import { Object3D, Scene3D, Camera3D, OrbitController, Vector3 } from '@rings/core';
 
-// 创建场景和相机
+// 创建场景
 const scene = new Scene3D();
-const camera = new Camera3D();
-camera.perspective(60, 1.0, 0.1, 1000);
 
-// 创建轨道相机控制器
-const orbitController = new OrbitController();
-orbitController.autoRotate = true; // 启用自动旋转
-orbitController.minDistance = 1.0; // 设置最小距离
-orbitController.maxDistance = 100.0; // 设置最大距离
-orbitController.start(); // 启动控制器
+// 创建相机对象
+const cameraObj = new Object3D();
+const camera = cameraObj.addComponent(Camera3D);
+const controller = cameraObj.addComponent(OrbitController);
 
-// 在渲染循环中更新控制器
-function update() {
-  requestAnimationFrame(update);
-  orbitController.onUpdate(); // 更新相机状态
-}
-update();
+// 设置相机参数
+camera.perspective(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+controller.target = new Vector3(0, 0, 0);
+controller.distance = 20;
+controller.autoRotate = true;
+
+// 设置初始位置
+cameraObj.transform.position = new Vector3(0, 10, 20);
+scene.addChild(cameraObj);
 ```
 
-### 2. 光照组件(LightComponent)
+---
 
-管理场景光源和照明效果
+## 光照系统
 
-```javascript
-entity.addComponent(LightComponent, {
-  type: "directional",
-  color: 0xffffff,
-  intensity: 1.0,
-});
-```
+### 光源类型
 
-#### 属性说明
+#### 平行光 (DirectLight)
 
-| 属性名    | 类型    | 默认值        | 描述                                                           |
-| --------- | ------- | ------------- | -------------------------------------------------------------- |
-| type      | string  | "directional" | 光源类型："directional"(平行光),"point"(点光源),"spot"(聚光灯) |
-| color     | number  | 0xffffff      | 光源颜色，十六进制 RGB 格式                                    |
-| intensity | number  | 1.0           | 光照强度，数值越大光线越亮                                     |
-| distance  | number  | 0             | 光照距离(仅点光源和聚光灯有效)，0 表示无限远                   |
-| angle     | number  | Math.PI/3     | 聚光灯锥角(弧度，仅聚光灯有效)                                 |
-| penumbra  | number  | 0.0           | 聚光灯光晕衰减(0.0-1.0，仅聚光灯有效)                          |
-| decay     | number  | 1.0           | 光照衰减系数(仅点光源和聚光灯有效)                             |
-| position  | Vector3 | (0,0,0)       | 光源位置(仅点光源和聚光灯有效)                                 |
-| target    | Vector3 | (0,0,0)       | 光源照射目标(仅平行光和聚光灯有效)                             |
+模拟太阳光等平行光源，光线方向一致，无限范围。
 
-### 2 基础光源(LightBase)
+**属性说明**
 
-`LightBase` 是所有光源组件的基类，定义了光源的通用属性和方法。
+| 属性名 | 类型 | 默认值 | 描述 |
+|--------|------|--------|------|
+| `color` | Color | 0xffffff | 光源颜色 |
+| `intensity` | number | 1.0 | 光照强度 |
+| `castShadow` | boolean | false | 是否投射阴影 |
+| `castGI` | boolean | false | 是否参与全局光照 |
+| `indirect` | number | 0.3 | 间接光强度 |
+| `radius` | number | Number.MAX_SAFE_INTEGER | 光照范围（无限远） |
+| `size` | number | 1 | 光源大小 |
+| `realTimeShadow` | boolean | true | 是否实时更新阴影 |
+| `needUpdateShadow` | boolean | true | 是否需要更新阴影 |
+| `iesProfile` | IESProfiles | null | IES光度学文件 |
+| `shadowCamera` | Camera3D | null | 阴影相机实例 |
 
-#### 属性说明
-
-| 属性名       | 类型    | 默认值   | 描述                            |
-| ------------ | ------- | -------- | ------------------------------- |
-| `type`       | string  | "light"  | 光源类型标识符。                |
-| `color`      | number  | 0xffffff | 光源颜色（十六进制 RGB 格式）。 |
-| `intensity`  | number  | 1.0      | 光照强度。                      |
-| `visible`    | boolean | true     | 是否启用光源。                  |
-| `castShadow` | boolean | false    | 是否投射阴影。                  |
-| `shadowBias` | number  | 0.0      | 阴影偏移量，用于消除阴影失真。  |
-
-#### 方法说明
-
-| 方法名     | 描述             |
-| ---------- | ---------------- |
-| `init()`   | 初始化光源参数。 |
-| `start()`  | 启用光源组件。   |
-| `stop()`   | 禁用光源组件。   |
-| `update()` | 更新光源状态。   |
-| `debug()`  | 调试用方法。     |
-
-#### 示例代码
+**使用示例**
 
 ```typescript
-import { Scene3D, Camera3D, LightBase } from "@rings/core";
+import { Object3D, Scene3D, DirectLight, Color, Vector3 } from '@rings/core';
 
-// 创建场景和相机
+// 创建场景
 const scene = new Scene3D();
-const camera = new Camera3D();
-camera.perspective(60, 1.0, 0.1, 1000);
 
-// 创建基础光源
-const light = new LightBase();
-light.color = 0xff0000; // 设置光源颜色为红色
-light.intensity = 0.8; // 设置光照强度
-light.castShadow = true; // 启用阴影投射
-scene.addChild(light.object3D); // 将光源添加到场景
+// 创建平行光源
+const lightObj = new Object3D();
+const light = lightObj.addComponent(DirectLight);
+
+// 配置光源属性
+light.color = new Color(1, 1, 1);
+light.intensity = 1.0;
+light.castShadow = true;
+light.castGI = true;
+light.indirect = 0.5;
+
+// 设置光照方向
+lightObj.transform.rotation = new Vector3(-45, 45, 0);
+
+// 添加到场景
+scene.addChild(lightObj);
 ```
 
-### 2.1 平行光(DirectLight)
+#### 点光源 (PointLight)
 
-`DirectLight` 是一个继承自 `LightBase` 的平行光组件，用于模拟太阳光等无限远光源效果。
+模拟灯泡等点状光源，光线向四周发散。
 
-#### 属性说明
+**属性说明**
 
-| 属性名     | 类型    | 默认值           | 描述               |
-| ---------- | ------- | ---------------- | ------------------ |
-| `radius`   | number  | MAX_SAFE_INTEGER | 光照影响范围。     |
-| `indirect` | number  | 0.3              | 间接光照强度系数。 |
-| `castGI`   | boolean | true             | 是否启用全局光照。 |
+| 属性名 | 类型 | 默认值 | 描述 |
+|--------|------|--------|------|
+| `color` | Color | 0xffffff | 光源颜色 |
+| `intensity` | number | 1.0 | 光照强度 |
+| `range` | number | 10 | 光照范围 |
+| `castShadow` | boolean | false | 是否投射阴影 |
+| `castGI` | boolean | false | 是否参与全局光照 |
+| `radius` | number | 0 | 光源半径 |
+| `size` | number | 1 | 光源大小 |
+| `at` | number | 0 | 线性衰减系数 |
+| `quadratic` | number | 1 | 二次衰减系数 |
+| `realTimeShadow` | boolean | true | 是否实时更新阴影 |
+| `needUpdateShadow` | boolean | true | 是否需要更新阴影 |
+| `iesProfile` | IESProfiles | null | IES光度学文件 |
 
-#### 方法说明
-
-| 方法名    | 描述             |
-| --------- | ---------------- |
-| `init()`  | 初始化光源参数。 |
-| `start()` | 启用光源组件。   |
-| `debug()` | 调试用方法。     |
-
-#### 示例代码
-
-```typescript
-import { Scene3D, Camera3D, DirectLight } from "@rings/core";
-
-// 创建场景和相机
-const scene = new Scene3D();
-const camera = new Camera3D();
-camera.perspective(60, 1.0, 0.1, 1000);
-
-// 创建平行光
-const directLight = new DirectLight();
-directLight.radius = 1000; // 设置光照范围
-directLight.indirect = 0.5; // 设置间接光照强度
-directLight.castGI = true; // 启用全局光照
-scene.addChild(directLight.object3D); // 将光源添加到场景
-```
-
-### 2.2 点光源(PointLight)
-
-`PointLight` 是一个继承自 `LightBase` 的点光源组件，用于模拟灯泡等点状光源效果。
-
-#### 属性说明
-
-| 属性名         | 类型    | 默认值  | 描述                           |
-| -------------- | ------- | ------- | ------------------------------ |
-| `distance`     | number  | 0       | 光照影响距离，0 表示无限远。   |
-| `decay`        | number  | 1.0     | 光照衰减系数，值越大衰减越快。 |
-| `position`     | Vector3 | (0,0,0) | 光源位置。                     |
-| `shadowRadius` | number  | 1.0     | 阴影边缘模糊半径。             |
-
-#### 方法说明
-
-| 方法名     | 描述             |
-| ---------- | ---------------- |
-| `init()`   | 初始化光源参数。 |
-| `start()`  | 启用光源组件。   |
-| `update()` | 更新光源状态。   |
-| `debug()`  | 调试用方法。     |
-
-#### 示例代码
+**使用示例**
 
 ```typescript
-import { Scene3D, Camera3D, PointLight } from "@rings/core";
+import { Object3D, Scene3D, PointLight, Color, Vector3 } from '@rings/core';
 
-// 创建场景和相机
+// 创建场景
 const scene = new Scene3D();
-const camera = new Camera3D();
-camera.perspective(60, 1.0, 0.1, 1000);
 
 // 创建点光源
-const pointLight = new PointLight();
-pointLight.color = 0xff8800; // 设置光源颜色为橙色
-pointLight.distance = 100; // 设置光照距离
-pointLight.position.set(0, 10, 0); // 设置光源位置
-pointLight.castShadow = true; // 启用阴影投射
-scene.addChild(pointLight.object3D); // 将光源添加到场景
+const lightObj = new Object3D();
+const light = lightObj.addComponent(PointLight);
+
+// 配置光源属性
+light.color = new Color(1, 0.5, 0);
+light.intensity = 2.0;
+light.range = 15;
+light.radius = 1;
+light.at = 0.1;
+light.quadratic = 0.5;
+light.castShadow = true;
+
+// 设置光源位置
+lightObj.transform.position = new Vector3(5, 5, 0);
+
+// 添加到场景
+scene.addChild(lightObj);
 ```
 
-### 2.3 聚光灯(SpotLight)
+#### 聚光灯 (SpotLight)
 
-`SpotLight` 是一个继承自 `LightBase` 的聚光灯组件，用于模拟手电筒等锥形光源效果。
+模拟手电筒等聚光效果，具有方向性和锥形范围。
 
-#### 属性说明
+**属性说明**
 
-| 属性名       | 类型    | 默认值    | 描述                         |
-| ------------ | ------- | --------- | ---------------------------- |
-| `angle`      | number  | Math.PI/3 | 聚光灯锥角（弧度）。         |
-| `penumbra`   | number  | 0.0       | 光晕衰减系数（0.0-1.0）。    |
-| `distance`   | number  | 0         | 光照影响距离，0 表示无限远。 |
-| `decay`      | number  | 1.0       | 光照衰减系数。               |
-| `position`   | Vector3 | (0,0,0)   | 光源位置。                   |
-| `target`     | Vector3 | (0,0,0)   | 光源照射目标。               |
-| `shadowBias` | number  | 0.0       | 阴影偏移量。                 |
+| 属性名 | 类型 | 默认值 | 描述 |
+|--------|------|--------|------|
+| `color` | Color | 0xffffff | 光源颜色 |
+| `intensity` | number | 1.0 | 光照强度 |
+| `range` | number | 10 | 光照范围 |
+| `angle` | number | 30 | 外锥角（度） |
+| `penumbra` | number | 0.2 | 边缘衰减 |
+| `castShadow` | boolean | false | 是否投射阴影 |
+| `castGI` | boolean | false | 是否参与全局光照 |
+| `innerAngle` | number | 100 | 内锥角百分比（0-100） |
+| `outerAngle` | number | 60 | 外锥角（度，1-179） |
+| `radius` | number | 0 | 光源半径 |
+| `size` | number | 1 | 光源大小 |
+| `at` | number | 0 | 线性衰减系数 |
+| `quadratic` | number | 1 | 二次衰减系数 |
+| `realTimeShadow` | boolean | true | 是否实时更新阴影 |
+| `needUpdateShadow` | boolean | true | 是否需要更新阴影 |
+| `iesProfile` | IESProfiles | null | IES光度学文件 |
 
-#### 方法说明
-
-| 方法名     | 描述             |
-| ---------- | ---------------- |
-| `init()`   | 初始化光源参数。 |
-| `start()`  | 启用光源组件。   |
-| `update()` | 更新光源状态。   |
-| `debug()`  | 调试用方法。     |
-
-#### 示例代码
+**使用示例**
 
 ```typescript
-import { Scene3D, Camera3D, SpotLight } from "@rings/core";
+import { Object3D, Scene3D, SpotLight, Color, Vector3 } from '@rings/core';
 
-// 创建场景和相机
+// 创建场景
 const scene = new Scene3D();
-const camera = new Camera3D();
-camera.perspective(60, 1.0, 0.1, 1000);
 
 // 创建聚光灯
-const spotLight = new SpotLight();
-spotLight.color = 0xffffff; // 设置光源颜色为白色
-spotLight.angle = Math.PI / 4; // 设置锥角为45度
-spotLight.penumbra = 0.5; // 设置光晕衰减
-spotLight.position.set(0, 10, 0); // 设置光源位置
-spotLight.target.set(0, 0, 0); // 设置照射目标
-spotLight.castShadow = true; // 启用阴影投射
-scene.addChild(spotLight.object3D); // 将光源添加到场景
+const lightObj = new Object3D();
+const light = lightObj.addComponent(SpotLight);
+
+// 配置光源属性
+light.color = new Color(0.8, 0.8, 1);
+light.intensity = 3.0;
+light.range = 20;
+light.outerAngle = 45;
+light.innerAngle = 80; // 80%的内锥角
+light.at = 0.1;
+light.quadratic = 0.5;
+light.castShadow = true;
+
+// 设置光源位置和方向
+lightObj.transform.position = new Vector3(0, 10, 0);
+lightObj.transform.lookAt(new Vector3(0, 0, 0));
+
+// 添加到场景
+scene.addChild(lightObj);
 ```
 
-### 2.4 全局光照(GlobalIlluminationComponent)
+### 环境光照
 
-`GlobalIlluminationComponent` 是一个用于实现全局光照效果的组件，支持间接光照和环境光遮蔽等高级光照特性。
+#### 环境光 (AmbientLight)
 
-#### 属性说明
+提供场景基础环境照明，无方向性。
 
-| 属性名        | 类型    | 默认值 | 描述                 |
-| ------------- | ------- | ------ | -------------------- |
-| `enabled`     | boolean | true   | 是否启用全局光照。   |
-| `intensity`   | number  | 1.0    | 全局光照强度。       |
-| `bounces`     | number  | 3      | 光线反弹次数。       |
-| `resolution`  | number  | 256    | 光照贴图分辨率。     |
-| `aoEnabled`   | boolean | true   | 是否启用环境光遮蔽。 |
-| `aoRadius`    | number  | 1.0    | 环境光遮蔽半径。     |
-| `aoIntensity` | number  | 1.0    | 环境光遮蔽强度。     |
+**属性说明**
 
-#### 方法说明
+| 属性名 | 类型 | 默认值 | 描述 |
+|--------|------|--------|------|
+| `color` | Color | 0x404040 | 环境光颜色 |
+| `intensity` | number | 0.2 | 光照强度 |
 
-| 方法名     | 描述                 |
-| ---------- | -------------------- |
-| `init()`   | 初始化全局光照参数。 |
-| `start()`  | 启用全局光照组件。   |
-| `stop()`   | 禁用全局光照组件。   |
-| `update()` | 更新全局光照状态。   |
-| `debug()`  | 调试用方法。         |
-
-#### 示例代码
+**使用示例**
 
 ```typescript
-import { Scene3D, Camera3D, GlobalIlluminationComponent } from "@rings/core";
+import { Object3D, Scene3D, AmbientLight, Color } from '@rings/core';
 
-// 创建场景和相机
+// 创建场景
 const scene = new Scene3D();
-const camera = new Camera3D();
-camera.perspective(60, 1.0, 0.1, 1000);
 
-// 创建全局光照组件
-const gi = new GlobalIlluminationComponent();
-gi.intensity = 0.8; // 设置全局光照强度
-gi.bounces = 2; // 设置光线反弹次数
-gi.aoRadius = 0.5; // 设置环境光遮蔽半径
-scene.addComponent(gi); // 将组件添加到场景
+// 创建环境光
+const ambientObj = new Object3D();
+const ambient = ambientObj.addComponent(AmbientLight);
+
+// 配置环境光属性
+ambient.color = new Color(0.2, 0.2, 0.3);
+ambient.intensity = 0.3;
+
+// 添加到场景
+scene.addChild(ambientObj);
 ```
 
-### 全局光照属性设置(Engine3D.setting.gi)
+---
 
-`Engine3D.setting.gi` 是用于配置全局光照(GI)相关参数的设置对象。
+## 纹理 (Texture)
 
-#### 属性说明
+纹理用于为材质提供表面细节，支持2D纹理、立方体贴图等多种类型。
 
-| 属性名                                        | 类型    | 默认值          | 描述                                             |
-| --------------------------------------------- | ------- | --------------- | ------------------------------------------------ |
-| `enable`                                      | boolean | `false`         | 是否启用全局光照（GI）。                         |
-| `offsetX` / `offsetY` / `offsetZ`             | number  | `0`             | 光照探针的偏移量（X/Y/Z 轴）。                   |
-| `probeSpace`                                  | number  | `64`            | 探针之间的间距（单位：米）。                     |
-| `probeXCount` / `probeYCount` / `probeZCount` | number  | `4` / `2` / `4` | 探针在 X/Y/Z 轴上的数量。                        |
-| `probeSize`                                   | number  | `32`            | 单个探针的尺寸（单位：像素）。                   |
-| `probeSourceTextureSize`                      | number  | `2048`          | 探针源纹理的分辨率。                             |
-| `octRTMaxSize`                                | number  | `2048`          | 八叉树渲染目标的最大尺寸。                       |
-| `octRTSideSize`                               | number  | `16`            | 八叉树渲染目标的单边尺寸。                       |
-| `maxDistance`                                 | number  | `64 * 1.73`     | 光照的最大影响距离。                             |
-| `normalBias`                                  | number  | `0.25`          | 法线偏移量，用于减少阴影失真。                   |
-| `depthSharpness`                              | number  | `1`             | 深度锐度，控制光照边缘的锐利程度。               |
-| `hysteresis`                                  | number  | `0.98`          | 滞后系数，用于平滑光照变化（值越小，反应越慢）。 |
-| `lerpHysteresis`                              | number  | `0.01`          | 插值滞后系数，防止闪烁。                         |
-| `irradianceChebyshevBias`                     | number  | `0.01`          | 减少漏光的偏差值。                               |
-| `rayNumber`                                   | number  | `144`           | 每条光线的采样数。                               |
-| `irradianceDistanceBias`                      | number  | `32`            | 光照距离的偏差值。                               |
-| `indirectIntensity`                           | number  | `1.0`           | 间接光强度。                                     |
-| `ddgiGamma`                                   | number  | `2.2`           | DDGI（动态漫反射全局光照）的伽马值。             |
-| `bounceIntensity`                             | number  | `0.025`         | 光线反弹的强度。                                 |
-| `probeRoughness`                              | number  | `1`             | 探针的粗糙度。                                   |
-| `realTimeGI`                                  | boolean | `false`         | 是否启用实时全局光照（性能开销较大）。           |
-| `debug`                                       | boolean | `false`         | 是否启用调试模式（可视化探针或光照贴图）。       |
-| `autoRenderProbe`                             | boolean | `false`         | 是否自动渲染探针（动态场景需启用）。             |
+### 完整属性列表
 
-#### 示例代码
+| 属性 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| **基础属性** |
+| name | string | "" | 纹理名称 |
+| url | string | "" | 纹理文件路径 |
+| width | number | 32 | 纹理宽度 |
+| height | number | 32 | 纹理高度 |
+| format | GPUTextureFormat | "rgba8unorm" | 纹理格式 |
+| usage | GPUFlagsConstant | GPUTextureUsage.TEXTURE_BINDING | 纹理用途标志 |
+| **采样参数** |
+| addressModeU | GPUAddressMode | "repeat" | U方向寻址模式 |
+| addressModeV | GPUAddressMode | "repeat" | V方向寻址模式 |
+| addressModeW | GPUAddressMode | "repeat" | W方向寻址模式 |
+| magFilter | GPUFilterMode | "linear" | 放大过滤模式 |
+| minFilter | GPUFilterMode | "linear" | 缩小过滤模式 |
+| mipmapFilter | GPUMipmapFilterMode | "linear" | Mipmap过滤模式 |
+| maxAnisotropy | number | 1 | 最大各向异性过滤 |
+| lodMinClamp | number | 0 | LOD最小值 |
+| lodMaxClamp | number | 32 | LOD最大值 |
+| compare | GPUCompareFunction | "never" | 深度比较函数 |
+| **Mipmap相关** |
+| useMipmap | boolean | false | 是否使用mipmap |
+| mipmapCount | number | 1 | mipmap层级数量(自动计算) |
+| flipY | boolean | false | 是否翻转Y轴 |
+| **状态管理** |
+| isVideoTexture | boolean | false | 是否为视频纹理 |
+| isHDRTexture | boolean | false | 是否为HDR纹理 |
+| visibility | number | 0 | 着色器可见性标志 |
 
+### 纹理类型系统
+
+#### 支持的纹理类型
+| 纹理类型 | 类名 | 描述 | 适用场景 |
+|----------|------|------|----------|
+| **2D纹理** | `BitmapTexture2D` | 标准2D纹理贴图 | 漫反射、法线、遮罩贴图 |
+| **立方体纹理** | `BitmapTextureCube` | 6面立方体纹理 | 天空盒、环境反射 |
+| **HDR立方体** | `HDRTextureCube` | HDR格式立方体纹理 | 基于图像的照明(IBL) |
+| **HDR纹理** | `HDRTexture` | HDR格式2D纹理 | 高动态范围贴图 |
+| **渲染纹理** | `RenderTexture` | 离屏渲染目标 | 后处理、反射探针 |
+
+### 采样设置详解
+
+##### 寻址模式
+| 模式 | 值 | 描述 |
+|------|----|------|
+| `repeat` | "repeat" | 重复平铺(默认) |
+| `clamp-to-edge` | "clamp-to-edge" | 边缘拉伸 |
+| `mirror-repeat` | "mirror-repeat" | 镜像重复 |
+
+##### 过滤模式
+| 模式 | 值 | 描述 |
+|------|----|------|
+| `nearest` | "nearest" | 最近邻采样(像素化) |
+| `linear` | "linear" | 线性插值采样(平滑) |
+
+##### 各向异性过滤
+| 属性 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `maxAnisotropy` | number | 1 | 各向异性过滤级别(1-16) |
+
+### 主要方法
+
+##### 基础方法
+| 方法 | 参数 | 返回值 | 描述 |
+|------|------|--------|------|
+| `load` | url: string\|string[] | Promise<boolean> | 异步加载纹理 |
+| `generate` | image: HTMLImageElement\|ImageBitmap | void | 从图像生成纹理 |
+| `init` | - | Texture | 初始化GPU资源 |
+| `destroy` | force?: boolean | void | 销毁纹理资源 |
+
+### 2D纹理使用示例
+
+#### 基础2D纹理加载
 ```typescript
-import { Scene3D, Camera3D, Engine3D } from "@rings/core";
+import { BitmapTexture2D, Engine3D } from '@rings/core';
 
-// 创建场景和相机
-const scene = new Scene3D();
-const camera = new Camera3D();
-camera.perspective(60, 1.0, 0.1, 1000);
+// 创建2D纹理实例
+const texture2D = new BitmapTexture2D(true); // 启用Mipmap
 
-// 配置全局光照（GI）
-Engine3D.setting.gi.enable = true; // 启用 GI
-Engine3D.setting.gi.probeSpace = 128; // 增大探针间距
-Engine3D.setting.gi.indirectIntensity = 1.5; // 增强间接光
-Engine3D.setting.gi.debug = true; // 启用调试模式
+// 设置采样参数
+texture2D.addressModeU = "repeat";
+texture2D.addressModeV = "repeat";
+texture2D.magFilter = "linear";
+texture2D.minFilter = "linear";
+texture2D.mipmapFilter = "linear";
+texture2D.maxAnisotropy = 16;
 
-// 启动引擎
-Engine3D.start(scene, camera);
-Engine3D.setting.gi.specularIntensity = 0.5;
-Engine3D.setting.gi.bounces = 2;
-Engine3D.setting.gi.apply(); // 应用设置
+// 异步加载纹理
+await texture2D.load("textures/diffuse/brick_wall.jpg");
 
-// 将相机添加到场景
-scene.addChild(camera.object3D);
+// 应用到材质
+material.setTexture("baseMap", texture2D);
 ```
 
-### 3. 阴影设置(Engine3D.setting.shadow)
-
-`Engine3D.setting.shadow` 是用于配置阴影相关参数的设置对象。
-
-#### 属性说明
-
-| 属性名             | 类型    | 默认值   | 描述                                   |
-| ------------------ | ------- | -------- | -------------------------------------- |
-| `enable`           | boolean | `true`   | 是否启用阴影。                         |
-| `type`             | string  | `"HARD"` | 阴影类型（`"HARD"` 或 `"SOFT"`）。     |
-| `pointShadowBias`  | number  | `0.0005` | 点光源阴影的偏移量。                   |
-| `shadowSize`       | number  | `2048`   | 阴影贴图的分辨率（单位：像素）。       |
-| `pointShadowSize`  | number  | `1024`   | 点光源阴影贴图的分辨率（单位：像素）。 |
-| `shadowSoft`       | number  | `0.005`  | 阴影边缘模糊程度。                     |
-| `shadowBound`      | number  | `100`    | 阴影的最大影响范围（单位：米）。       |
-| `shadowBias`       | number  | `0.05`   | 阴影偏移量，用于减少阴影失真。         |
-| `needUpdate`       | boolean | `true`   | 是否需要更新阴影贴图。                 |
-| `autoUpdate`       | boolean | `true`   | 是否自动更新阴影贴图。                 |
-| `updateFrameRate`  | number  | `2`      | 阴影贴图更新的帧率。                   |
-| `csmMargin`        | number  | `0.1`    | 级联阴影贴图的边界扩展量。             |
-| `csmScatteringExp` | number  | `0.7`    | 级联阴影的散射系数。                   |
-| `csmAreaScale`     | number  | `0.4`    | 级联阴影的区域缩放系数。               |
-| `debug`            | boolean | `false`  | 是否启用调试模式（可视化阴影贴图）。   |
-
-#### 示例代码
-
-```typescript
-import { Scene3D, Camera3D, Engine3D } from "@rings/core";
-
-// 创建场景和相机
-const scene = new Scene3D();
-const camera = new Camera3D();
-camera.perspective(60, 1.0, 0.1, 1000);
-
-// 配置阴影参数
-Engine3D.setting.shadow.enable = true; // 启用阴影
-Engine3D.setting.shadow.type = "SOFT"; // 使用软阴影
-Engine3D.setting.shadow.shadowSize = 4096; // 提高阴影贴图分辨率
-Engine3D.setting.shadow.debug = true; // 启用调试模式
-
-// 启动引擎
-Engine3D.start(scene, camera);
-entity.addComponent(MaterialComponent, {
-  type: "standard",
-  color: 0xff0000,
-  roughness: 0.5,
-  metalness: 0.0,
-});
-```
-
-#### 属性说明
-
-| 属性名            | 类型    | 默认值     | 描述                                                                    |
-| ----------------- | ------- | ---------- | ----------------------------------------------------------------------- |
-| type              | string  | "standard" | 材质类型："standard"(标准),"basic"(基础),"phong"(冯氏),"physical"(物理) |
-| color             | number  | 0xffffff   | 基础颜色，十六进制 RGB 格式                                             |
-| roughness         | number  | 0.5        | 表面粗糙度(0.0-1.0)，0 表示完全光滑                                     |
-| metalness         | number  | 0.0        | 金属质感(0.0-1.0)，1 表示完全金属                                       |
-| emissive          | number  | 0x000000   | 自发光颜色                                                              |
-| emissiveIntensity | number  | 1.0        | 自发光强度                                                              |
-| transparent       | boolean | false      | 是否透明                                                                |
-| opacity           | number  | 1.0        | 透明度(0.0-1.0)，1 表示完全不透明                                       |
-| wireframe         | boolean | false      | 是否显示为线框模式                                                      |
-| side              | number  | 2          | 渲染面：0(背面),1(正面),2(双面)                                         |
-
-### 5. 纹理组件(TextureComponent)
-
-管理材质使用的纹理贴图
-
-```javascript
-entity.addComponent(TextureComponent, {
-  baseColor: "textures/diffuse.jpg",
-  normalMap: "textures/normal.png",
-});
-```
-
-#### 属性说明
-
-| 属性名          | 类型    | 默认值 | 描述                                                 |
-| --------------- | ------- | ------ | ---------------------------------------------------- |
-| baseColor       | string  | ""     | 基础颜色贴图路径，控制物体表面颜色                   |
-| normalMap       | string  | ""     | 法线贴图路径，用于表面细节凹凸效果                   |
-| roughnessMap    | string  | ""     | 粗糙度贴图路径，控制表面粗糙度分布                   |
-| metalnessMap    | string  | ""     | 金属度贴图路径，控制表面金属质感分布                 |
-| aoMap           | string  | ""     | 环境光遮蔽贴图路径，增强表面阴影细节                 |
-| emissiveMap     | string  | ""     | 自发光贴图路径，控制表面发光区域                     |
-| displacementMap | string  | ""     | 置换贴图路径，实际改变几何形状                       |
-| alphaMap        | string  | ""     | 透明度贴图路径，控制透明区域                         |
-| wrapS           | number  | 1001   | 水平重复方式：1000(不重复),1001(重复),1002(镜像重复) |
-| wrapT           | number  | 1001   | 垂直重复方式：1000(不重复),1001(重复),1002(镜像重复) |
-| repeat          | Vector2 | (1,1)  | 纹理重复次数                                         |
-| offset          | Vector2 | (0,0)  | 纹理偏移量                                           |
-
-### 4. 网格渲染器(MeshRenderer)
-
-`MeshRenderer` 是用于渲染网格的核心组件，负责将几何体和材质组合成可视对象。
-
-#### 属性说明
-
-| 属性名          | 类型       | 默认值       | 描述                                                                 |
-|----------------|------------|--------------|----------------------------------------------------------------------|
-| `geometry`     | `Geometry` | `undefined`  | 几何体对象，定义物体的形状（如立方体、球体等）。                     |
-| `material`     | `Material` | `undefined`  | 材质对象，定义物体的表面属性（如颜色、纹理、光照效果等）。           |
-| `castShadow`   | `boolean`  | `false`      | 是否投射阴影到其他物体。                                             |
-| `receiveShadow`| `boolean`  | `false`      | 是否接收其他物体投射的阴影。                                         |
-| `frustumCulled`| `boolean`  | `true`       | 是否启用视锥体剔除（优化性能）。                                     |
-| `visible`      | `boolean`  | `true`       | 是否可见。                                                          |
-
-#### 方法说明
-
-| 方法名                | 描述                                                                 |
-|----------------------|----------------------------------------------------------------------|
-| `setGeometry(geometry)` | 设置几何体对象。                                                   |
-| `setMaterial(material)` | 设置材质对象。                                                     |
-| `update()`           | 更新网格渲染器的状态（通常在修改几何体或材质后调用）。             |
-
-#### 示例代码
-
-```typescript
-import { Object3D, MeshRenderer, BoxGeometry } from '@rings/core';
-
-// 创建一个立方体网格
-const cube = new Object3D();
-const geometry = new BoxGeometry(1, 1, 1); // 创建立方体几何体
-const material = new Material(); // 创建材质（假设 Material 已定义）
-
-// 添加 MeshRenderer 组件
-const meshRenderer = cube.addComponent(MeshRenderer);
-meshRenderer.geometry = geometry;
-meshRenderer.material = material;
-meshRenderer.castShadow = true;
-meshRenderer.receiveShadow = true;
-
-// 将立方体添加到场景
-scene.addChild(cube);
-```
-
-### 6. 几何体组件(GeometryComponent)
-
-定义物体基础形状
-
-```javascript
-entity.addComponent(GeometryComponent, {
-  type: "box",
-  width: 1,
-  height: 1,
-  depth: 1,
-});
-```
-
-#### 属性说明
-
-| 属性名         | 类型    | 默认值       | 描述                                                                    |
-| -------------- | ------- | ------------ | ----------------------------------------------------------------------- |
-| type           | string  | "box"        | 几何体类型："box"(立方体),"sphere"(球体),"cylinder"(圆柱),"plane"(平面) |
-| width          | number  | 1            | 宽度(立方体、平面)                                                      |
-| height         | number  | 1            | 高度(立方体、圆柱)                                                      |
-| depth          | number  | 1            | 深度(立方体)                                                            |
-| radius         | number  | 1            | 半径(球体、圆柱)                                                        |
-| widthSegments  | number  | 1            | 宽度分段数(提高曲面精度)                                                |
-| heightSegments | number  | 1            | 高度分段数(提高曲面精度)                                                |
-| depthSegments  | number  | 1            | 深度分段数(提高曲面精度)                                                |
-| radialSegments | number  | 8            | 径向分段数(圆柱、球体)                                                  |
-| openEnded      | boolean | false        | 圆柱体是否无顶无底                                                      |
-| thetaStart     | number  | 0            | 起始角度(弧度)                                                          |
-| thetaLength    | number  | Math.PI \* 2 | 覆盖角度(弧度)                                                          |
-
-### 7. 网格组件(MeshComponent)
-
-组合几何体和材质的可视对象
-
-```javascript
-entity.addComponent(MeshComponent, {
-  geometry: "box",
-  material: "standard",
-});
-```
-
-#### 属性说明
-
-| 属性名           | 类型    | 默认值     | 描述                     |
-| ---------------- | ------- | ---------- | ------------------------ |
-| geometry         | string  | "box"      | 引用的几何体名称         |
-| material         | string  | "standard" | 引用的材质名称           |
-| castShadow       | boolean | true       | 是否投射阴影             |
-| receiveShadow    | boolean | true       | 是否接收阴影             |
-| frustumCulled    | boolean | true       | 是否启用视锥体剔除       |
-| renderOrder      | number  | 0          | 渲染顺序，数值大的后渲染 |
-| visible          | boolean | true       | 是否可见                 |
-| userData         | object  | {}         | 自定义数据对象           |
-| matrixAutoUpdate | boolean | true       | 是否自动更新变换矩阵     |
-| position         | Vector3 | (0,0,0)    | 局部空间位置             |
-| rotation         | Euler   | (0,0,0)    | 局部空间旋转             |
-| scale            | Vector3 | (1,1,1)    | 局部空间缩放             |
-
-### 5. 几何体(Geometry)
-
-`@rings/core` 提供了多种内置几何体类型，用于定义物体的基础形状。以下是常用几何体的属性和方法说明。
-
-#### 1. 立方体(BoxGeometry)
-
-```typescript
-import { BoxGeometry } from '@rings/core';
-
-// 创建立方体几何体
-const geometry = new BoxGeometry(width, height, depth, widthSegments, heightSegments, depthSegments);
-```
-
-| 参数名           | 类型    | 默认值 | 描述                     |
-|------------------|---------|--------|--------------------------|
-| `width`          | number  | 1      | 立方体的宽度             |
-| `height`         | number  | 1      | 立方体的高度             |
-| `depth`          | number  | 1      | 立方体的深度             |
-| `widthSegments`  | number  | 1      | 宽度方向的分段数         |
-| `heightSegments` | number  | 1      | 高度方向的分段数         |
-| `depthSegments`  | number  | 1      | 深度方向的分段数         |
-
-#### 2. 球体(SphereGeometry)
-
-```typescript
-import { SphereGeometry } from '@rings/core';
-
-// 创建球体几何体
-const geometry = new SphereGeometry(radius, widthSegments, heightSegments, phiStart, phiLength, thetaStart, thetaLength);
-```
-
-| 参数名           | 类型    | 默认值       | 描述                     |
-|------------------|---------|--------------|--------------------------|
-| `radius`        | number  | 1            | 球体的半径               |
-| `widthSegments` | number  | 8            | 水平方向的分段数         |
-| `heightSegments`| number  | 6            | 垂直方向的分段数         |
-| `phiStart`      | number  | 0            | 水平起始角度（弧度）     |
-| `phiLength`     | number  | Math.PI * 2  | 水平覆盖角度（弧度）     |
-| `thetaStart`    | number  | 0            | 垂直起始角度（弧度）     |
-| `thetaLength`   | number  | Math.PI      | 垂直覆盖角度（弧度）     |
-
-#### 3. 圆柱体(CylinderGeometry)
-
-```typescript
-import { CylinderGeometry } from '@rings/core';
-
-// 创建圆柱体几何体
-const geometry = new CylinderGeometry(radiusTop, radiusBottom, height, radialSegments, heightSegments, openEnded, thetaStart, thetaLength);
-```
-
-| 参数名           | 类型    | 默认值       | 描述                     |
-|------------------|---------|--------------|--------------------------|
-| `radiusTop`     | number  | 1            | 顶部半径                 |
-| `radiusBottom`  | number  | 1            | 底部半径                 |
-| `height`        | number  | 1            | 圆柱体的高度             |
-| `radialSegments`| number  | 8            | 侧面分段数               |
-| `heightSegments`| number  | 1            | 高度方向的分段数         |
-| `openEnded`     | boolean | false        | 是否无顶无底             |
-| `thetaStart`    | number  | 0            | 起始角度（弧度）         |
-| `thetaLength`   | number  | Math.PI * 2  | 覆盖角度（弧度）         |
-
-#### 4. 圆环(TorusGeometry)
-
-```typescript
-import { TorusGeometry } from '@rings/core';
-
-// 创建圆环几何体
-const geometry = new TorusGeometry(radius, tube, radialSegments, tubularSegments, arc);
-```
-
-| 参数名           | 类型    | 默认值       | 描述                     |
-|------------------|---------|--------------|--------------------------|
-| `radius`        | number  | 1            | 圆环的半径               |
-| `tube`          | number  | 0.4          | 管道的半径               |
-| `radialSegments`| number  | 8            | 侧面分段数               |
-| `tubularSegments`| number | 6            | 管道分段数               |
-| `arc`           | number  | Math.PI * 2  | 圆环的覆盖角度（弧度）   |
-
-#### 5. 平面(PlaneGeometry)
-
-```typescript
-import { PlaneGeometry } from '@rings/core';
-
-// 创建平面几何体
-const geometry = new PlaneGeometry(width, height, widthSegments, heightSegments);
-```
-
-| 参数名           | 类型    | 默认值 | 描述                     |
-|------------------|---------|--------|--------------------------|
-| `width`         | number  | 1      | 平面的宽度               |
-| `height`        | number  | 1      | 平面的高度               |
-| `widthSegments` | number  | 1      | 宽度方向的分段数         |
-| `heightSegments`| number  | 1      | 高度方向的分段数         |
-
-#### 6. 挤出几何体(ExtrudeGeometry)
-
-```typescript
-import { ExtrudeGeometry } from '@rings/core';
-
-// 创建挤出几何体
-const geometry = new ExtrudeGeometry(shape, options);
-```
-
-| 参数名    | 类型    | 默认值 | 描述                     |
-|-----------|---------|--------|--------------------------|
-| `shape`   | Shape   | -      | 基础形状（如圆形、矩形） |
-| `options` | object  | {}     | 挤出参数（如深度、分段） |
-
-### 6.1 不感光材质(UnLitMaterial)
-
-`UnLitMaterial` 是一种不依赖光照的材质，适用于不需要光照计算的场景（如 UI 元素、特效等）。以下是其核心属性和方法：
-
-```typescript
-import { Object3D, MeshRenderer, UnLitMaterial, SphereGeometry } from '@rings/core';
-
-// 创建 UnLitMaterial 实例
-const material = new UnLitMaterial({
-  baseColor: 0xffffff, // 基础颜色
-  alphaCutoff: 0.5,    // Alpha 测试阈值
-});
-
-// 创建球体几何体
-const geometry = new SphereGeometry(1, 32, 32);
-
-// 创建物体并应用材质
-const object = new Object3D();
-const renderer = object.addComponent(MeshRenderer);
-renderer.material = material;
-renderer.geometry = geometry;
-```
-
-#### 属性说明
-
-| 属性名              | 类型    | 默认值     | 描述                     |
-|---------------------|---------|------------|--------------------------|
-| `baseColor`        | number  | 0xffffff   | 基础颜色（十六进制）      |
-| `alphaCutoff`      | number  | 0.0        | Alpha 测试阈值（0-1）     |
-| `baseMap`         | Texture | null       | 基础颜色贴图             |
-
-#### 方法说明
-
-- **`clone()`**: 克隆当前材质实例。
-- **`dispose()`**: 释放材质占用的资源。
-
-### 6. 材质(LitMaterial)
-
-### 7. 纹理基础属性
-
-`Texture` 是纹理的基类，提供了纹理的基本属性和方法，支持多种纹理类型（如 2D 纹理、立方体贴图等）。
-
-#### 属性
-- `name`: 纹理名称。
-- `url`: 纹理源 URL。
-- `format`: 纹理格式（如 `rgba8unorm`）。
-- `width` 和 `height`: 纹理的宽度和高度。
-- `useMipmap`: 是否启用 Mipmap。
-- `flipY`: 是否垂直翻转纹理。
-- `isHDRTexture`: 标识是否为 HDR 纹理。
-- `isVideoTexture`: 标识是否为视频纹理。
-- `magFilter`: 纹理放大过滤模式（如 `linear` 或 `nearest`）。
-- `addressModeU`: 纹理 U 轴（水平方向）的寻址模式（如 `repeat`、`clamp-to-edge`）。
-- `addressModeV`: 纹理 V 轴（垂直方向）的寻址模式（如 `repeat`、`clamp-to-edge`）。
-
-#### 方法
-- `init()`: 初始化纹理。
-- `createTextureDescriptor()`: 创建纹理描述符。
-- `getGPUTexture()`: 获取 GPU 纹理对象。
-- `updateTextureDescription()`: 更新纹理描述。
-
-#### 示例
-```typescript
-import { Texture } from '@rings/core';
-
-// 创建一个 2D 纹理
-const texture = new Texture(512, 512);
-texture.name = 'example_texture';
-texture.format = 'rgba8unorm';
-texture.useMipmap = true;
-texture.init();
-
-console.log('Texture created:', texture);
-```
-
-### 7. 纹理
-
-#### 7.1 BitmapTexture2D
-`BitmapTexture2D` 是基础的 2D 纹理类，支持从图片文件或 Canvas 加载纹理。
-
-**属性**：
-- `source`: 纹理源（HTMLCanvasElement、ImageBitmap、OffscreenCanvas 或 HTMLImageElement）。
-- `premultiplyAlpha`: 是否预乘 Alpha 通道。
-
-**方法**：
-- `load(url: string, loaderFunctions?: LoaderFunctions)`: 从 URL 加载纹理。
-- `loadFromBlob(imgData: Blob)`: 从 Blob 加载纹理。
-
-**示例**：
+#### 程序化创建纹理
 ```typescript
 import { BitmapTexture2D } from '@rings/core';
 
+// 从Canvas创建纹理
+const canvas = document.createElement('canvas');
+canvas.width = 512;
+canvas.height = 512;
+const ctx = canvas.getContext('2d');
+
+// 绘制程序化图案
+const gradient = ctx.createLinearGradient(0, 0, 512, 512);
+gradient.addColorStop(0, '#ff0000');
+gradient.addColorStop(1, '#0000ff');
+ctx.fillStyle = gradient;
+ctx.fillRect(0, 0, 512, 512);
+
+// 创建纹理
 const texture = new BitmapTexture2D();
-texture.load('path/to/image.png').then(() => {
-  console.log('Texture loaded');
-});
+texture.source = canvas;
 ```
 
-#### 7.2 BitmapTextureCube
-`BitmapTextureCube` 是立方体贴图纹理类，支持从 6 张图片或 Canvas 加载纹理。
+### 立方体纹理使用示例
 
-**属性**：
-- `images`: 纹理源数组（HTMLCanvasElement、ImageBitmap 或 OffscreenCanvas）。
-
-**方法**：
-- `generateImages(images: any[])`: 从图片数组生成立方体贴图。
-
-**示例**：
+#### 标准立方体纹理
 ```typescript
 import { BitmapTextureCube } from '@rings/core';
 
+// 创建立方体纹理
 const cubeTexture = new BitmapTextureCube();
-cubeTexture.generateImages([image1, image2, image3, image4, image5, image6]);
+
+// 定义6个面的纹理路径
+const faceUrls = [
+  "textures/skybox/right.jpg",   // +X
+  "textures/skybox/left.jpg",    // -X
+  "textures/skybox/top.jpg",     // +Y
+  "textures/skybox/bottom.jpg",  // -Y
+  "textures/skybox/front.jpg",   // +Z
+  "textures/skybox/back.jpg"     // -Z
+];
+
+// 加载所有面
+await cubeTexture.load(faceUrls);
+
+// 应用到天空盒
+skybox.material.setTexture("envMap", cubeTexture);
 ```
 
-#### 7.3 LDRTextureCube
-`LDRTextureCube` 是低动态范围（LDR）立方体贴图纹理类。
+### HDR环境贴图示例
 
-**属性**：
-- `ldrImageUrl`: 纹理源 URL。
-
-**方法**：
-- `load(url: string, loaderFunctions?: LoaderFunctions)`: 从 URL 加载纹理。
-
-**示例**：
-```typescript
-import { LDRTextureCube } from '@rings/core';
-
-const ldrTexture = new LDRTextureCube();
-ldrTexture.load('path/to/ldr_image.hdr').then(() => {
-  console.log('LDR texture loaded');
-});
-```
-
-#### 7.4 HDRTexture
-`HDRTexture` 是高动态范围（HDR）2D 纹理类。
-
-**属性**：
-- `isHDRTexture`: 标识是否为 HDR 纹理。
-
-**方法**：
-- `load(url: string, loaderFunctions?: LoaderFunctions)`: 从 URL 加载纹理。
-
-**示例**：
-```typescript
-import { HDRTexture } from '@rings/core';
-
-const hdrTexture = new HDRTexture();
-hdrTexture.load('path/to/hdr_image.hdr').then(() => {
-  console.log('HDR texture loaded');
-});
-```
-
-#### 7.5 HDRTextureCube
-`HDRTextureCube` 是高动态范围（HDR）立方体贴图纹理类。
-
-**属性**：
-- `isHDRTexture`: 标识是否为 HDR 纹理。
-
-**方法**：
-- `load(url: string, loaderFunctions?: LoaderFunctions)`: 从 URL 加载纹理。
-
-**示例**：
+#### HDR立方体纹理
 ```typescript
 import { HDRTextureCube } from '@rings/core';
 
-const hdrCubeTexture = new HDRTextureCube();
-hdrCubeTexture.load('path/to/hdr_cube_image.hdr').then(() => {
-  console.log('HDR cube texture loaded');
-});
+// 创建HDR立方体纹理
+const hdrTexture = new HDRTextureCube();
+
+// 加载HDR全景图并转换为立方体
+await hdrTexture.load("environments/studio.hdr");
+
+// 用于IBL照明
+scene.envMap = hdrTexture;
 ```
 
-`LitMaterial` 是一种基于物理渲染（PBR）的材质，支持光照、阴影和反射效果。以下是其核心属性和方法：
+### 采样过滤设置详解
+
+#### 三线性过滤(高质量)
+```typescript
+// 三线性过滤(高质量Mipmap)
+texture.minFilter = "linear";
+texture.magFilter = "linear";
+texture.mipmapFilter = "linear";
+texture.useMipmap = true;
+texture.maxAnisotropy = 16; // 启用各向异性过滤
+```
+
+#### 双线性过滤(标准)
+```typescript
+// 双线性过滤(无Mipmap)
+texture.minFilter = "linear";
+texture.magFilter = "linear";
+texture.useMipmap = false;
+```
+
+#### 最近邻过滤(像素化)
+```typescript
+// 像素化效果
+texture.minFilter = "nearest";
+texture.magFilter = "nearest";
+texture.useMipmap = false;
+```
+
+### Mipmap设置详解
+
+#### 自动生成Mipmap
+```typescript
+import { BitmapTexture2D } from '@rings/core';
+
+const texture = new BitmapTexture2D(true); // 启用Mipmap
+await texture.load("textures/terrain/diffuse.png");
+// Mipmap自动生成，层级根据纹理大小计算
+```
+
+#### 手动控制Mipmap范围
+```typescript
+// 限制Mipmap使用范围
+texture.lodMinClamp = 0;   // 从最高级别开始
+texture.lodMaxClamp = 4;   // 最多使用4级Mipmap
+```
+
+### 纹理资源管理
+
+#### 预加载纹理
+```typescript
+import { Engine3D } from '@rings/core';
+
+// 预加载多个纹理
+const textures = await Promise.all([
+  Engine3D.res.loadTexture("textures/wood_diffuse.jpg"),
+  Engine3D.res.loadTexture("textures/wood_normal.jpg"),
+  Engine3D.res.loadTexture("textures/wood_roughness.jpg")
+]);
+```
+
+#### 纹理缓存检查
+```typescript
+// 检查纹理是否已缓存
+const cachedTexture = Engine3D.res.getTexture("textures/brick.jpg");
+if (!cachedTexture) {
+  await Engine3D.res.loadTexture("textures/brick.jpg");
+}
+```
+
+### 纹理导入参考表
+
+| 纹理类型 | 导入路径 | 使用场景 |
+|----------|----------|----------|
+| `BitmapTexture2D` | `@rings/core` | 标准2D纹理贴图 |
+| `BitmapTextureCube` | `@rings/core` | 6面立方体纹理 |
+| `HDRTextureCube` | `@rings/core` | HDR环境贴图 |
+| `HDRTexture` | `@rings/core` | HDR 2D纹理 |
+| `RenderTexture` | `@rings/core` | 离屏渲染目标 |
+
+### 完整纹理创建流程示例
 
 ```typescript
-import { LitMaterial } from '@rings/core';
+import { 
+  BitmapTexture2D, 
+  BitmapTextureCube, 
+  HDRTextureCube, 
+  Engine3D,
+  Scene3D 
+} from '@rings/core';
 
-// 创建 LitMaterial 实例
-const material = new LitMaterial({
-  baseColor: 0xffffff, // 基础颜色
-  metallic: 0.5,      // 金属度
-  roughness: 0.5,     // 粗糙度
-  emissive: 0x000000, // 自发光颜色
-  emissiveIntensity: 1.0, // 自发光强度
-});
+// 1. 创建2D纹理
+const diffuseMap = new BitmapTexture2D(true);
+await diffuseMap.load("textures/diffuse/wood.jpg");
+diffuseMap.addressModeU = "repeat";
+diffuseMap.addressModeV = "repeat";
+
+// 2. 创建法线贴图
+const normalMap = new BitmapTexture2D(true);
+await normalMap.load("textures/normal/wood_normal.jpg");
+normalMap.addressModeU = "repeat";
+normalMap.addressModeV = "repeat";
+
+// 3. 创建环境贴图
+const envMap = new HDRTextureCube();
+await envMap.load("environments/studio.hdr");
+
+// 4. 应用到场景
+scene.envMap = envMap;
+scene.exposure = 1.0;
+
+// 5. 应用到材质
+const material = new StandardMaterial();
+material.setTexture("baseMap", diffuseMap);
+material.setTexture("normalMap", normalMap);
+material.envMapIntensity = 1.0;
 ```
 
-#### 属性说明
+---
 
-| 属性名              | 类型    | 默认值     | 描述                     |
-|---------------------|---------|------------|--------------------------|
-| `baseColor`        | number  | 0xffffff   | 基础颜色（十六进制）      |
-| `metallic`        | number  | 0.5        | 金属度（0-1）            |
-| `roughness`       | number  | 0.5        | 粗糙度（0-1）            |
-| `emissive`        | number  | 0x000000   | 自发光颜色（十六进制）    |
-| `emissiveIntensity`| number  | 1.0        | 自发光强度（0-1）         |
-| `transparent`     | boolean | false      | 是否透明                 |
-| `opacity`        | number  | 1.0        | 透明度（0-1）            |
-| `alphaTest`      | number  | 0.0        | Alpha 测试阈值（0-1）     |
-| `side`           | number  | 0          | 渲染面（0: 正面，1: 背面）|
-| `shadowBias`     | number  | 0.0        | 阴影偏移量               |
-| `specularColor`  | number  | 0xffffff   | 高光颜色（十六进制）      |
-| `materialF0`     | number  | 0.04       | 基础反射率               |
-| `envIntensity`   | number  | 1.0        | 环境光强度               |
-| `normalScale`    | number  | 1.0        | 法线贴图缩放             |
-| `ao`            | number  | 1.0        | 环境光遮蔽强度           |
-| `ior`           | number  | 1.5        | 折射率                   |
-| `clearcoatFactor`| number  | 0.0        | 清漆层强度               |
-| `clearcoatRoughnessFactor`| number | 0.0 | 清漆层粗糙度             |
-| `clearcoatColor` | number  | 0xffffff   | 清漆层颜色（十六进制）    |
-| `clearcoatWeight`| number  | 1.0        | 清漆层权重               |
-| `clearcoatIor`   | number  | 1.5        | 清漆层折射率             |
-| `baseMap`        | Texture | null       | 基础颜色贴图             |
-| `normalMap`      | Texture | null       | 法线贴图                 |
-| `emissiveMap`    | Texture | null       | 自发光贴图               |
-| `aoMap`         | Texture | null       | 环境光遮蔽贴图           |
-| `maskMap`       | Texture | null       | 遮罩贴图                 |
+## 材质系统
 
-#### 方法说明
+### 基础材质类 (Material)
 
-| 方法名              | 参数                  | 返回值 | 描述                     |
-|---------------------|-----------------------|--------|--------------------------|
-| `setBaseColor`     | `color: number`       | void   | 设置基础颜色             |
-| `setMetallic`      | `value: number`       | void   | 设置金属度               |
-| `setRoughness`     | `value: number`       | void   | 设置粗糙度               |
-| `setEmissive`      | `color: number`       | void   | 设置自发光颜色           |
-| `setEmissiveIntensity`| `intensity: number` | void   | 设置自发光强度           |
-| `setTransparent`   | `value: boolean`      | void   | 设置是否透明             |
-| `setOpacity`      | `value: number`       | void   | 设置透明度               |
-| `setAlphaTest`    | `value: number`       | void   | 设置 Alpha 测试阈值       |
-| `setSide`        | `side: number`        | void   | 设置渲染面               |
-| `setShadowBias`   | `value: number`       | void   | 设置阴影偏移量           |
-| `setSpecularColor`| `color: number`       | void   | 设置高光颜色             |
-| `setMaterialF0`   | `value: number`       | void   | 设置基础反射率           |
-| `setEnvIntensity` | `value: number`       | void   | 设置环境光强度           |
-| `setNormalScale`  | `value: number`       | void   | 设置法线贴图缩放         |
-| `setAo`          | `value: number`       | void   | 设置环境光遮蔽强度       |
-| `setIor`         | `value: number`       | void   | 设置折射率               |
-| `setClearcoatFactor`| `value: number`     | void   | 设置清漆层强度           |
-| `setClearcoatRoughnessFactor`| `value: number` | void | 设置清漆层粗糙度         |
-| `setClearcoatColor`| `color: number`       | void   | 设置清漆层颜色           |
-| `setClearcoatWeight`| `value: number`      | void   | 设置清漆层权重           |
-| `setClearcoatIor` | `value: number`       | void   | 设置清漆层折射率         |
+所有材质都继承自 `Material` 基类，提供了材质系统的核心功能和通用属性。
 
-### 8. 高性能网格组件(InstancedMeshComponent)
-
-优化大量相同物体的渲染性能
-
-```javascript
-entity.addComponent(InstancedMeshComponent, {
-  baseMesh: "tree",
-  count: 100,
-  positions: [...],
-});
+#### 构造函数
+```typescript
+constructor()
 ```
 
-#### 属性说明
+#### 基础属性
 
-| 属性名           | 类型            | 默认值 | 描述                             |
-| ---------------- | --------------- | ------ | -------------------------------- |
-| baseMesh         | string          | ""     | 基础网格名称，所有实例共享的网格 |
-| count            | number          | 0      | 实例数量                         |
-| positions        | Array           | []     | 实例位置数组，每个元素是 Vector3 |
-| rotations        | Array           | []     | 实例旋转数组，每个元素是 Euler   |
-| scales           | Array           | []     | 实例缩放数组，每个元素是 Vector3 |
-| colors           | Array           | []     | 实例颜色数组，每个元素是 Color   |
-| matrixAutoUpdate | boolean         | true   | 是否自动更新实例矩阵             |
-| instanceMatrix   | BufferAttribute | null   | 实例变换矩阵数据                 |
-| frustumCulled    | boolean         | true   | 是否启用视锥体剔除               |
-| visible          | boolean         | true   | 是否可见                         |
-| castShadow       | boolean         | true   | 是否投射阴影                     |
-| receiveShadow    | boolean         | true   | 是否接收阴影                     |
+| 属性 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `instanceID` | `string` | `UUID()` | 唯一实例标识符 |
+| `name` | `string` | `''` | 材质名称 |
+| `enable` | `boolean` | `true` | 是否启用材质 |
 
-### 9. 线框组件(WireframeComponent)
+#### 渲染状态控制
 
-为几何体添加线框可视化效果
+| 属性 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `doubleSide` | `boolean` | `false` | 是否双面渲染 |
+| `castShadow` | `boolean` | `true` | 是否投射阴影 |
+| `acceptShadow` | `boolean` | `true` | 是否接收阴影 |
+| `castReflection` | `boolean` | `true` | 是否反射环境 |
+| `transparent` | `boolean` | `false` | 是否透明渲染 |
 
-```javascript
-entity.addComponent(WireframeComponent, {
-  enabled: true,
+#### 混合与剔除模式
+
+| 属性 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `blendMode` | `BlendMode` | `BlendMode.NONE` | 混合模式 |
+| `cullMode` | `GPUCullMode` | `GPUCullMode.back` | 剔除模式 |
+| `depthCompare` | `GPUCompareFunction` | `GPUCompareFunction.less_equal` | 深度比较函数 |
+| `depthWriteEnabled` | `boolean` | `true` | 是否写入深度缓冲区 |
+
+#### 混合模式枚举 (BlendMode)
+
+```typescript
+enum BlendMode {
+  NONE,      // 无混合，提高性能
+  ABOVE,     // 显示在背景上方
+  ALPHA,     // 透明混合
+  NORMAL,    // 正常混合
+  ADD,       // 加法混合
+  BELOW,     // 显示在背景下方
+  ERASE,     // 擦除背景
+  MUL,       // 乘法混合
+  SCREEN,    // 屏幕混合
+  DIVD,      // 除法混合
+  SOFT_ADD   // 柔和加法
+}
+```
+
+#### 剔除模式枚举 (GPUCullMode)
+
+```typescript
+enum GPUCullMode {
+  none = 'none',    // 不剔除
+  front = 'front',  // 剔除正面
+  back = 'back',    // 剔除背面（默认）
+}
+```
+
+#### 通用方法
+
+```typescript
+// 纹理设置
+setTexture(name: string, texture: Texture): void
+getTexture(name: string): Texture
+
+// 统一变量设置
+setUniformFloat(name: string, value: number): void
+setUniformVector2(name: string, value: Vector2): void
+setUniformVector3(name: string, value: Vector3): void
+setUniformVector4(name: string, value: Vector4): void
+setUniformColor(name: string, value: Color): void
+
+// 着色器宏定义
+setDefine(define: string, value: boolean): void
+
+// 材质管理
+clone(): Material
+destroy(force: boolean): void
+```
+
+### 无光照材质 (UnLitMaterial)
+
+不接受光照的表面材质，适用于UI、特效、卡通渲染等场景。
+
+#### 构造函数
+```typescript
+constructor()
+```
+
+#### 专属属性
+
+| 属性 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `baseMap` | `Texture` | `whiteTexture` | 基础纹理贴图 |
+| `baseColor` | `Color` | `Color(1, 1, 1, 1)` | 基础颜色（染色） |
+
+#### 使用示例
+
+```typescript
+// 创建无光照材质
+const unlitMaterial = new UnLitMaterial();
+
+// 设置纹理和颜色
+unlitMaterial.baseMap = Engine3D.res.whiteTexture;
+unlitMaterial.baseColor = new Color(1, 0.5, 0.2, 1); // 橙色
+
+// 应用到物体
+const cube = new Object3D();
+cube.addComponent(MeshRenderer).material = unlitMaterial;
+```
+
+### PBR材质 (LitMaterial)
+
+基于物理渲染的材质系统，支持金属度-粗糙度工作流，适用于真实感渲染。
+
+#### 构造函数
+```typescript
+constructor()
+```
+
+#### 核心属性
+
+| 属性 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `baseMap` | `Texture` | `null` | 基础颜色贴图（反照率） |
+| `baseColor` | `Color` | `Color(1, 1, 1, 1)` | 基础颜色 |
+| `normalMap` | `Texture` | `null` | 法线贴图 |
+| `maskMap` | `Texture` | `null` | 遮罩贴图（R:金属度 G:粗糙度 B:AO A:Alpha） |
+| `metallic` | `number` | `0.0` | 金属度 (0-1) |
+| `roughness` | `number` | `0.5` | 粗糙度 (0-1) |
+
+#### 光照与反射
+
+| 属性 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `emissiveMap` | `Texture` | `null` | 自发光贴图 |
+| `emissiveColor` | `Color` | `Color(0, 0, 0, 1)` | 自发光颜色 |
+| `emissiveIntensity` | `number` | `1.0` | 自发光强度 |
+| `aoMap` | `Texture` | `null` | 环境光遮蔽贴图 |
+| `ao` | `number` | `1.0` | 环境光遮蔽强度 |
+
+#### 清漆层（Clear Coat）
+
+| 属性 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `clearcoatColor` | `Color` | `Color(1, 1, 1, 1)` | 清漆颜色 |
+| `clearcoatFactor` | `number` | `0.0` | 清漆强度 (0-1) |
+| `clearcoatWeight` | `number` | `0.0` | 清漆权重 |
+| `clearcoatRoughnessFactor` | `number` | `0.0` | 清漆粗糙度 |
+| `ior` | `number` | `1.5` | 折射率 |
+
+#### 透明度控制
+
+| 属性 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `alphaCutoff` | `number` | `0.5` | Alpha裁剪阈值 |
+
+#### UV变换控制
+
+PBR材质支持UV变换，通过统一变量控制：
+
+| 统一变量名 | 类型 | 描述 |
+|------------|------|------|
+| `baseMapOffsetSize` | `Vector4` | 基础贴图UV偏移和缩放 (x, y, z, w) |
+| `normalMapOffsetSize` | `Vector4` | 法线贴图UV偏移和缩放 |
+| `emissiveMapOffsetSize` | `Vector4` | 自发光贴图UV偏移和缩放 |
+| `roughnessMapOffsetSize` | `Vector4` | 粗糙度贴图UV偏移和缩放 |
+| `metallicMapOffsetSize` | `Vector4` | 金属度贴图UV偏移和缩放 |
+| `aoMapOffsetSize` | `Vector4` | AO贴图UV偏移和缩放 |
+
+#### UV变换示例
+
+```typescript
+import { LitMaterial, Color, Vector4 } from '@rings/core';
+
+// 创建PBR材质
+const pbrMaterial = new LitMaterial();
+
+// 设置基础纹理和颜色
+pbrMaterial.baseMap = texture;
+pbrMaterial.baseColor = new Color(1, 1, 1, 1);
+
+// 设置金属度和粗糙度
+pbrMaterial.metallic = 0.8;  // 高金属度
+pbrMaterial.roughness = 0.2; // 低粗糙度（光滑）
+
+// UV变换：偏移(0.1, 0.2)，缩放(2, 3)
+pbrMaterial.shader.setUniformVector4('baseMapOffsetSize', new Vector4(0.1, 0.2, 2, 3));
+```
+
+#### 混合模式切换示例
+
+```typescript
+import { LitMaterial, Color, BlendMode } from '@rings/core';
+
+// 创建透明材质
+const transparentMaterial = new LitMaterial();
+transparentMaterial.baseColor = new Color(1, 0, 0, 0.5); // 半透明红色
+transparentMaterial.blendMode = BlendMode.ALPHA;
+transparentMaterial.transparent = true;
+
+// 创建加法混合材质
+const additiveMaterial = new LitMaterial();
+additiveMaterial.baseColor = new Color(0.2, 0.5, 1, 0.8);
+additiveMaterial.blendMode = BlendMode.ADD;
+
+// 创建无混合材质（不透明）
+const opaqueMaterial = new LitMaterial();
+opaqueMaterial.blendMode = BlendMode.NONE;
+opaqueMaterial.transparent = false;
+```
+
+#### 剔除模式切换示例
+
+```typescript
+import { LitMaterial, GPUCullMode } from '@rings/core';
+
+// 创建双面渲染材质
+const doubleSidedMaterial = new LitMaterial();
+doubleSidedMaterial.cullMode = GPUCullMode.none; // 不剔除任何面
+doubleSidedMaterial.doubleSide = true;
+
+// 创建单面渲染材质（默认）
+const singleSidedMaterial = new LitMaterial();
+singleSidedMaterial.cullMode = GPUCullMode.back; // 剔除背面
+```
+
+#### 完整PBR材质配置示例
+
+```typescript
+import { LitMaterial, Color, BlendMode, GPUCullMode } from '@rings/core';
+
+// 创建汽车车漆材质
+const carPaintMaterial = new LitMaterial();
+
+// 基础设置
+carPaintMaterial.baseMap = carTexture;
+carPaintMaterial.baseColor = new Color(0.8, 0.1, 0.1, 1); // 红色车漆
+
+// 金属度-粗糙度设置
+carPaintMaterial.metallic = 0.9;
+carPaintMaterial.roughness = 0.1;
+
+// 法线贴图
+carPaintMaterial.normalMap = normalTexture;
+
+// 环境光遮蔽
+carPaintMaterial.aoMap = aoTexture;
+carPaintMaterial.ao = 1.0;
+
+// 自发光（车灯）
+carPaintMaterial.emissiveMap = emissiveTexture;
+carPaintMaterial.emissiveColor = new Color(1, 1, 0.8, 1);
+carPaintMaterial.emissiveIntensity = 2.0;
+
+// 清漆层
+carPaintMaterial.clearcoatFactor = 0.8;
+carPaintMaterial.clearcoatRoughnessFactor = 0.05;
+
+// 渲染设置
+carPaintMaterial.blendMode = BlendMode.NONE;
+carPaintMaterial.cullMode = GPUCullMode.back;
+```
+
+---
+
+## 几何体系统
+
+### 基础几何体类
+
+所有几何体类都继承自 `GeometryBase` 基类，提供统一的顶点数据管理和渲染接口。
+
+### BoxGeometry - 立方体几何体
+
+**类定义：** `class BoxGeometry extends GeometryBase`
+
+#### 构造函数
+```typescript
+new BoxGeometry(width?: number, height?: number, depth?: number)
+```
+
+#### 属性列表
+| 属性 | 类型 | 默认值 | 描述 |
+| :--- | :--- | :--- | :--- |
+| `width` | `number` | `1` | 立方体宽度 |
+| `height` | `number` | `1` | 立方体高度 |
+| `depth` | `number` | `1` | 立方体深度 |
+
+#### 使用示例
+```typescript
+import { BoxGeometry } from '@rings/core';
+
+// 创建一个1x1x1的立方体
+const box = new BoxGeometry();
+
+// 创建一个2x3x4的立方体
+const customBox = new BoxGeometry(2, 3, 4);
+```
+
+---
+
+### SphereGeometry - 球体几何体
+
+**类定义：** `class SphereGeometry extends GeometryBase`
+
+#### 构造函数
+```typescript
+new SphereGeometry(
+    radius: number,
+    widthSegments: number,
+    heightSegments: number,
+    phiStart?: number,
+    phiLength?: number,
+    thetaStart?: number,
+    thetaLength?: number
+)
+```
+
+#### 属性列表
+| 属性 | 类型 | 默认值 | 描述 |
+| :--- | :--- | :--- | :--- |
+| `radius` | `number` | - | 球体半径 |
+| `widthSegments` | `number` | - | 水平分段数 |
+| `heightSegments` | `number` | - | 垂直分段数 |
+| `phiStart` | `number` | `0` | 水平起始角度（弧度） |
+| `phiLength` | `number` | `2π` | 水平角度范围（弧度） |
+| `thetaStart` | `number` | `0` | 垂直起始角度（弧度） |
+| `thetaLength` | `number` | `π` | 垂直角度范围（弧度） |
+
+#### 使用示例
+```typescript
+import { SphereGeometry } from '@rings/core';
+
+// 创建一个半径为1的完整球体
+const sphere = new SphereGeometry(1, 32, 32);
+
+// 创建一个半球体
+const hemisphere = new SphereGeometry(1, 32, 32, 0, Math.PI * 2, 0, Math.PI / 2);
+```
+
+---
+
+### CylinderGeometry - 圆柱体几何体
+
+**类定义：** `class CylinderGeometry extends GeometryBase`
+
+#### 构造函数
+```typescript
+new CylinderGeometry(
+    radiusTop?: number,
+    radiusBottom?: number,
+    height?: number,
+    radialSegments?: number,
+    heightSegments?: number,
+    openEnded?: boolean,
+    thetaStart?: number,
+    thetaLength?: number
+)
+```
+
+#### 属性列表
+| 属性 | 类型 | 默认值 | 描述 |
+| :--- | :--- | :--- | :--- |
+| `radiusTop` | `number` | `1` | 顶部半径 |
+| `radiusBottom` | `number` | `1` | 底部半径 |
+| `height` | `number` | `1` | 圆柱高度 |
+| `radialSegments` | `number` | `32` | 侧面分段数 |
+| `heightSegments` | `number` | `1` | 高度分段数 |
+| `openEnded` | `boolean` | `false` | 是否开放底部 |
+| `thetaStart` | `number` | `0` | 起始角度 |
+| `thetaLength` | `number` | `2π` | 角度范围 |
+
+#### 使用示例
+```typescript
+import { CylinderGeometry } from '@rings/core';
+
+// 创建一个标准圆柱体
+const cylinder = new CylinderGeometry();
+
+// 创建一个圆锥体（顶部半径为0）
+const cone = new CylinderGeometry(0, 1, 2, 32);
+```
+
+---
+
+### TorusGeometry - 圆环体几何体
+
+**类定义：** `class TorusGeometry extends GeometryBase`
+
+#### 构造函数
+```typescript
+new TorusGeometry(
+    radius?: number,
+    tube?: number,
+    radialSegments?: number,
+    tubularSegments?: number
+)
+```
+
+#### 属性列表
+| 属性 | 类型 | 默认值 | 描述 |
+| :--- | :--- | :--- | :--- |
+| `radius` | `number` | `1` | 圆环半径 |
+| `tube` | `number` | `0.4` | 管道半径 |
+| `radialSegments` | `number` | `8` | 圆环分段数 |
+| `tubularSegments` | `number` | `16` | 管道分段数 |
+
+#### 使用示例
+```typescript
+import { TorusGeometry } from '@rings/core';
+
+// 创建一个标准圆环体
+const torus = new TorusGeometry();
+
+// 创建一个细圆环
+const thinTorus = new TorusGeometry(2, 0.1, 16, 100);
+```
+
+---
+
+### PlaneGeometry - 平面几何体
+
+**类定义：** `class PlaneGeometry extends GeometryBase`
+
+#### 构造函数
+```typescript
+new PlaneGeometry(
+    width: number,
+    height: number,
+    segmentW?: number,
+    segmentH?: number,
+    up?: Vector3
+)
+```
+
+#### 属性列表
+| 属性 | 类型 | 默认值 | 描述 |
+| :--- | :--- | :--- | :--- |
+| `width` | `number` | - | 平面宽度 |
+| `height` | `number` | - | 平面高度 |
+| `segmentW` | `number` | `1` | 宽度分段数 |
+| `segmentH` | `number` | `1` | 高度分段数 |
+| `up` | `Vector3` | `Vector3.Y_AXIS` | 平面法线方向 |
+
+#### 使用示例
+```typescript
+import { PlaneGeometry, Vector3 } from '@rings/core';
+
+// 创建一个1x1的平面
+const plane = new PlaneGeometry(1, 1);
+
+// 创建一个10x10的网格平面
+const gridPlane = new PlaneGeometry(10, 10, 10, 10);
+
+// 创建一个垂直于X轴的平面
+const verticalPlane = new PlaneGeometry(5, 5, 1, 1, Vector3.X_AXIS);
+```
+
+---
+
+### ExtrudeGeometry - 挤压几何体
+
+**类定义：** `class ExtrudeGeometry extends GeometryBase`
+
+#### 构造函数
+```typescript
+new ExtrudeGeometry()
+```
+
+#### 主要方法
+| 方法 | 参数 | 返回值 | 描述 |
+| :--- | :--- | :--- | :--- |
+| `build` | `shape: Vector3[]`, `isShapeClosed: boolean`, `path: Vector3[]`, `vScale?: number`, `uNegate?: boolean` | `this` | 构建挤压几何体 |
+
+#### 属性列表
+| 属性 | 类型 | 默认值 | 描述 |
+| :--- | :--- | :--- | :--- |
+| `vScale` | `number` | `1.0` | V坐标缩放 |
+| `uNegate` | `boolean` | `true` | U坐标反转 |
+| `sections` | `Section[]` | `[]` | 截面数据 |
+
+#### 使用示例
+```typescript
+import { ExtrudeGeometry, Vector3 } from '@rings/core';
+
+const extrude = new ExtrudeGeometry();
+
+// 定义一个2D形状（三角形）
+const shape = [
+    new Vector3(0, 0, 0),
+    new Vector3(1, 0, 0),
+    new Vector3(0.5, 1, 0)
+];
+
+// 定义挤压路径
+const path = [
+    new Vector3(0, 0, 0),
+    new Vector3(0, 0, 5)
+];
+
+// 构建挤压几何体
+extrude.build(shape, true, path, 1.0, true);
+```
+
+---
+
+### 通用继承属性
+
+所有几何体类都继承自 `GeometryBase`，具有以下通用属性：
+
+| 属性 | 类型 | 默认值 | 描述 |
+| :--- | :--- | :--- | :--- |
+| `instanceID` | `string` | `UUID()` | 唯一实例ID |
+| `name` | `string` | `""` | 几何体名称 |
+
+---
+
+## 网格 (Mesh)
+
+网格是3D场景中的核心渲染对象，由几何体(Geometry)和材质(Material)组成，支持多种渲染特性和优化选项。
+
+### 网格系统架构
+
+| 网格类型 | 类名 | 继承关系 | 主要特性 |
+|----------|------|----------|----------|
+| **基础网格** | `MeshRenderer` | `RenderNode` → `MeshRenderer` | 标准网格渲染 |
+| **网格过滤器** | `MeshFilter` | `MeshRenderer` → `MeshFilter` | 几何体管理 |
+| **蒙皮网格** | `SkinnedMeshRenderer` | `MeshRenderer` → `SkinnedMeshRenderer` | 骨骼动画支持 |
+| **蒙皮网格2** | `SkinnedMeshRenderer2` | `MeshRenderer` → `SkinnedMeshRenderer2` | 优化版蒙皮渲染 |
+
+### 完整属性列表
+
+#### 基础渲染属性
+| 属性 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `geometry` | `GeometryBase` | `null` | 几何体数据 |
+| `material` | `Material` | `null` | 主材质 |
+| `materials` | `Material[]` | `[]` | 多材质数组 |
+| `receiveShadow` | `boolean` | `true` | 是否接收阴影 |
+| `castShadow` | `boolean` | `true` | 是否投射阴影 |
+| `castGI` | `boolean` | `true` | 是否参与全局光照 |
+| `castReflection` | `boolean` | `true` | 是否参与反射探针 |
+
+#### LOD和实例化
+| 属性 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `lodLevel` | `number` | `0` | LOD层级索引 |
+| `instanceCount` | `number` | `0` | GPU实例化数量 |
+| `alwaysRender` | `boolean` | `false` | 始终渲染标志 |
+| `drawType` | `number` | `0` | 绘制类型枚举 |
+
+#### 变形目标
+| 属性 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `morphData` | `MorphTargetData` | `null` | 变形目标数据 |
+
+#### 渲染控制
+| 属性 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `renderLayer` | `RenderLayer` | `RenderLayer.None` | 渲染层级 |
+| `rendererMask` | `number` | `0` | 渲染遮罩标志 |
+| `renderOrder` | `number` | `0` | 渲染排序优先级 |
+
+### 主要方法
+
+#### 基础方法
+| 方法 | 参数 | 返回值 | 描述 |
+|------|------|--------|------|
+| `geometry` | `value: GeometryBase` | `void` | 设置几何体 |
+| `material` | `value: Material` | `void` | 设置主材质 |
+| `materials` | `value: Material[]` | `void` | 设置多材质数组 |
+
+#### 网格过滤器专用
+| 方法 | 参数 | 返回值 | 描述 |
+|------|------|--------|------|
+| `meshURL` | `value: string` | `void` | 通过URL设置几何体 |
+
+### 网格创建使用示例
+
+#### 基础网格创建
+```typescript
+import { Object3D, MeshRenderer, GeometryBase, StandardMaterial } from '@rings/core';
+
+// 创建网格对象
+const meshObject = new Object3D();
+const meshRenderer = meshObject.addComponent(MeshRenderer);
+
+// 设置几何体
+const geometry = new BoxGeometry(2, 2, 2); // 2x2x2立方体
+meshRenderer.geometry = geometry;
+
+// 设置材质
+const material = new StandardMaterial({
   color: 0x00ff00,
-  lineWidth: 1,
-  dashed: false,
-  dashSize: 3,
-  gapSize: 1,
+  roughness: 0.5,
+  metalness: 0.0
 });
+meshRenderer.material = material;
+
+// 添加到场景
+scene.addChild(meshObject);
 ```
 
-#### 属性说明
+#### 通过URL加载网格
+```typescript
+import { Object3D, MeshFilter } from '@rings/core';
 
-| 属性名    | 类型    | 默认值   | 描述                                           |
-| --------- | ------- | -------- | ---------------------------------------------- |
-| enabled   | boolean | true     | 是否启用线框效果                               |
-| color     | number  | 0x00ff00 | 线框颜色，十六进制 RGB 格式                    |
-| lineWidth | number  | 1        | 线框宽度(像素)                                 |
-| dashed    | boolean | false    | 是否使用虚线样式                               |
-| dashSize  | number  | 3        | 虚线片段长度(像素)，仅当 dashed 为 true 时有效 |
-| gapSize   | number  | 1        | 虚线间隔长度(像素)，仅当 dashed 为 true 时有效 |
-| opacity   | number  | 1.0      | 线框透明度(0.0-1.0)                            |
-| depthTest | boolean | true     | 是否启用深度测试，禁用后线框将始终显示在最前面 |
-| visible   | boolean | true     | 线框是否可见                                   |
+// 创建网格过滤器
+const meshObject = new Object3D();
+const meshFilter = meshObject.addComponent(MeshFilter);
 
-### 10. 辅助线框组件(AuxiliaryWireframeComponent)
+// 通过URL加载几何体
+meshFilter.meshURL = "models/character.glb";
 
-通过引用@rings/graphic 获取 Graphic3D 对象，提供高级线框控制功能
+// 自动处理材质加载
+// 如果GLB包含材质，会自动应用到meshFilter.material
 
-```javascript
-import { Graphic3D } from "@rings/graphic";
-
-entity.addComponent(AuxiliaryWireframeComponent, {
-  graphic: new Graphic3D(),
-  autoUpdate: true,
-});
+scene.addChild(meshObject);
 ```
 
-#### Graphic3D 对象说明
+#### 多材质网格
+```typescript
+import { Object3D, MeshRenderer } from '@rings/core';
 
-##### 基础属性
+const meshObject = new Object3D();
+const meshRenderer = meshObject.addComponent(MeshRenderer);
 
-| 属性名           | 类型     | 默认值 | 描述                 |
-| ---------------- | -------- | ------ | -------------------- |
-| geometry         | Geometry | null   | 关联的几何体对象     |
-| material         | Material | null   | 关联的材质对象       |
-| visible          | boolean  | true   | 是否可见             |
-| matrixAutoUpdate | boolean  | true   | 是否自动更新变换矩阵 |
-| castShadow       | boolean  | true   | 是否投射阴影         |
-| receiveShadow    | boolean  | true   | 是否接收阴影         |
+// 加载包含多个子网格的几何体
+meshRenderer.geometry = await Engine3D.res.loadGeometry("models/house.glb");
 
-##### 几何体操作方法
+// 设置多个材质
+const materials = [
+  new StandardMaterial({ color: 0x8B4513, roughness: 0.8 }), // 墙面
+  new StandardMaterial({ color: 0x696969, roughness: 0.3 }), // 屋顶
+  new StandardMaterial({ color: 0x4169E1, roughness: 0.2 })  // 窗户
+];
+meshRenderer.materials = materials;
 
-| 方法名               | 参数           | 返回值   | 描述           |
-| -------------------- | -------------- | -------- | -------------- |
-| setGeometry(geom)    | geom: Geometry | void     | 设置几何体     |
-| getGeometry()        | -              | Geometry | 获取当前几何体 |
-| computeBoundingBox() | -              | void     | 计算包围盒     |
+scene.addChild(meshObject);
+```
 
-##### 材质控制方法
+#### GPU实例化网格
+```typescript
+import { Object3D, MeshRenderer, Matrix4 } from '@rings/core';
 
-| 方法名           | 参数          | 返回值   | 描述             |
-| ---------------- | ------------- | -------- | ---------------- |
-| setMaterial(mat) | mat: Material | void     | 设置材质         |
-| getMaterial()    | -             | Material | 获取当前材质     |
-| updateMaterial() | -             | void     | 强制更新材质属性 |
+// 创建基础网格
+const meshObject = new Object3D();
+const meshRenderer = meshObject.addComponent(MeshRenderer);
+meshRenderer.geometry = new BoxGeometry(0.5, 0.5, 0.5);
+meshRenderer.material = new StandardMaterial({ color: 0x00ff00 });
 
-##### 渲染控制方法
+// 启用GPU实例化
+meshRenderer.instanceCount = 1000; // 1000个实例
 
-| 方法名             | 参数                 | 返回值 | 描述             |
-| ------------------ | -------------------- | ------ | ---------------- |
-| raycast(raycaster) | raycaster: Raycaster | Array  | 执行光线投射检测 |
-| updateMatrix()     | -                    | void   | 手动更新变换矩阵 |
-| dispose()          | -                    | void   | 释放资源         |
+// 设置实例变换矩阵
+const instanceMatrices: Matrix4[] = [];
+for (let i = 0; i < 1000; i++) {
+  const matrix = new Matrix4();
+  matrix.setPosition(
+    Math.random() * 100 - 50,
+    Math.random() * 10,
+    Math.random() * 100 - 50
+  );
+  instanceMatrices.push(matrix);
+}
 
-#### 组件属性说明
+// 应用实例数据
+// 实际应用中通过UniformBuffer设置
 
-| 属性名     | 类型      | 默认值 | 描述                        |
-| ---------- | --------- | ------ | --------------------------- |
-| graphic    | Graphic3D | null   | 关联的 Graphic3D 实例       |
-| autoUpdate | boolean   | true   | 是否自动更新 Graphic3D 属性 |
-| precision  | number    | 0.01   | 线框计算精度                |
+scene.addChild(meshObject);
+```
 
-## 基础组件 API 参考表
+#### 蒙皮网格动画
+```typescript
+import { Object3D, SkinnedMeshRenderer } from '@rings/core';
 
-| 组件类型               | 关键属性                   | 主要方法                       |
-| ---------------------- | -------------------------- | ------------------------------ |
-| CameraComponent        | type, fov, near, far       | setFOV(), lookAt()             |
-| LightComponent         | type, color, intensity     | setIntensity(), setColor()     |
-| ShadowComponent        | castShadow, receiveShadow  | enable(), disable()            |
-| MaterialComponent      | type, color, roughness     | setColor(), setRoughness()     |
-| TextureComponent       | baseColor, normalMap       | load(), dispose()              |
-| GeometryComponent      | type, width, height, depth | update(), computeBoundingBox() |
-| MeshComponent          | geometry, material         | clone(), raycast()             |
-| InstancedMeshComponent | baseMesh, count, positions | setPositionAt(), getMatrixAt() |
+// 创建蒙皮网格
+const character = new Object3D();
+const skinnedMesh = character.addComponent(SkinnedMeshRenderer);
 
-[返回组件概述 →](/components)
+// 加载带骨骼动画的模型
+const gltf = await Engine3D.res.loadGLTF("models/character.gltf");
+skinnedMesh.geometry = gltf.meshes[0].geometry;
+skinnedMesh.material = gltf.materials[0];
+
+// 设置骨骼数据
+skinnedMesh.bindPose = gltf.skins[0].bindPose;
+
+// 播放动画
+const animation = character.addComponent(AnimationComponent);
+animation.play("idle");
+
+scene.addChild(character);
+```
+
+#### LOD网格系统
+```typescript
+import { Object3D, MeshRenderer } from '@rings/core';
+
+// 创建LOD网格组
+const lodGroup = new Object3D();
+
+// 高细节网格 (近距离)
+const highDetail = new Object3D();
+const highRenderer = highDetail.addComponent(MeshRenderer);
+highRenderer.geometry = await Engine3D.res.loadGeometry("models/tree_high.glb");
+highRenderer.lodLevel = 0;
+lodGroup.addChild(highDetail);
+
+// 中细节网格 (中距离)
+const mediumDetail = new Object3D();
+const mediumRenderer = mediumDetail.addComponent(MeshRenderer);
+mediumRenderer.geometry = await Engine3D.res.loadGeometry("models/tree_medium.glb");
+mediumRenderer.lodLevel = 1;
+lodGroup.addChild(mediumDetail);
+
+// 低细节网格 (远距离)
+const lowDetail = new Object3D();
+const lowRenderer = lowDetail.addComponent(MeshRenderer);
+lowRenderer.geometry = await Engine3D.res.loadGeometry("models/tree_low.glb");
+lowRenderer.lodLevel = 2;
+lodGroup.addChild(lowDetail);
+
+scene.addChild(lodGroup);
+```
+
+### 网格优化配置
+
+#### 阴影优化
+```typescript
+// 针对性能优化阴影设置
+const meshRenderer = meshObject.addComponent(MeshRenderer);
+meshRenderer.castShadow = true;      // 投射阴影
+meshRenderer.receiveShadow = false;  // 不接收阴影(节省性能)
+```
+
+#### 渲染层级控制
+```typescript
+// 设置渲染层级
+meshRenderer.renderLayer = RenderLayer.Opaque;  // 不透明物体
+// 或
+meshRenderer.renderLayer = RenderLayer.Transparent; // 透明物体
+```
+
+#### 动态批处理
+```typescript
+// 启用动态批处理优化
+const meshObject = new Object3D();
+const meshRenderer = meshObject.addComponent(MeshRenderer);
+meshRenderer.geometry = new BoxGeometry(1, 1, 1);
+meshRenderer.material = sharedMaterial; // 使用共享材质
+
+// 多个相同网格会自动批处理
+for (let i = 0; i < 100; i++) {
+  const instance = meshObject.clone();
+  instance.transform.position.set(i * 2, 0, 0);
+  scene.addChild(instance);
+}
+```
+
+### 网格导入参考表
+
+| 网格类型 | 导入路径 | 主要用途 |
+|----------|----------|----------|
+| `MeshRenderer` | `@rings/core` | 标准网格渲染 |
+| `MeshFilter` | `@rings/core` | 几何体管理 |
+| `SkinnedMeshRenderer` | `@rings/core` | 骨骼动画网格 |
+| `SkinnedMeshRenderer2` | `@rings/core` | 优化版蒙皮网格 |
+
+---
+
+## 全局光照
+
+#### Engine3D.setting.gi
+
+配置全局光照(GI)相关参数，基于DDGI(动态漫反射全局光照)探针系统。
+
+**完整属性列表**
+
+| 属性名 | 类型 | 默认值 | 描述 |
+|--------|------|--------|------|
+| `enable` | boolean | false | 是否启用全局光照 |
+| `debug` | boolean | false | 是否启用调试模式 |
+| `debugCamera` | boolean | false | 是否启用调试相机视角 |
+| **探针体积设置** |
+| `probeXCount` | number | 16 | X轴探针数量 |
+| `probeYCount` | number | 8 | Y轴探针数量 |
+| `probeZCount` | number | 16 | Z轴探针数量 |
+| `probeSpace` | number | 64 | 探针间距(单位：世界空间距离) |
+| `probeSize` | number | 1.0 | 探针采样数据大小 |
+| `offsetX` | number | 0 | 体积X轴偏移 |
+| `offsetY` | number | 0 | 体积Y轴偏移 |
+| `offsetZ` | number | 0 | 体积Z轴偏移 |
+| **渲染质量设置** |
+| `probeSourceTextureSize` | number | 128 | 探针纹理分辨率 |
+| `octRTMaxSize` | number | 1024 | 八面体纹理总大小 |
+| `octRTSideSize` | number | 8 | 单个八面体纹理边长 |
+| `maxDistance` | number | 100 | 探针最大深度距离 |
+| `rayNumber` | number | 256 | 每探针光线数量 |
+| **光照参数** |
+| `indirectIntensity` | number | 1.0 | 间接光强度 |
+| `bounceIntensity` | number | 1.0 | 反弹光强度 |
+| `ddgiGamma` | number | 2.2 | DDGI伽马校正 |
+| **实时更新** |
+| `realTimeGI` | boolean | false | 是否启用实时全局光照更新 |
+| `autoRenderProbe` | boolean | true | 是否自动渲染探针 |
+| **高级参数** |
+| `normalBias` | number | 0.5 | 法线偏移 |
+| `depthSharpness` | number | 100 | 深度锐度 |
+| `hysteresis` | number | 0.01 | 滞后值 |
+| `lerpHysteresis` | number | 0.01 | 插值滞后值 |
+| `irradianceChebyshevBias` | number | 0.5 | 辐照度切比雪夫偏移 |
+| `irradianceDistanceBias` | number | 0.1 | 辐照度距离偏移 |
+| `probeRoughness` | number | 0.5 | 探针粗糙度 |
+
+**使用示例**
+
+```typescript
+import { Engine3D } from '@rings/core';
+
+// 基础配置
+Engine3D.setting.gi.enable = true;
+Engine3D.setting.gi.indirectIntensity = 1.5;
+
+// 探针体积配置
+Engine3D.setting.gi.probeXCount = 32;
+Engine3D.setting.gi.probeYCount = 16;
+Engine3D.setting.gi.probeZCount = 32;
+Engine3D.setting.gi.probeSpace = 64;
+
+// 质量设置
+Engine3D.setting.gi.rayNumber = 512;
+Engine3D.setting.gi.probeSourceTextureSize = 256;
+
+// 实时更新
+Engine3D.setting.gi.realTimeGI = true;
+Engine3D.setting.gi.autoRenderProbe = true;
+```
+
+## 阴影设置
+
+#### Engine3D.setting.shadow
+
+配置阴影相关参数，支持PCF、HARD、SOFT三种阴影类型。
+
+**完整属性列表**
+
+| 属性名 | 类型 | 默认值 | 描述 |
+|--------|------|--------|------|
+| **基础设置** |
+| `enable` | boolean | true | 是否启用阴影 |
+| `type` | "PCF" \| "HARD" \| "SOFT" | "HARD" | 阴影类型 |
+| **阴影贴图** |
+| `shadowSize` | number | 2048 | 方向光阴影贴图分辨率 |
+| `pointShadowSize` | number | 2048 | 点光源阴影贴图分辨率 |
+| **偏移设置** |
+| `shadowBias` | number | 0.05 | 阴影偏移量 |
+| `pointShadowBias` | number | 0.005 | 点光源阴影偏移量 |
+| **软阴影参数** |
+| `shadowSoft` | number | 1.0 | 软阴影强度 |
+| **更新控制** |
+| `needUpdate` | boolean | true | 是否需要更新阴影 |
+| `autoUpdate` | boolean | true | 是否自动更新阴影 |
+| `updateFrameRate` | number | 1 | 阴影更新帧率 |
+| **级联阴影(CSM)** |
+| `csmMargin` | number | 1.0 | CSM边缘扩展 |
+| `csmScatteringExp` | number | 1.0 | CSM散射指数 |
+| `csmAreaScale` | number | 1.0 | CSM区域缩放 |
+| **调试** |
+| `debug` | any | null | 调试配置 |
+| `shadowBound` | number | - | 阴影边界距离 |
+
+**使用示例**
+
+```typescript
+import { Engine3D } from '@rings/core';
+
+// 基础阴影配置
+Engine3D.setting.shadow.enable = true;
+Engine3D.setting.shadow.type = "PCF";
+Engine3D.setting.shadow.shadowSize = 4096;
+
+// 软阴影配置
+Engine3D.setting.shadow.shadowSoft = 2.0;
+
+// 性能优化
+Engine3D.setting.shadow.autoUpdate = true;
+Engine3D.setting.shadow.updateFrameRate = 2;
+
+// 偏移调整
+Engine3D.setting.shadow.shadowBias = 0.01;
+Engine3D.setting.shadow.pointShadowBias = 0.001;
+
+// CSM配置
+Engine3D.setting.shadow.csmMargin = 2.0;
+```
+
+## 使用指南
+
+### 性能优化
+
+- **光源限制**：场景中实时阴影光源建议不超过4个
+- **分辨率平衡**：使用合适的阴影贴图分辨率平衡质量与性能
+- **剔除优化**：合理设置相机远近裁剪面
+- **静态光照**：静态场景使用烘焙光照提升性能
+
+### 场景配置示例
+
+#### 室外场景配置
+
+```typescript
+import { Object3D, Scene3D, DirectLight, Color, Vector3 } from '@rings/core';
+
+const setupOutdoorLighting = (scene: Scene3D) => {
+  // 主光源（太阳）
+  const sunObj = new Object3D();
+  const sun = sunObj.addComponent(DirectLight);
+  sun.color = new Color(1, 0.95, 0.8);
+  sun.intensity = 1.2;
+  sun.castShadow = true;
+  sunObj.transform.rotation = new Vector3(-30, 45, 0);
+  scene.addChild(sunObj);
+
+  // 环境照明通过HDR环境贴图
+  const hdrTexture = new HDRTextureCube();
+  await hdrTexture.load("environments/outdoor_sky.hdr");
+  scene.envMap = hdrTexture;
+  scene.exposure = 1.2;
+};
+```
+
+#### 室内场景配置
+
+```typescript
+import { Object3D, Scene3D, PointLight, Color, Vector3 } from '@rings/core';
+
+const setupIndoorLighting = (scene: Scene3D) => {
+  // 主照明
+  const mainLight = new Object3D();
+  const point = mainLight.addComponent(PointLight);
+  point.color = new Color(1, 0.9, 0.8);
+  point.intensity = 1.5;
+  point.range = 15;
+  point.castShadow = true;
+  mainLight.transform.position = new Vector3(0, 8, 0);
+  scene.addChild(mainLight);
+
+  // 补光
+  const fillLight = new Object3D();
+  const fill = fillLight.addComponent(PointLight);
+  fill.color = new Color(0.4, 0.5, 0.8);
+  fill.intensity = 0.5;
+  fill.range = 20;
+  fillLight.transform.position = new Vector3(-5, 3, -5);
+  scene.addChild(fillLight);
+
+  // 环境照明通过GI系统
+  const gi = scene.addComponent(GlobalIlluminationComponent);
+  gi.enable = true;
+  gi.indirectIntensity = 0.3;
+};
+```
