@@ -1,0 +1,74 @@
+--- ​
+description: "Enforces TypeScript strict mode and best practices for type definitions." ​
+globs: [ "**/*.ts" , "**/*.tsx" ] ​
+alwaysApply: true ​
+--- ​
+
+​
+
+# TypeScript Strictness and Typing Best Practices ​
+
+​
+
+- **Strict Mode**: Ensure `tsconfig.json` has `strict: true ` enabled. All new code must adhere to strict type checking. ​
+
+- **Prefer Interfaces for Object Shapes**: For defining the shape of objects or props, prefer `interface` over `type`. ​
+
+```typescript ​
+
+// Good ​
+
+interface UserProfile { ​
+
+id: string; ​
+
+name: string; ​
+
+email?: string; ​
+
+} ​
+
+​
+
+// Avoid for object shapes if interface is suitable ​
+
+// type UserProfileType = { ​
+
+// id: string; ​
+
+// name: string; ​
+
+// email?: string; ​
+
+// } ; ​
+
+``` ​
+
+- **Avoid `any`**: Do not use the `any` type. If a type is truly unknown, use `unknown` and perform necessary type checks. For complex third-party library types, consider creating more specific type definitions or using utility types. ​
+
+- **Use Utility Types**: Leverage TypeScript's built-in utility types like `Partial<T>`, `Readonly<T>`, `Pick<T, K>`, `Omit<T, K>` to create new types from existing ones concisely. ​
+
+- **Consistent Enum Alternative**: Avoid traditional `enum`s. Use `as const` objects for string or number enums. ​
+
+```typescript ​
+
+// Good ​
+
+const UserRole = { ​
+
+ADMIN: 'ADMIN' , ​
+
+EDITOR: 'EDITOR' , ​
+
+VIEWER: 'VIEWER' , ​
+
+} as const; ​
+
+type UserRole = typeof UserRole; ​
+
+
+// Avoid ​
+
+// enum UserRoleEnum { ADMIN , EDITOR , VIEWER } ​
+
+```

@@ -276,7 +276,7 @@ component.addEventListener(ComponentEvent.DISABLED, () => {
 ### 创建自定义组件
 
 ```typescript
-import { ComponentBase, RegisterComponent } from '@orillusion/core';
+import { ComponentBase, RegisterComponent } from '@rings/core';
 
 @RegisterComponent('MyCustomComponent')
 export class MyCustomComponent extends ComponentBase {

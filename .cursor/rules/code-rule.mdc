@@ -1,0 +1,33 @@
+​
+
+--- ​
+
+description: "Standardizes naming conventions across the project for files, folders, variables, functions, and components." ​
+
+alwaysApply: true ​
+
+--- ​
+
+# Project Naming Conventions ​
+
+​
+
+- **Directories/Folders** : Use `kebab-case` (e.g., `src/user-profile` , `components/auth-wizard` ). [5] ​
+
+- **Files** : ​
+
+- TypeScript/JavaScript files: `CamelCase.ts` or `UserProfile.ts` (e.g., `UserProfile.ts` ). ​
+
+- Vue Component files: `PascalCase.vue` (e.g., `UserProfileCard.vue` ). ​
+
+- Test files: `*.test.ts` , `*.spec.ts` , `*.test.tsx` , `*.spec.tsx` . ​
+
+- **Variables & Functions** : Use `camelCase` (e.g., `const userName = "";` , `function getUserProfile() {}` ). ​
+
+- **Class** : Use `PascalCase` (e.g., `class UserProfile` ). ​
+
+- **Interfaces & Types** : Use `PascalCase` (e.g., `interface UserProfileProps {}` , `type UserId = string;` ). ​
+
+- **Constants (especially for enums or action types)** : Use `UPPER_SNAKE_CASE` (e.g., `const MAX_USERS = 100;` , `const FETCH_USER_SUCCESS = 'FETCH_USER_SUCCESS';` ). ​
+
+- **CSS Classes (if not using utility-first like Tailwind)** : Use `kebab-case` or BEM.
