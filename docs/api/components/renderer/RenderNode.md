@@ -41,6 +41,7 @@
 | renderPass | 传统绘制路径：绑定几何/管线并提交 drawIndexed | `view: View3D, passType: PassType, renderContext: RenderContext` | `void` |
 | renderPass2 | 新绘制路径：基于 encoder 提交 draw（支持全屏/网格） | `view: View3D, passType: PassType, rendererPassState: RendererPassState, clusterLightingBuffer: ClusterLightingBuffer, encoder: GPURenderPassEncoder, useBundle?: boolean` | `void` |
 | recordRenderPass2 | 仅记录命令到 encoder | 同上 | `void` |
+| preInit | 查询指定 Pass 是否已完成一次初始化 | `_rendererType: PassType` | `boolean` |
 | addMask | 添加渲染掩码位 | `mask: RendererMask` | `void` |
 | removeMask | 移除渲染掩码位 | `mask: RendererMask` | `void` |
 | hasMask | 判断是否包含掩码位 | `mask: RendererMask` | `boolean` |
@@ -50,13 +51,20 @@
 | detachSceneOctree | 从八叉树解绑并移除监听 | — | `void` |
 | selfCloneMaterials | 深拷贝材质数组并重建管线 | `key: string` | `this` |
 
-Examples
+## Behavior
+- 管线初始化：当 `geometry` 与 `materials` 就绪时，预编译 `PassType.COLOR` 下的 Pass 并调用几何 `generate` 匹配布局；随后依据透明度与 `renderOrder` 计算排序。
+- 通道补齐：根据 `castGI/castShadow/castReflection` 与 `Engine3D.setting.render.zPrePass` 自动为材质创建/移除 GI/Shadow/Reflection/Depth 等 Pass。
+- 资源注入：`nodeUpdate` 会注入 `envMap`、反射探针缓冲、光照缓冲、阴影贴图、IES、DDGI 与 Cluster Lighting 等资源。
+- 可见性：`alwaysRender` 可跳过部分裁剪；`needSortOnCameraZ` 控制相机 Z 排序策略。
+
+## Examples
 ```ts
 const node = new Object3D().addComponent(MeshRenderer);
 node.geometry = new BoxGeometry();
 node.materials = [new LitMaterial()];
 node.castShadow = true;
 node.renderOrder = 3100; // 透明排序示例
+node.addMask(RendererMask.IgnoreDepthPass);
 ```
 
 

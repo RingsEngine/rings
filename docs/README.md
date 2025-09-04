@@ -15,16 +15,23 @@
 ## API
 
 - 核心 Core
-  - [Engine3D](/api/core/Engine3D)
-  - [Scene3D](/api/core/Scene3D)
-  - [View3D](/api/core/View3D)
-  - [Camera3D](/api/core/Camera3D)
-  - [Object3D](/api/core/Object3D)
+  - [Engine3D](api/core/Engine3D.md)
+  - [Scene3D](api/core/Scene3D.md)
+  - [View3D](api/core/View3D.md)
+  - [Camera3D](api/core/Camera3D.md)
+  - [Object3D](api/core/Object3D.md)
 
 - 组件 Components
   - 渲染 Renderer
-    - [RenderNode](/api/components/renderer/RenderNode)
-    - [MeshRenderer](/api/components/renderer/MeshRenderer)
+    - [RenderNode](api/components/renderer/RenderNode.md)
+    - [MeshRenderer](api/components/renderer/MeshRenderer.md)
+  - 材质 Materials
+    - [Material](api/materials/Material.md)
+    - [LitMaterial](api/materials/LitMaterial.md)
+    - [UnLitMaterial](api/materials/UnLitMaterial.md)
+  - 纹理 Textures
+    - [BitmapTexture2D](api/textures/BitmapTexture2D.md)
+    - [RenderTexture](api/textures/RenderTexture.md)
 
 ## 特性
 
