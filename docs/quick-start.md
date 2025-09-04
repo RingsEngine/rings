@@ -18,7 +18,7 @@
 <html>
 <head>
     <title>Rings Engine Demo</title>
-    <script src="https://unpkg.com/@orillusion/core/dist/orillusion.js"></script>
+    <script src="https://unpkg.com/@rings/core/dist/rings.js"></script>
 </head>
 <body>
     <canvas id="canvas" width="800" height="600"></canvas>
@@ -31,11 +31,11 @@
 
 #### 方式二：NPM安装
 ```bash
-npm install @orillusion/core
+npm install @rings/core
 ```
 
 ```typescript
-import { Engine3D, Scene3D, Object3D, Camera3D, LitMaterial, BoxGeometry, MeshRenderer } from '@orillusion/core';
+import { Engine3D, Scene3D, Object3D, Camera3D, LitMaterial, BoxGeometry, MeshRenderer } from '@rings/core';
 ```
 
 ## 🎯 第一个3D场景
@@ -62,7 +62,7 @@ import { Engine3D, Scene3D, Object3D, Camera3D, LitMaterial, BoxGeometry, MeshRe
             Engine3D, Scene3D, Object3D, Camera3D, View3D, LitMaterial, 
             BoxGeometry, SphereGeometry, PlaneGeometry, MeshRenderer, 
             AtmosphericComponent, DirectLight, HoverCameraController
-        } from 'https://unpkg.com/@orillusion/core/dist/orillusion.es.js';
+        } from 'https://unpkg.com/@rings/core/dist/rings.es.js';
 
         async function init() {
             // 初始化引擎
@@ -175,7 +175,7 @@ my-rings-project/
     "preview": "vite preview"
   },
   "dependencies": {
-    "@orillusion/core": "latest"
+    "@rings/core": "latest"
   },
   "devDependencies": {
     "typescript": "^5.0.0",
@@ -369,9 +369,9 @@ Engine3D.stats.onUpdate = (stats) => {
 
 ## 📚 示例代码仓库
 
-- [基础示例](https://github.com/orillusion/orillusion-examples)
-- [进阶教程](https://github.com/orillusion/orillusion-tutorials)
-- [官方演示](https://github.com/orillusion/orillusion-demos)
+- [基础示例](https://github.com/rings/rings-examples)
+- [进阶教程](https://github.com/rings/rings-tutorials)
+- [官方演示](https://github.com/rings/rings-demos)
 
 ## 💡 常见问题
 
