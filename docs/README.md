@@ -12,6 +12,20 @@
 - [Shader 开发](/shaders)
 - [后处理效果](/post-processing)
 
+## API
+
+- 核心 Core
+  - [Engine3D](/api/core/Engine3D)
+  - [Scene3D](/api/core/Scene3D)
+  - [View3D](/api/core/View3D)
+  - [Camera3D](/api/core/Camera3D)
+  - [Object3D](/api/core/Object3D)
+
+- 组件 Components
+  - 渲染 Renderer
+    - [RenderNode](/api/components/renderer/RenderNode)
+    - [MeshRenderer](/api/components/renderer/MeshRenderer)
+
 ## 特性
 
 - 基于 WebGPU 的高性能渲染
