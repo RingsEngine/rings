@@ -1,0 +1,32 @@
+--- ​
+
+description: "Guides AI to generate code that adheres to ESLint and Prettier configurations, focusing on React hooks and formatting." ​
+
+globs: [ "**/*.tsx" , "**/*.ts" ] ​
+
+alwaysApply: false # Apply when relevant, e.g., when generating new components or hooks ​
+
+--- ​
+
+# ESLint and Prettier Adherence ​
+
+
+- **ESLint Comments**: If generating code that might temporarily violate a lint rule (e.g., during scaffolding), include an appropriate ESLint disable comment with a TODO to fix it: ​
+
+\`\`\`typescript ​
+
+// eslint-disable-next-line some-rule -- TODO: Address this lint violation by refactoring X. ​
+
+\`\`\` ​
+
+- **Prettier Formatting**: Generate code that is likely to pass Prettier formatting. This generally means: ​
+
+- Indentation: 2 spaces. ​
+
+- Quotes: Single quotes for JavaScript/TypeScript strings (e.g., `const message = 'Hello';`). JSX props should use double quotes. ​
+
+- Semicolons: Use semicolons at the end of statements. ​
+
+- Trailing Commas: Use trailing commas where applicable (e.g., in multi-line object literals, arrays, and function parameters). ​
+
+- **Imports**: Group and sort imports according to standard conventions (e.g., Vue, React, external libraries, internal modules, relative paths, styles).
