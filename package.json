@@ -16,6 +16,7 @@
     },
     "./dist/*": "./dist/*"
   },
+  "types": "./dist/types/index.d.ts",
   "scripts": {
     "dev": "vite",
     "build": "tsc --p tsconfig.build.json && vite build && npm run build:types && npm run minify",
@@ -23,8 +24,8 @@
     "build:physics": "cd packages/physics && npm run build",
     "build:media": "cd packages/media-extention && npm run build",
     "build:stats": "cd packages/stats && npm run build",
-    "build:graphic": "cd packages/graphic && npm run build",
-    "build:types": "tsc --emitDeclarationOnly -p tsconfig.build.json && rm -rf dist/packages && mv dist/src dist/types",
+    "build:types": "tsc --emitDeclarationOnly -p tsconfig.build.json && node scripts/build-types.js",
+    "minify": "node scripts/minify.js",
     "docs": "typedoc --skipErrorChecking"
   },
   "files": [

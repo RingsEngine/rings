@@ -48,7 +48,8 @@ export class IndicesGPUBuffer extends GPUBufferBase {
     if (data) {
       // 分配内存节点并设置数据
       this.indicesNode = this.memory.allocation_node(data.length * 4);
-      this.indicesNode.setArrayBuffer(0, data);
+      const buffer = data.buffer instanceof ArrayBuffer ? data.buffer : new Uint8Array(data.buffer).buffer;
+      this.indicesNode.setArrayBuffer(0, buffer as ArrayBuffer);
       this.apply();
     }
   }

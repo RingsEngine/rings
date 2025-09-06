@@ -2,7 +2,7 @@ import { GeometryBase, Object3D } from "../..";
 import { Engine3D } from "../../Engine3D";
 import { RegisterComponent } from "../../util/SerializeDecoration";
 import { MeshRenderer } from "./MeshRenderer";
-
+/* eslint-disable */
 @RegisterComponent(MeshFilter, "MeshFilter")
 export class MeshFilter extends MeshRenderer {
   constructor() {

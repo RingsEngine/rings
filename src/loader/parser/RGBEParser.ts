@@ -4,7 +4,7 @@ import { HDRTexture } from "../../textures/HDRTexture";
 import { HDRTextureCube } from "../../textures/HDRTextureCube";
 import { toHalfFloat } from "../../util/Convert";
 import { ParserBase } from "./ParserBase";
-
+/* eslint-disable */
 export enum RGBEErrorCode {
   RGBE_RETURN_FAILURE = -1,
   rgbe_read_error = 1,
@@ -90,7 +90,7 @@ export class RGBEParser extends ParserBase {
     let texture = new HDRTexture().create(
       this._width,
       this._height,
-      this._rgbeArray
+      this._rgbeArray.buffer instanceof ArrayBuffer ? this._rgbeArray.buffer : new Uint8Array(this._rgbeArray).buffer
     );
     return texture;
   }

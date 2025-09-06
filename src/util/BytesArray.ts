@@ -1,6 +1,19 @@
 import { Color, Matrix4, Quaternion, Vector2, Vector3, Vector4 } from "..";
 
-export class BytesArray extends DataView {
+/* eslint-disable */export class BytesArray extends DataView<ArrayBufferLike> {
+  public get buffer() { return super.buffer; }
+  public get byteOffset() { return super.byteOffset; }
+  public get byteLength() { return super.byteLength; }
+  public getInt16(byteOffset: number, littleEndian?: boolean): number { return super.getInt16(byteOffset, littleEndian); }
+  public getInt32(byteOffset: number, littleEndian?: boolean): number { return super.getInt32(byteOffset, littleEndian); }
+  public getFloat32(byteOffset: number, littleEndian?: boolean): number { return super.getFloat32(byteOffset, littleEndian); }
+  public getFloat64(byteOffset: number, littleEndian?: boolean): number { return super.getFloat64(byteOffset, littleEndian); }
+  public getUint8(byteOffset: number): number { return super.getUint8(byteOffset); }
+  public getUint32(byteOffset: number, littleEndian?: boolean): number { return super.getUint32(byteOffset, littleEndian); }
+  public getInt8(byteOffset: number): number { return super.getInt8(byteOffset); }
+  public getUint16(byteOffset: number, littleEndian?: boolean): number { 
+    return super.getUint16(byteOffset, littleEndian); 
+  }
   public position: number = 0;
   public littleEndian?: boolean = true;
   constructor(
@@ -237,8 +250,11 @@ export class BytesArray extends DataView {
     return list;
   }
   public readFloat32Array(len: number): Float32Array {
-    let ret = new Float32Array(this.buffer, this.position, len);
-    ret = ret.slice(0, this.byteLength);
+    let view = new DataView(this.buffer);
+    let ret = new Float32Array(len);
+    for (let i = 0; i < len; i++) {
+      ret[i] = view.getFloat32(this.position + i * Float32Array.BYTES_PER_ELEMENT, this.littleEndian);
+    }
     this.position += len * Float32Array.BYTES_PER_ELEMENT;
     return ret;
   }

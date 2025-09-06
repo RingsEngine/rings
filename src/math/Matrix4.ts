@@ -47,7 +47,7 @@ export class Matrix4 {
   /**
    * @internal
    */
-  public static buffer: ArrayBuffer;
+  public static buffer: ArrayBufferLike;
 
   /**
    * @internal
@@ -127,6 +127,7 @@ export class Matrix4 {
    * init matrix memory by totalCount * 4(float) * 4
    * @param count every alloc matrix count
    */
+  /* eslint-disable */
   public static allocMatrix(allocCount: number) {
     this.allocCount = allocCount;
 

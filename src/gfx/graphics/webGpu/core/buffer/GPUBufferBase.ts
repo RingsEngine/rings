@@ -11,7 +11,7 @@ import { webGPUContext } from "../../Context3D";
 import { MemoryDO } from "../../../../../core/pool/memory/MemoryDO";
 import { MemoryInfo } from "../../../../../core/pool/memory/MemoryInfo";
 import { FloatArray } from "@rings/wasm-matrix/WasmMatrix";
-
+/* eslint-disable */
 export class GPUBufferBase {
   public bufferType: GPUBufferType;
   public buffer: GPUBuffer;
@@ -528,7 +528,8 @@ export class GPUBufferBase {
     this.memory.allocation(this.byteSize);
     if (data) {
       let m = this.memory.allocation_node(data.length * 4);
-      m.setArrayBuffer(0, data);
+      const buffer = data.buffer instanceof ArrayBuffer ? data.buffer : new Uint8Array(data.buffer).buffer;
+    m.setArrayBuffer(0, buffer as ArrayBuffer);
       this.apply();
     }
   }

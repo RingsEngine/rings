@@ -1,0 +1,1 @@
+export class KHR_materials_ior {}

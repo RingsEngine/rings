@@ -1,11 +1,11 @@
 import { BytesArray } from "../../../..";
-
+/* eslint-disable */
 export class BlendShapePropertyData {
   public shapeName: string;
   public shapeIndex: number;
   public frameCount: number;
-  public blendPositionList = new Float32Array();
-  public blendNormalList = new Float32Array();
+  public blendPositionList: Float32Array = new Float32Array();
+  public blendNormalList: Float32Array = new Float32Array();
   public formBytes(byteArray: BytesArray) {
     let bytes = byteArray.readBytesArray();
 

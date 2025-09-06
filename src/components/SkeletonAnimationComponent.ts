@@ -7,7 +7,7 @@ import { Skeleton } from "./anim/skeletonAnim/Skeleton";
 import { SkeletonAnimationClip } from "./anim/skeletonAnim/SkeletonAnimationClip";
 import { SkeletonAnimationClipState } from "./anim/skeletonAnim/SkeletonAnimationClipState";
 import { SkeletonPose } from "./anim/skeletonAnim/SkeletonPose";
-
+/* eslint-disable */
 @RegisterComponent(SkeletonAnimationComponent, "SkeletonAnimationComponent")
 export class SkeletonAnimationComponent extends ComponentBase {
   public isPlaying: boolean = true;

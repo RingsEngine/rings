@@ -1,7 +1,7 @@
 import { ArrayBufferData } from "../../gfx/graphics/webGpu/core/buffer/ArrayBufferData";
 import { IndicesGPUBuffer } from "../../gfx/graphics/webGpu/core/buffer/IndicesGPUBuffer";
 import { VertexAttributeData } from "./VertexAttributeData";
-
+/* eslint-disable */
 export class GeometryIndicesBuffer {
   public uuid: string = "";
   public name: string;
@@ -21,7 +21,8 @@ export class GeometryIndicesBuffer {
   }
 
   public upload(data: ArrayBufferData) {
-    this.indicesGPUBuffer.indicesNode.setArrayBuffer(0, data as ArrayBuffer);
+    const buffer = data.buffer instanceof ArrayBuffer ? data.buffer : new Uint8Array(data.buffer).buffer;
+    this.indicesGPUBuffer.indicesNode.setArrayBuffer(0, buffer as ArrayBuffer);
     this.indicesGPUBuffer.apply();
   }
 

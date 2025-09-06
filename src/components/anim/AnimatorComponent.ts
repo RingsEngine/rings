@@ -19,7 +19,7 @@ import {
 import { PropertyAnimationClip } from "../../math/AnimationCurveClip";
 import { RegisterComponent } from "../../util/SerializeDecoration";
 import { ComponentBase } from "../ComponentBase";
-
+/* eslint-disable */
 @RegisterComponent(AnimatorComponent, "AnimatorComponent")
 export class AnimatorComponent extends ComponentBase {
   public timeScale: number = 1.0;
