@@ -13,7 +13,7 @@ import {
 } from "../../util/SerializeDecoration";
 import { mergeFunctions } from "../../util/Global";
 import { Material } from "../../materials/Material";
-
+/* eslint-disable */
 @RegisterComponent(MeshRenderer, "MeshRenderer")
 export class MeshRenderer extends RenderNode {
   public receiveShadow: boolean;

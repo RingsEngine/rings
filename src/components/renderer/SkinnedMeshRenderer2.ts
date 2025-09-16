@@ -7,7 +7,7 @@ import { PassType } from "../../gfx/renderJob/passRenderer/state/PassType";
 import { RendererPassState } from "../../gfx/renderJob/passRenderer/state/RendererPassState";
 import { ClusterLightingBuffer } from "../../gfx/renderJob/passRenderer/cluster/ClusterLightingBuffer";
 import { AnimatorComponent, GeometryBase, RegisterComponent } from "../..";
-
+/* eslint-disable */
 @RegisterComponent(SkinnedMeshRenderer2, "SkinnedMeshRenderer2")
 export class SkinnedMeshRenderer2 extends MeshRenderer {
   public skinJointsName: Array<string>;

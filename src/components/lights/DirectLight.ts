@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { Camera3D } from "../../core/Camera3D";
 import { UUID } from "../../util/Global";
 import { RegisterComponent } from "../../util/SerializeDecoration";

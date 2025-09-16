@@ -8,6 +8,7 @@ import { LightType } from "./LightData";
  * 点光源
  * @group Lights
  */
+/* eslint-disable */
 @RegisterComponent(Light, "Light")
 export class Light extends LightBase {
   constructor() {

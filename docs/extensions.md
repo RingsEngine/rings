@@ -891,7 +891,64 @@ animator.pause();
 animator.resume();
 ```
 
-### 2.2 骨骼动画组件（SkeletonAnimationComponent）
+### 2.2 属性动画组件（PropertyAnimation）
+
+用于处理对象属性的动画，支持位置、旋转、缩放、颜色等各种属性的动画：
+
+```javascript
+import { PropertyAnimation, PropertyAnimClip } from "@rings/core";
+
+// 创建属性动画实体
+const animatedObject = new Object3D();
+const propertyAnimator = animatedObject.addComponent(PropertyAnimation);
+
+// 创建动画剪辑
+const moveClip = new PropertyAnimClip();
+moveClip.name = "moveAnimation";
+moveClip.wrapMode = WrapMode.Loop;
+
+// 从JSON数据加载动画
+moveClip.parse(animationJsonData);
+
+// 添加到动画器
+propertyAnimator.appendClip(moveClip);
+
+// 设置默认动画和自动播放
+propertyAnimator.defaultClip = "moveAnimation";
+propertyAnimator.autoPlay = true;
+
+// 播放动画
+propertyAnimator.play("moveAnimation");
+
+// 控制播放
+propertyAnimator.speed = 2.0; // 双倍速度
+propertyAnimator.seek(1.5);   // 跳转到1.5秒
+propertyAnimator.stop();      // 停止播放
+propertyAnimator.toggle();    // 切换播放/暂停
+```
+
+#### PropertyAnimation 属性列表
+
+| 属性名 | 类型 | 描述 |
+|--------|------|------|
+| `defaultClip` | `string` | 自动播放的默认动画剪辑名称 |
+| `autoPlay` | `boolean` | 是否在组件启动时自动播放默认动画 |
+| `speed` | `number` | 动画播放速度，默认1.0 |
+| `currentClip` | `PropertyAnimClip` | 当前播放的动画剪辑 |
+| `time` | `number` | 当前动画时间（秒） |
+
+#### PropertyAnimation 方法列表
+
+| 方法名 | 参数 | 返回值 | 描述 |
+|--------|------|--------|------|
+| `play` | name: string, reset?: boolean | PropertyAnimClip | 播放指定动画剪辑 |
+| `stop` | - | void | 停止当前动画 |
+| `seek` | time: number | void | 跳转到指定时间 |
+| `toggle` | - | void | 切换播放/暂停状态 |
+| `getClip` | name: string | PropertyAnimClip | 获取指定名称的动画剪辑 |
+| `appendClip` | clip: PropertyAnimClip | void | 添加动画剪辑到动画器 |
+
+### 2.3 骨骼动画组件（SkeletonAnimationComponent）
 
 用于处理更底层的骨骼动画系统：
 
@@ -1143,68 +1200,229 @@ skeleton.joints.forEach((joint, index) => {
 });
 ```
 
+### 2.4 动画事件系统
+
+动画系统支持事件回调，可以在动画播放过程中的特定时间点触发事件：
+
+```javascript
+import { PropertyAnimation, PropertyAnimationEvent } from "@rings/core";
+
+// 创建属性动画并添加事件监听
+const animator = entity.addComponent(PropertyAnimation);
+
+// 监听动画完成事件
+animator.eventDispatcher.addEventListener(PropertyAnimationEvent.COMPLETE, (e) => {
+  console.log('动画播放完成:', e.animation.currentClip.name);
+});
+
+// 监听关键帧事件
+animator.eventDispatcher.addEventListener(PropertyAnimationEvent.SEEK, (e) => {
+  console.log('到达关键帧:', e.frame.time, '数据:', e.frame.data);
+});
+
+// 注册关键帧事件
+const keyframe = {
+  clipName: "moveAnimation",
+  time: 2.5,  // 2.5秒时触发
+  data: { message: "到达中点" }
+};
+animator.registerEventKeyFrame(keyframe);
+```
+
+### 2.5 动画剪辑详解
+
+#### 骨骼动画剪辑（SkeletonAnimationClip）
+
+用于存储骨骼动画数据：
+
+```javascript
+import { SkeletonAnimationClip } from "@rings/core";
+
+// 创建骨骼动画剪辑
+const clip = new SkeletonAnimationClip(
+  "walk",           // 动画名称
+  skeleton,         // 骨骼对象
+  60,              // 帧数
+  bufferData       // Float32Array动画数据
+);
+
+// 获取动画信息
+console.log('总时长:', clip.totalTime);
+console.log('帧率:', clip.frameRate);
+console.log('帧数:', clip.numFrame);
+
+// 添加动画事件
+clip.addEvent("eventName", 1.5); // 在1.5秒添加事件
+```
+
+#### 属性动画剪辑（PropertyAnimClip）
+
+用于存储对象属性动画数据：
+
+```javascript
+import { PropertyAnimClip, WrapMode } from "@rings/core";
+
+// 创建属性动画剪辑
+const clip = new PropertyAnimClip();
+clip.name = "colorChange";
+clip.wrapMode = WrapMode.Loop; // 循环播放
+clip.parse(animationJson);     // 从JSON解析动画数据
+
+// 支持的包装模式
+// WrapMode.Default = 0
+// WrapMode.Clamp = 1    // 播放一次后停止
+// WrapMode.Loop = 2     // 循环播放
+// WrapMode.PingPong = 4 // 往返播放
+// WrapMode.ClampForever = 8 // 保持最后一帧
+```
+
 ### 动画系统导入路径
 
-| 组件类名 | 导入路径 | 描述 |
+| 类名 | 导入路径 | 描述 |
 |----------|----------|------|
 | `AnimatorComponent` | `@rings/core` | 通用动画组件，支持骨骼和变形动画 |
 | `SkeletonAnimationComponent` | `@rings/core` | 专用骨骼动画组件 |
 | `PropertyAnimation` | `@rings/core` | 属性动画组件 |
+| `Skeleton` | `@rings/core` | 骨骼数据结构 |
+| `Joint` | `@rings/core` | 骨骼关节类 |
 | `SkeletonAnimationClip` | `@rings/core` | 骨骼动画剪辑 |
-| `PropertyAnimationClip` | `@rings/core` | 属性动画剪辑 |
+| `PropertyAnimClip` | `@rings/core` | 属性动画剪辑 |
+| `PropertyAnimationEvent` | `@rings/core` | 动画事件类 |
 
 ### 动画系统使用注意事项
 
-1. **必需设置**：
-   - `AnimatorComponent` 必须设置 `avatar` 属性
-   - `SkeletonAnimationComponent` 必须设置 `skeleton` 属性
+#### 1. 必需设置
+- `AnimatorComponent` 必须设置 `avatar` 属性
+- `SkeletonAnimationComponent` 必须设置 `skeleton` 属性
+- `PropertyAnimation` 需要添加至少一个动画剪辑
 
-2. **动画数据加载**：
-   ```javascript
-   // 从GLTF加载动画数据
-   const gltf = await Engine3D.res.loadGLTF("model.gltf");
-   const avatar = gltf.skeletonData; // 获取骨骼数据
-   animator.avatar = avatar.name;
-   ```
+#### 2. 动画数据加载
+```javascript
+// 从GLTF加载完整的动画系统
+const gltf = await Engine3D.res.loadGLTF("model.gltf");
 
-3. **性能优化**：
-   - 避免频繁切换动画
-   - 合理使用动画混合
-   - 及时清理不需要的动画剪辑
-   - **用法**：
-     ```typescript
-     animator.crossFade("run", 0.5); // 在0.5秒内淡入跑步动画
-     ```
+// 顶点变形动画（适用于FBX/GLTF模型）
+const animator = entity.addComponent(AnimatorComponent);
+animator.avatar = gltf.skeletonData.name;
+animator.clips = gltf.animations;
 
-3. **`playBlendShape(shapeName: string, time?: number, speed?: number)`**
+// 骨骼动画（更底层控制）
+const skeletonAnimator = entity.addComponent(SkeletonAnimationComponent);
+skeletonAnimator.skeleton = gltf.skeleton;
+for (let anim of gltf.skeletonAnimations) {
+  skeletonAnimator.addAnimationClip(anim);
+}
 
-   - **描述**：播放指定的 BlendShape 动画。
-   - **参数**：
-     - `shapeName`：BlendShape 名称。
-     - `time`：起始时间（秒），默认为 `0`。
-     - `speed`：播放速度，默认为 `1`。
-   - **用法**：
-     ```typescript
-     animator.playBlendShape("smile", 0, 0.5); // 以0.5倍速度播放微笑动画
-     ```
+// 属性动画（适用于程序化动画）
+const propertyAnimator = entity.addComponent(PropertyAnimation);
+const clip = new PropertyAnimClip();
+clip.parse(animationJsonData);
+propertyAnimator.appendClip(clip);
+```
 
-4. **`getJointIndexTable(skinJointsName: string[])`**
+#### 3. 动画类型选择指南
+| 动画类型 | 适用场景 | 性能 | 特点 |
+|----------|----------|------|------|
+| `AnimatorComponent` | 模型内置动画、骨骼动画、顶点变形 | 中等 | 功能全面，支持混合 |
+| `SkeletonAnimationComponent` | 纯骨骼动画 | 高 | 底层控制，性能最佳 |
+| `PropertyAnimation` | 属性动画、UI动画、程序化动画 | 低 | 灵活，支持任意属性 |
 
-   - **描述**：获取骨骼索引表。
-   - **参数**：
-     - `skinJointsName`：骨骼名称数组。
-   - **返回值**：骨骼索引数组。
-   - **用法**：
-     ```typescript
-     let indices = animator.getJointIndexTable(["arm_L", "arm_R"]);
-     ```
+#### 4. 动画混合与过渡
+```javascript
+// AnimatorComponent动画混合
+animator.playAnim("walk", 0, 1.0);
+animator.crossFade("run", 0.5); // 0.5秒平滑过渡
 
-5. 多动画剪辑管理
-6. 平滑过渡和混合
-7. 精确的动画事件系统
-8. 播放控制（暂停/恢复/速度调节）
-9. 支持 GLTF/GLB、FBX 等主流动画格式
-10. 动画遮罩和分层控制
+// SkeletonAnimationComponent动画混合
+skeletonAnimator.crossFade("run", 0.3);
+
+// 同时播放多个动画（权重混合）
+skeletonAnimator.play("walk", 0.7); // 70%权重
+skeletonAnimator.play("strafe", 0.3); // 30%权重
+```
+
+#### 5. 性能优化建议
+- **骨骼动画优化**：
+  - 减少骨骼数量（建议<50根）
+  - 使用GPU蒙皮而非CPU蒙皮
+  - 避免每帧更新骨骼矩阵
+
+- **动画剪辑优化**：
+  - 压缩动画数据（减少关键帧）
+  - 使用合理的帧率（24-30fps）
+  - 避免过长的动画剪辑
+
+- **运行时优化**：
+  - 使用动画LOD（距离远时降低精度）
+  - 批量更新动画组件
+  - 禁用不可见对象的动画
+
+#### 6. 常见问题与解决方案
+
+**问题1：动画不播放**
+```javascript
+// 检查必需设置
+console.log('avatar设置:', animator.avatar);
+console.log('骨骼设置:', skeletonAnimator.skeleton);
+console.log('动画剪辑数量:', animator.clips?.length);
+```
+
+**问题2：动画抖动**
+```javascript
+// 确保骨骼数据匹配
+console.log('骨骼关节数:', skeleton.numJoint);
+console.log('动画骨骼数:', clip.skeleton.numJoint);
+```
+
+**问题3：性能问题**
+```javascript
+// 监控动画性能
+const stats = {
+  activeAnimators: 0,
+  totalBones: 0,
+  updateTime: 0
+};
+// 使用引擎统计工具监控
+```
+
+#### 7. 高级功能示例
+
+**动画状态机**：
+```javascript
+// 创建简单的动画状态机
+class AnimationStateMachine {
+  constructor(animator) {
+    this.animator = animator;
+    this.currentState = "idle";
+    this.states = {
+      idle: { next: ["walk", "run"] },
+      walk: { next: ["idle", "run"] },
+      run: { next: ["walk", "idle"] }
+    };
+  }
+  
+  transitionTo(newState) {
+    if (this.states[this.currentState].next.includes(newState)) {
+      this.animator.crossFade(newState, 0.3);
+      this.currentState = newState;
+    }
+  }
+}
+```
+
+**骨骼绑定高级用法**：
+```javascript
+// 动态绑定武器到骨骼
+const weapon = new Object3D();
+const skeletonAnimator = character.getComponent(SkeletonAnimationComponent);
+
+// 绑定到右手骨骼
+skeletonAnimator.addJointBind("RightHand", weapon);
+
+// 动态切换绑定
+skeletonAnimator.removeJointBind(weapon);
+skeletonAnimator.addJointBind("LeftHand", weapon);
+```
 
 ### 2.2 属性动画
 

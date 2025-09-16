@@ -9,7 +9,7 @@ import { RegisterComponent } from "../../util/SerializeDecoration";
 import { LightBase } from "./LightBase";
 import { LightType } from "./LightData";
 
-@RegisterComponent(SpotLight, "SpotLight")
+/* eslint-disable */@RegisterComponent(SpotLight, "SpotLight")
 export class SpotLight extends LightBase {
   constructor() {
     super();

@@ -13,7 +13,7 @@
   "scripts": {
     "build": "vite build && npm run build:types && npm run build:clean",
     "build:types": "tsc --emitDeclarationOnly -p tsconfig.json",
-    "build:clean": "mv dist/packages/stats/* dist && rm -rf dist/src && rm -rf dist/packages",
+    "build:clean": "node -e \"const fs=require('fs');const path=require('path');const dirs=['dist/packages/stats','dist/src','dist/packages'];dirs.forEach(dir=>{if(fs.existsSync(dir)){if(fs.lstatSync(dir).isDirectory()){fs.rmSync(dir,{recursive:true,force:true})}else{const files=fs.readdirSync(dir);files.forEach(file=>{const srcPath=path.join(dir,file);const destPath=path.join('dist',file);if(fs.existsSync(srcPath)){fs.renameSync(srcPath,destPath)}})}}});\"",
     "docs": "npm run docs:typedoc ../../docs/stats index.ts",
     "docs:typedoc": "npx typedoc --plugin typedoc-plugin-markdown --tsconfig tsconfig.json --gitRevision main --hideBreadcrumbs true --allReflectionsHaveOwnDocument true --readme none --excludeInternal --excludePrivate --excludeProtected --sort source-order --out"
   },

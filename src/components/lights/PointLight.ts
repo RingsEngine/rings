@@ -3,7 +3,7 @@ import { UUID } from "../../util/Global";
 import { RegisterComponent } from "../../util/SerializeDecoration";
 import { LightBase } from "./LightBase";
 import { LightType } from "./LightData";
-
+/* eslint-disable */
 @RegisterComponent(PointLight, "PointLight")
 export class PointLight extends LightBase {
   constructor() {

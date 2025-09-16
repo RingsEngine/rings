@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { Skeleton } from "./Skeleton";
 import { SkeletonPose } from "./SkeletonPose";
 import { OAnimationEvent } from "../OAnimationEvent";
@@ -23,8 +24,9 @@ export class SkeletonAnimationClip {
       let skeletonPoseLength: number = 12 * skeleton.numJoint;
       for (let nFrame: number = 0; nFrame < numFrame; nFrame++) {
         let byteOffset: number = skeletonPoseLength * nFrame * 4;
+        const buffer = bufferData.buffer instanceof ArrayBuffer ? bufferData.buffer : new Uint8Array(bufferData.buffer).buffer;
         let poseData = new Float32Array(
-          bufferData.buffer,
+          buffer as ArrayBuffer,
           byteOffset,
           skeletonPoseLength
         );
@@ -84,8 +86,9 @@ export class SkeletonAnimationClip {
     );
     result._skeletonPoses = this._skeletonPoses.slice(startFrame, endFrame);
     const skeletonPoseByteLength = 12 * this._skeleton.numJoint * 4;
+    const buffer = this._animationClipData.buffer instanceof ArrayBuffer ? this._animationClipData.buffer : new Uint8Array(this._animationClipData.buffer).buffer;
     this._animationClipData = new Float32Array(
-      this._animationClipData,
+      buffer as ArrayBuffer,
       startFrame * skeletonPoseByteLength,
       (endFrame - startFrame) * skeletonPoseByteLength
     );
