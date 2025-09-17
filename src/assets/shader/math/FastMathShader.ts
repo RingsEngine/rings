@@ -67,7 +67,7 @@ export let FastMathShader: string = `
         return res ;
         }else{
         return PI - res ;
-        }
+        };
     }
 
     fn acosFast4( inX : f32 )-> f32
@@ -86,6 +86,6 @@ export let FastMathShader: string = `
         return s ;
         }else{
         return PI - s ;
-        }
+        };
     }
 `;

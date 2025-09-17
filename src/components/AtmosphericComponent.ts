@@ -163,7 +163,7 @@ export class AtmosphericComponent extends SkyRenderer {
           this._relatedTransform.rotationY
         )
       ) {
-        this.sunX = (this._relatedTransform.rotationY + 90) / 360; //
+        this.sunX = (this._relatedTransform.rotationY + 90) / 360;
         this.sunY = this._relatedTransform.rotationX / 180 + 0.5;
       } else if (this._historyData.isSkyChange(this.sunX, this.sunY)) {
         this._relatedTransform.rotationY = this.sunX * 360 - 90;

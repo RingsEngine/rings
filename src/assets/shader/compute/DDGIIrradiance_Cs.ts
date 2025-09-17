@@ -175,12 +175,12 @@ export let DDGIIrradiance_shader = `
                 cornerCoord.x = sideBorderCnt - 1;
             }else{
                 cornerCoord.x = 0;
-            }
+            };
             if(modeXY.y == 0){
                 cornerCoord.y = sideBorderCnt - 1;
             }else{
                 cornerCoord.y = 0;
-            }
+            };
             cornerCoord = indexXY * sideBorderCnt + cornerCoord;
             textureStore(texture, cornerCoord, color);
         }

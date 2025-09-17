@@ -1,4 +1,4 @@
-export let Common_vert: string = `
+export let Common_vert: string = /*wgsl*/ `
     #include "WorldMatrixUniform"
     #include "VertexAttributes_vert"
     #include "GlobalUniform"
@@ -7,6 +7,6 @@ export let Common_vert: string = `
     fn VertMain( vertex:VertexAttributes ) -> VertexOutput {
         vertex_inline(vertex);
         vert(vertex);
-        return ORI_VertexOut;
+        return ORI_VertexOut ;
     }
-`;
+`

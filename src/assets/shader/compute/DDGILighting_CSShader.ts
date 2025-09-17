@@ -108,7 +108,7 @@ fn directShadowMaping(P:vec3<f32>, N:vec3<f32>, shadowBias: f32)  {
       }else{
         shadowMatrix = globalUniform.shadowMatrix[shadowIndex];
         visibility = directShadowMapingIndex(light, shadowMatrix, P, N, shadowIndex, shadowBias).x;
-      }
+      };
     }
   shadowStrut.directShadowVisibility = visibility;
 }
@@ -217,7 +217,7 @@ fn spotLight( albedo:vec3<f32>,WP:vec3<f32>, N:vec3<f32>, V:vec3<f32>, light:Lig
        }
      }else{
        atten = 0.0 ;
-     }
+     };
      var lightColor = light.lightColor.rgb  ;
      lightColor = getHDRColor(lightColor , light.linear ) * light.intensity / LUMEN * 2.0;
      color = (albedo / PI) * lightColor.rgb * atten ;

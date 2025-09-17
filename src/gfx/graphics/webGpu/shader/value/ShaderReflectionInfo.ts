@@ -431,7 +431,7 @@ export class ShaderReflection {
   private static parserVertex(entryPoint: string, wgsl: string) {
     let attributes: any[] = [];
     let list = wgsl.split(`fn ${entryPoint}(`);
-    let block = list[1].split("->")[0];
+    let block = list[1].split('->')[0];
     let blockList = block.split("@");
     if (blockList && blockList.length > 1) {
       for (let i = 1; i < blockList.length; i++) {

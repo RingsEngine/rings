@@ -77,14 +77,14 @@ export let BRDFLUT: string = `
         return 4.0 * vec2<f32>(A, B) / f32(numSamples);
     }
 
-    @group(0) @binding(0) var brdfluTexture: texture_storage_2d<rgba8unorm, write>;
+    @group(0) @binding(0) var brdflutTexture: texture_storage_2d<rgba8unorm, write>;
     @compute @workgroup_size(8,8,1)
-    fn CsMain(@builtin(global_invocation_id) workgroup_id: vec3<u32>, @builtin(local_invocation_id) local_invocation_id: vec3<u32>){
-        var fragCoord = vec2<u32>(global_invocation_id.x, global_invocation_id.y);
-        var fragColor = vec4<f32>(0,0);
-        var res = integrateBRDF(f32(fragCoord.y + 1u) / 256.0, f32(fragCoord.x + 1u) / 256.0);
-        fragColor = vec4<f32>(res.x, res.y, 0.0, 1.0);
-
-        textureStore(brdflutTexture, vec2<i32>(fragCoord.xy), fragColor);
-    }
+    fn CsMain(@builtin(global_invocation_id) global_invocation_id : vec3<u32>){
+    var fragCoord = vec2<u32>(global_invocation_id.x, global_invocation_id.y);
+    var fragColor = vec4<f32>(0.0);
+    // Output to screen
+    var res = integrateBRDF(f32(fragCoord.y + 1u) / 256.0, f32(fragCoord.x + 1u) / 256.0);
+    fragColor = vec4<f32>(res.x, res.y, 0.0, 1.0);
+    textureStore(brdflutTexture, vec2<i32>(fragCoord.xy), fragColor);
+}
 `;

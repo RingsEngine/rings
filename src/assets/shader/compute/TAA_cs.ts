@@ -74,7 +74,7 @@ fn blendColor() -> vec4<f32>{
             preCoord = vec2<i32>(reProjectionCoord);
         }else{ 
             mixWeight = 1.0;
-        }
+        };
     }
 
     var curUV01 = fragUV;
@@ -147,6 +147,6 @@ fn minmax4(coord:vec2<i32>) {
           return vec4<f32>(p_clip, color_avg.w) + v_clip / ma_unit;
       }else{
           return input_texel;
-      }
+      };
   }
 `;

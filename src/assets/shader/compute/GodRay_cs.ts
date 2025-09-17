@@ -88,7 +88,7 @@ export let GodRay_cs: string = /*wgsl*/ `
             }else{
                 shadowMatrix = globalUniform.shadowMatrix[shadowIndex];
                 visibility = directShadowMapingIndex(light, shadowMatrix, P, N, shadowIndex, shadowBias).x;
-            }
+            };
         }
         shadowStruct.directShadowVisibility = visibility;
     }

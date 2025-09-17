@@ -50,7 +50,7 @@ export let Hair_frag = `
           face = 1.0 ;
       }else{
           face = -1.0 ;
-      }
+      };
       #if USE_TANGENT
         let T = ORI_VertexVarying.TANGENT.xyz;
         let N = ORI_VertexVarying.vWorldNormal ;

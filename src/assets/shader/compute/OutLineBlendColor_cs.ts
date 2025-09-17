@@ -43,7 +43,7 @@ export let OutLineBlendColor_cs: string = /*wgsl*/ `
             blendColor = inColor.xyz + outLineColor.xyz * outLineColor.w;
         }else{
             blendColor = mix(inColor.xyz, outLineColor.xyz, outLineColor.w);
-        }
+        };
         textureStore(outlineTex, fragCoord, vec4<f32>(blendColor, inColor.w));
    }
 `;

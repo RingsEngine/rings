@@ -1,9 +1,51 @@
-export let BxdfDebug_frag: string = `
-    #include "ClusterDebug_frag"
+/**
+ * @internal
+ */
+export let BxdfDebug_frag: string = /*wgsl*/ `
+#include "ClusterDebug_frag" 
+
+        fn debugPosition(){
+        }
 
         fn debugMeshID(){
             let meshIDColor = u32(round(ORI_VertexVarying.vWorldPos.w) ) ;
             let color = colorSet[ meshIDColor % 9u] ;
+        }
+
+        fn debugNormal(){
+        }
+
+        fn debugUV(){
+        }
+
+        fn debugColor(){
+        }
+
+        fn debugDiffuse(){
+        }
+
+        fn debugAmbient(){
+        }
+        
+        fn debugEmissive(){
+        }
+
+        fn debugEnvment(){
+        }
+
+        fn debugAo(){
+        }
+
+        fn debugRoughness(){
+        }
+
+        fn debugMetallic(){
+        }
+
+        fn debugIrradiance(){
+        }
+
+        fn debugTangent(){
         }
 
         fn debugFragmentOut(){
@@ -135,4 +177,4 @@ export let BxdfDebug_frag: string = `
                 }
               }
         }
-`;
+`

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rings Engine 开发测试</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .test-section {
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .test-button {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        .test-button:hover {
+            background: #005a9e;
+        }
+
+        #log {
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .success {
+            color: #4caf50;
+        }
+
+        .error {
+            color: #f44336;
+        }
+
+        .info {
+            color: #2196f3;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Rings Engine 源码测试</h1>
+        <p>这个页面用于在开发模式下测试源码功能，不影响 docs 页面</p>
+
+        <div class="test-section">
+            <h3>模块测试</h3>
+            <button class="test-button" onclick="testImport()">测试模块导入</button>
+            <button class="test-button" onclick="testEngine()">测试引擎</button>
+            <button class="test-button" onclick="testScene()">测试场景</button>
+            <button class="test-button" onclick="clearLog()">清空日志</button>
+        </div>
+
+        <div class="test-section">
+            <h3>日志输出</h3>
+            <div id="log">等待测试开始...</div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { Engine3D, Scene3D, Object3D, Camera3D, AtmosphericComponent, View3D } from './index.ts';
+        // import { Engine3D, ComponentBase, Object3DUtil, Scene3D, AtmosphericComponent, CameraUtil, HoverCameraController, View3D, Object3D, DirectLight, KelvinUtil } from "https://unpkg.com/@orillusion/core/dist/orillusion.es.js" 
+
+
+        // initializa engine
+        await Engine3D.init();
+        // create a Scene3D
+        let scene3D = new Scene3D();
+
+        // add an Atmospheric sky enviroment
+        let sky = scene3D.addComponent(AtmosphericComponent);
+        // set sun position
+        sky.sunX = 0.8;
+        sky.sunY = 0.54;
+        // set exposure
+        sky.exposure = 1;
+
+        // create a camera
+        let cameraObj = new Object3D();
+        let camera = cameraObj.addComponent(Camera3D);
+        camera.perspective(60, Engine3D.aspect, 1, 5000.0);
+        scene3D.addChild(cameraObj);
+
+        // create a view with target scene and camera
+        let view = new View3D();
+        view.scene = scene3D;
+        view.camera = camera;
+
+        // start render
+        Engine3D.startRenderView(view);
+    </script>
+</body>
+
+</html>
