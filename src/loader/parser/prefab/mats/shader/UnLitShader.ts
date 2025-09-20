@@ -7,7 +7,8 @@ import { Vector4 } from "../../../../../math/Vector4";
 import { RegisterShader } from "../../../../../util/SerializeDecoration";
 import { Shader } from "../../../../../gfx/graphics/webGpu/shader/Shader";
 
-@RegisterShader
+/* eslint-disable */
+@RegisterShader(UnLitShader,'UnLitShader')
 export class UnLitShader extends Shader {
   constructor() {
     super();

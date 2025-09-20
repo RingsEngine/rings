@@ -86,7 +86,8 @@
 
     <script type="module">
         import { Engine3D, Scene3D, Object3D, Camera3D, AtmosphericComponent, View3D } from './index.ts';
-        // import { Engine3D, ComponentBase, Object3DUtil, Scene3D, AtmosphericComponent, CameraUtil, HoverCameraController, View3D, Object3D, DirectLight, KelvinUtil } from "https://unpkg.com/@orillusion/core/dist/orillusion.es.js" 
+        // import { Engine3D, Scene3D, Object3D, Camera3D, AtmosphericComponent, View3D } from './dist/rings.es.js';
+
 
 
         // initializa engine
@@ -96,11 +97,14 @@
 
         // add an Atmospheric sky enviroment
         let sky = scene3D.addComponent(AtmosphericComponent);
+        
         // set sun position
         sky.sunX = 0.8;
         sky.sunY = 0.54;
         // set exposure
         sky.exposure = 1;
+
+        console.log(sky,11111)
 
         // create a camera
         let cameraObj = new Object3D();

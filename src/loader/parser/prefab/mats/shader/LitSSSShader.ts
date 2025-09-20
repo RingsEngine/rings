@@ -9,8 +9,8 @@ import { Texture } from "../../../../../gfx/graphics/webGpu/core/texture/Texture
 import { GPUCullMode } from "../../../../../gfx/graphics/webGpu/WebGPUConst";
 import { BlendMode } from "../../../../../materials/BlendMode";
 import { RenderShaderPass } from "../../../../../gfx/graphics/webGpu/shader/RenderShaderPass";
-
-@RegisterShader
+/* eslint-disable */
+@RegisterShader(LitSSSShader,'LitSSSShader')
 export class LitSSSShader extends Shader {
   constructor() {
     super();
