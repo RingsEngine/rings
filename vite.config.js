@@ -28,6 +28,9 @@ export default defineConfig((option) => ({
                 if (req.url === '/') {
                   res.writeHead(302, { 'Location': '/docs/' });
                   res.end();
+                } else if (req.url === '/test') {
+                  res.writeHead(302, { 'Location': '/test-dev.html' });
+                  res.end();
                 } else {
                   next();
                 }

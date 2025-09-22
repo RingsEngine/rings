@@ -7,8 +7,8 @@ import { Color } from "../../../../../math/Color";
 import { Vector4 } from "../../../../../math/Vector4";
 import { RegisterShader } from "../../../../../util/SerializeDecoration";
 import { Shader } from "../../../../../gfx/graphics/webGpu/shader/Shader";
-
-@RegisterShader
+/* eslint-disable */
+@RegisterShader(LitShader,'LitShader')
 export class LitShader extends Shader {
   constructor() {
     super();

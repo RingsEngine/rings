@@ -3,7 +3,7 @@ import { SHCommon_frag } from "./../core/common/SHCommon_frag";
 /**
  * 功能：表面散射  适用场景： 半透明材质  性能消耗: 中
  */
-export let BxDF_frag: string = `
+export let BxDF_frag: string = /*wgsl*/ `
   #include "Clearcoat_frag"
   #include "BRDF_frag"
   #include "MathShader"
@@ -21,7 +21,9 @@ export let BxDF_frag: string = `
   #include "BxdfDebug_frag"
   #include "ReflectionCG"
  
+  //ORI_ShadingInput
   fn initFragData() {
+      // fragData.Albedo = vec4f(gammaToLiner(ORI_ShadingInput.BaseColor.rgb),ORI_ShadingInput.BaseColor.w) ;
       fragData.Albedo = vec4f((ORI_ShadingInput.BaseColor.rgb),ORI_ShadingInput.BaseColor.w) ;
       fragData.Ao = clamp( pow(ORI_ShadingInput.AmbientOcclusion,materialUniform.ao) , 0.0 , 1.0 ) ; 
       fragData.Roughness = clamp((ORI_ShadingInput.Roughness),0.0001,1.0) * 1.85 ; 
@@ -37,13 +39,19 @@ export let BxDF_frag: string = `
  
       let R = 2.0 * dot( fragData.V , fragData.N ) * fragData.N - fragData.V ;
       fragData.R = R ;//reflect( fragData.V , fragData.N ) ;
+
       fragData.NoV = saturate(dot(fragData.N, fragData.V)) ;
+
       fragData.F0 = mix(vec3<f32>(0.04), fragData.Albedo.rgb , fragData.Metallic);
+      // fragData.F0 = gammaToLiner(fragData.F0);
+      
       fragData.F = computeFresnelSchlick(fragData.NoV, fragData.F0);
       fragData.KD = vec3<f32>(fragData.F) ;
       fragData.KS = vec3<f32>(0.0) ;
+
       fragData.Indirect = 0.0 ;
       fragData.Reflectance = 1.0 ;
+
       fragData.ClearcoatRoughness = materialUniform.clearcoatRoughnessFactor ;
       fragData.ClearcoatIor = materialUniform.clearcoatIor ;
       fragData.ClearcoatFactor = materialUniform.clearcoatFactor;
@@ -56,7 +64,9 @@ export let BxDF_frag: string = `
 
   fn BxDFShading(){
       initFragData();
+
       let sunLight = lightBuffer[0] ;
+
       var irradiance = vec3<f32>(0.0) ;
       #if USEGI
           irradiance += getIrradiance().rgb ;
@@ -117,6 +127,7 @@ export let BxDF_frag: string = `
       }
 
       //***********indirect-ambient part********* 
+      // var kdLast = (1.0 - 0.04) * (1.0 - fragData.Metallic);    
       var iblDiffuseResult : vec3f ;
 
       let MAX_LOD  = i32(textureNumLevels(prefilterMap)) ;
@@ -130,7 +141,8 @@ export let BxDF_frag: string = `
         indirectionSpec *= globalUniform.hdrExposure ;
       #endif
 
-      var color = vec3f(iblDiffuseResult + indirectionSpec + specColor);
+      var color = vec3f(iblDiffuseResult + indirectionSpec + specColor)  ;
+      // var color = vec3f(indirectionDiffuse )  ;
 
       var clearCoatColor = vec3<f32>(0.0);
       #if USE_CLEARCOAT
@@ -155,6 +167,9 @@ export let BxDF_frag: string = `
                 break;
               }
               case SpotLightType: {
+                // var lightColor = light.lightColor.rgb  ;
+                // var att = pointAtt(ORI_VertexVarying.vWorldPos.xyz, light);
+                // clearCoatColor += ClearCoat_BRDF( color , materialUniform.clearcoatColor.rgb , 1.5 , clearNormal ,  light.direction , fragData.V , clearcoatRoughness , lightColor,  att );
                 break;
               }
               default: {
@@ -193,4 +208,5 @@ export let BxDF_frag: string = `
           ORI_FragmentOutput.color = viewColor ;
         #endif
   }
-  `;
+
+  `

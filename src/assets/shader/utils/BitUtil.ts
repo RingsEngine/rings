@@ -1,12 +1,13 @@
-export let BitUtil = `
+export let BitUtil = /* wgsl */`
+
     const inv256:f32 = 1.0/256.0;
     const inv1024:f32 = 1.0/1024.0;
 
-    const bit7_inv128:f32 = 1.0/128.0;
+    const bit7_inv128:f32 = 1.0 / 128.0;
     const bit7_128:f32 = 128.0;
-
+    
     const r10g10b10 = vec2i(0x3FFFFF,0xFF);
-    fn floatToVec3f(v:f32) -> vec3f {
+    fn floatToVec3f( v:f32 ) -> vec3f {
         var VPInt:i32 = bitcast<i32>(v);
         var VPInt1024:i32 = VPInt%1024;
         var VPInt10241024:i32 = ((VPInt-VPInt1024)/1024)%1024;
@@ -32,6 +33,11 @@ export let BitUtil = `
         var VPInt128128128128:i32 = ((VPInt-VPInt128-VPInt128128-VPInt128128128)/2097152)%128;
         return vec4f(f32(VPInt128),f32(VPInt128128),f32(VPInt128128128),f32(VPInt128128128128))*vec4f(bit7_inv128);
     }
+
+
+
+
+
 
     const i_r11g11b11 = vec3i(0x7FF,0x7FF,0x7FF);
     const f_r11g11b11 = vec3f(f32(0x7FF),f32(0x7FF),f32(0x7FF));
@@ -81,6 +87,9 @@ export let BitUtil = `
         return vec3f(r,g,b);
     }
 
+
+
+
     fn floatToRGBA(v:f32) -> vec4f{
         var iv = bitcast<u32>(v);
         var color = vec4f(0.0);
@@ -95,4 +104,5 @@ export let BitUtil = `
         var f = dot(v, bitShift);
         return f;
     }
-`;
+
+`

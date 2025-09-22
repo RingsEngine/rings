@@ -124,12 +124,12 @@ struct SSRUniformData {
           }
       }else{
         rayTraceRet.alpha = 0.0;
-      }
+      };
       rayTraceRet.skyColor = getSkyColor();
     }else{
       rayTraceRet.alpha = -1.0;
       rayTraceRet.skyColor = vec3<f32>(0.0);
-    }
+    };
 
     rayTraceRet.roughness = roughness;
     rayTraceRet.fresnel = fresnel;
@@ -281,7 +281,7 @@ struct SSRUniformData {
           hitData.hitCoord = uv;
           return 1;
         }
-      }
+      };
     }
     return 0;
   }

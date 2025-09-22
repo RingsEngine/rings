@@ -1,5 +1,5 @@
-export let FXAAShader: string = `
-    @include 'BitUtil'
+export let FXAAShader: string = /*wgsl*/ `
+    #include 'BitUtil'
     struct FragmentOutput {
         @location(auto) o_Target: vec4<f32>
     };
@@ -18,6 +18,7 @@ export let FXAAShader: string = `
     @group(2) @binding(0)
     var<uniform> materialUniform: MaterialUniform;
 
+
     fn LinearToGammaSpace(linRGB0: vec3<f32>) -> vec3<f32> {
         var linRGB = max(linRGB0, vec3(0.0, 0.0, 0.0));
         linRGB.r = pow(linRGB.r,0.416666667);
@@ -26,30 +27,35 @@ export let FXAAShader: string = `
         return max(1.055 * linRGB - 0.055, vec3(0.0, 0.0, 0.0));
     }
 
-    fn texture2D(uv:vec2<f32>, offset:vec2<f32>) -> vec4<f32> {
-        let buffer = textureSample(baseMap, baseMapSampler, uv.xy + offset).rgba;
-        return buffer;
+    fn texture2D( uv:vec2<f32> , offset:vec2<f32> ) -> vec4<f32> {
+        let buffer = textureSample(baseMap, baseMapSampler, uv.xy + offset ).rgba ;
+        return buffer ;
     }
 
     @fragment
     fn main(@location(auto) fragUV: vec2<f32>) -> FragmentOutput {
-        var v_vTexcoord = fragUV;
+        var v_vTexcoord = fragUV ;
         v_vTexcoord.y = 1.0 - v_vTexcoord.y ;
+
         var reducemul = 1.0 / 8.0;
         var reducemin = 1.0 / 128.0;
+
         var basecol = texture2D(v_vTexcoord , vec2<f32>(0.0)).rgba;
         var baseNW = texture2D(v_vTexcoord , -materialUniform.u_texel).rgb;
         var baseNE = texture2D(v_vTexcoord , vec2<f32>(materialUniform.u_texel.x, -materialUniform.u_texel.y)).rgb;
         var baseSW = texture2D(v_vTexcoord , vec2<f32>(-materialUniform.u_texel.x, materialUniform.u_texel.y)).rgb;
         var baseSE = texture2D(v_vTexcoord , materialUniform.u_texel ).rgb;
+
         var gray = vec3<f32>(0.213, 0.715, 0.072);
         var monocol = dot(basecol.rgb, gray);
         var monoNW = dot(baseNW, gray);
         var monoNE = dot(baseNE, gray);
         var monoSW = dot(baseSW, gray);
         var monoSE = dot(baseSE, gray);
+
         var monomin = min(monocol, min(min(monoNW, monoNE), min(monoSW, monoSE)));
         var monomax = max(monocol, max(max(monoNW, monoNE), max(monoSW, monoSE)));
+
         var dir = vec2<f32>(-((monoNW + monoNE) - (monoSW + monoSE)), ((monoNW + monoSW) - (monoNE + monoSE)));
         var dirreduce = max((monoNW + monoNE + monoSW + monoSE) * reducemul * 0.25, reducemin);
         var dirmin = 1.0 / (min(abs(dir.x), abs(dir.y)) + dirreduce);
@@ -57,9 +63,11 @@ export let FXAAShader: string = `
 
         var resultA = 0.5 * (texture2D(v_vTexcoord , dir * -0.166667).rgb  +
                             texture2D(v_vTexcoord , dir * 0.166667).rgb);
+                            
         var resultB = resultA * 0.5 + 0.25 * (texture2D( v_vTexcoord , dir * -0.5).rgb +
                                             texture2D( v_vTexcoord , dir * 0.5).rgb);
         var monoB = dot(resultB.rgb, gray);
+        
         var color:vec3<f32> ;
         if(monoB < monomin || monoB > monomax) {
             color = resultA ;//* v_vColour;
@@ -68,4 +76,4 @@ export let FXAAShader: string = `
         }
         return FragmentOutput(vec4<f32>(color.rgb,basecol.a));
     }
-`;
+`

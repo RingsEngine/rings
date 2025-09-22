@@ -25,7 +25,7 @@ export let IESProfiles_frag: string = `
                 return textureSampleLevel(iesTextureArrayMap, iesTextureArrayMapSampler, vec2<f32>(normAngle , normTangentAngle) , i32(light.ies) , 0.0).r ;
             }else{
                 return 1.0;
-            }
+            };
         #else 
             return 1.0;
         #endif

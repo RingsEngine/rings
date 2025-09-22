@@ -1,6 +1,6 @@
 {
-  "name": "@rings/core",
-  "version": "0.0.1",
+  "name": "@rings-webgpu/core",
+  "version": "1.0.2",
   "description": "Rings webgpu Engine",
   "main": "index.js",
   "exports": {
@@ -16,17 +16,23 @@
     },
     "./dist/*": "./dist/*"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RingsEngine/rings.git"
+  },
   "types": "./dist/types/index.d.ts",
   "scripts": {
     "dev": "vite",
     "build": "tsc --p tsconfig.build.json && vite build && npm run build:types && npm run minify",
-    "build:packages": "npm run build:physics && npm run build:media && npm run build:stats && npm run build:graphic",
+    "build:test": "tsc --p tsconfig.build.json && vite build && npm run build:packages",
+    "build:packages": "npm run build:physics && npm run build:media && npm run build:stats",
     "build:physics": "cd packages/physics && npm run build",
     "build:media": "cd packages/media-extention && npm run build",
     "build:stats": "cd packages/stats && npm run build",
     "build:types": "tsc --emitDeclarationOnly -p tsconfig.build.json && node scripts/build-types.js",
     "minify": "node scripts/minify.js",
-    "docs": "typedoc --skipErrorChecking"
+    "docs": "typedoc --skipErrorChecking",
+    "publish": "npm publish --access public"
   },
   "files": [
     "dist"

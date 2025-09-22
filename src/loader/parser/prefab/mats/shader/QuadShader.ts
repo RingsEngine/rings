@@ -5,7 +5,8 @@ import { BlendMode } from "../../../../../materials/BlendMode";
 import { RegisterShader } from "../../../../../util/SerializeDecoration";
 import { Shader } from "../../../../../gfx/graphics/webGpu/shader/Shader";
 
-@RegisterShader
+/* eslint-disable */
+@RegisterShader(QuadShader,'QuadShader')
 export class QuadShader extends Shader {
   constructor(vs: string = "QuadGlsl_vs", fs: string = "QuadGlsl_fs") {
     super();

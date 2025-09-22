@@ -5,7 +5,7 @@ import { View3D } from "../../../core/View3D";
 import { CameraUtil } from "../../../util/CameraUtil";
 import { GlobalBindGroup } from "../../graphics/webGpu/core/bindGroups/GlobalBindGroup";
 import { GlobalUniformGroup } from "../../graphics/webGpu/core/bindGroups/GlobalUniformGroup";
-/* eslint-disable */
+
 export class ShadowLightsCollect {
   public static maxNumDirectionShadow = 8;
   public static maxNumPointShadow = 8;

@@ -162,7 +162,7 @@ export let SSGI2_cs: string = /*wgsl */ `
 
         }else{
             Output = vec4f(wColor.xyz, 1.0);
-        }
+        };
 
         return Output;
     }

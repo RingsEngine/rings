@@ -57,7 +57,7 @@ fn containsBox( size:vec3<f32> , center:vec3<f32> ) -> f32 {
         return 2.0 ;
     }else{
         return 1.0 ;
-    }
+    };
 }
 
 @compute @workgroup_size(128)

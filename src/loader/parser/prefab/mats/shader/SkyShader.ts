@@ -6,8 +6,8 @@ import { RenderShaderPass } from "../../../../../gfx/graphics/webGpu/shader/Rend
 import { Vector3 } from "../../../../../math/Vector3";
 import { RegisterShader } from "../../../../../util/SerializeDecoration";
 import { Shader } from "../../../../../gfx/graphics/webGpu/shader/Shader";
-
-@RegisterShader
+/* eslint-disable */
+@RegisterShader(SkyShader,"SkyShader")
 export class SkyShader extends Shader {
   constructor() {
     super();

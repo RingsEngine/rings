@@ -61,12 +61,12 @@ export let ShadowMapping_frag: string = `
                                     weight *= 1.0 - totalWeight;
                                     visibility += csmShadowResult.x * weight;
                                     totalWeight += weight;
-                                }
+                                };
 
                                 if(validCount >= 2 || totalWeight >= 0.99){
                                     csmLevel = csm;
                                     break;
-                                }
+                                };
                             }
                         }
 
@@ -75,7 +75,7 @@ export let ShadowMapping_frag: string = `
                             visibility = 1.0;
                         }else{
                             visibility = visibility / totalWeight ;
-                        }
+                        };
                     } else {
                         shadowMatrix = globalUniform.shadowMatrix[shadowIndex];
                         if(enableCSM) {
@@ -124,7 +124,7 @@ export let ShadowMapping_frag: string = `
                             totalWeight += weight;
                         }else{
                             totalWeight += 1.0;
-                        }
+                        };
                     }
                 }
                 visibility /= totalWeight;

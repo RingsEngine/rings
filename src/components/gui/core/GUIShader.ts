@@ -50,7 +50,7 @@ export class GUIShader {
                     s = border.x + (s / centerPartMax) * centerPartMin;
                 }else{
                     s = s - centerPartMax + border.x + centerPartMin;
-                }
+                };
             }
             return s;
         }
@@ -200,12 +200,12 @@ export class GUIShader {
                 ret.x = quad.x;
             }else{
                 ret.x = quad.z;
-            }
+            };
             if(index == 0 || index == 1){
                 ret.y = quad.w;
             }else{
                 ret.y = quad.y;
-            }
+            };
             return ret;
         }
     `;

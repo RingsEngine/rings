@@ -1,4 +1,4 @@
-export let Inline_vert: string = `
+export let Inline_vert: string = /*wgsl*/ `
     #include "MathShader"
     #include "FastMathShader"
     #include "InstanceUniform"
@@ -19,35 +19,35 @@ export let Inline_vert: string = `
     }
 
     fn TIME_frame() -> f32 {
-        return globalUniform.frame;
+        return globalUniform.frame ;
     }
 
     fn TIME_time() -> f32 {
-        return globalUniform.time;
+        return globalUniform.time ;
     }
 
     fn TIME_delta() -> f32 {
-        return globalUniform.delta;
+        return globalUniform.delta ;
     }
 
     fn MOUSE() -> vec2f {
-        return vec2f( globalUniform.mouseX, globalUniform.mouseY);
+        return vec2f( globalUniform.mouseX, globalUniform.mouseY) ;
     }
 
     fn SCREEN() -> vec2f {
-        return vec2f( globalUniform.windowWidth, globalUniform.windowHeight);
+        return vec2f( globalUniform.windowWidth, globalUniform.windowHeight) ;
     }
 
     fn ProjectionParams() -> vec3f {
-        return vec3f( globalUniform.near, globalUniform.far,1.0 + 1.0 / globalUniform.far);
+        return vec3f( globalUniform.near, globalUniform.far,1.0 + 1.0 / globalUniform.far) ;
     }
 
     fn vertex_inline(vertex:VertexAttributes){
-        ORI_MATRIX_P = globalUniform.projMat;
-        ORI_MATRIX_V = globalUniform.viewMat;
-        ORI_MATRIX_PV = ORI_MATRIX_P * ORI_MATRIX_V;
-        ORI_MATRIX_PVInv = globalUniform.pvMatrixInv;
-        ORI_CAMERAMATRIX = globalUniform.cameraWorldMatrix;
+        ORI_MATRIX_P = globalUniform.projMat ;
+        ORI_MATRIX_V = globalUniform.viewMat ;
+        ORI_MATRIX_PV = ORI_MATRIX_P * ORI_MATRIX_V ;
+        ORI_MATRIX_PVInv = globalUniform.pvMatrixInv ;
+        ORI_CAMERAMATRIX = globalUniform.cameraWorldMatrix ;
 
         ORI_MATRIX_M = models.matrix[u32(vertex.index)];
             
@@ -56,4 +56,4 @@ export let Inline_vert: string = `
             ORI_MATRIX_M = models.matrix[modelID];
         #endif
     }
-`;
+`

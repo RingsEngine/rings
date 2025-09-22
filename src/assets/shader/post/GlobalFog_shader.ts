@@ -128,7 +128,7 @@ export let GlobalFog_shader = /* wgsl */ `
             let sunLight = lightBuffer[0] ;
             var inScatteringValue = inScatterIng(sunLight.direction, texPosition.xyz, sunLight.lightColor);
             opColor += inScatteringValue;
-        }
+        };
 
         textureStore(outTex, fragCoord , vec4<f32>(opColor.xyz, texColor.a));
     }

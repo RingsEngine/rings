@@ -9,8 +9,8 @@ import { Shader } from "../../../../../gfx/graphics/webGpu/shader/Shader";
 import { UnLitTextureArray } from "../../../../../assets/shader/materials/UnLitTextureArray";
 import { ShaderLib } from "../../../../../assets/shader/ShaderLib";
 import { VertexAttributeIndexShader } from "../../../../../assets/shader/core/struct/VertexAttributeIndexShader";
-
-@RegisterShader
+/* eslint-disable */
+@RegisterShader(UnLitTexArrayShader,'UnLitTexArrayShader')
 export class UnLitTexArrayShader extends Shader {
   constructor() {
     super();
