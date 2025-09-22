@@ -31,7 +31,30 @@
     - [UnLitMaterial](api/materials/UnLitMaterial.md)
   - 纹理 Textures
     - [BitmapTexture2D](api/textures/BitmapTexture2D.md)
+    - [BitmapTexture2DArray](api/textures/BitmapTexture2DArray.md)
+    - [BitmapTextureCube](api/textures/BitmapTextureCube.md)
+    - [Depth2DTextureArray](api/textures/Depth2DTextureArray.md)
+    - [DepthCubeArrayTexture](api/textures/DepthCubeArrayTexture.md)
+    - [Float16ArrayTexture](api/textures/Float16ArrayTexture.md)
+    - [Float32ArrayTexture](api/textures/Float32ArrayTexture.md)
+    - [HDRTexture](api/textures/HDRTexture.md)
+    - [HDRTextureCube](api/textures/HDRTextureCube.md)
+    - [LDRTextureCube](api/textures/LDRTextureCube.md)
     - [RenderTexture](api/textures/RenderTexture.md)
+    - [SolidColorSky](api/textures/SolidColorSky.md)
+    - [TextureCubeFaceData](api/textures/TextureCubeFaceData.md)
+    - [Uint8ArrayTexture](api/textures/Uint8ArrayTexture.md)
+    - [VirtualTexture](api/textures/VirtualTexture.md)
+  - GFX / Generate
+    - [BRDFLUTGenerate](api/gfx/BRDFLUTGenerate.md)
+    - [PassGenerate](api/gfx/PassGenerate.md)
+    - [ErpImage2CubeMap](api/gfx/ErpImage2CubeMap.md)
+    - [TextureCubeUtils](api/gfx/TextureCubeUtils.md)
+    - [BlurTexture2DBufferCreator](api/gfx/BlurTexture2DBufferCreator.md)
+    - [IBLEnvMapCreator](api/gfx/IBLEnvMapCreator.md)
+    - [MergeRGBACreator](api/gfx/MergeRGBACreator.md)
+    - [TextureCubeStdCreator](api/gfx/TextureCubeStdCreator.md)
+    - [TextureScaleCompute](api/gfx/TextureScaleCompute.md)
 
 ## 特性
 
