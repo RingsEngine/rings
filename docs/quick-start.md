@@ -61,7 +61,7 @@ import { Engine3D, Scene3D, Object3D, Camera3D, LitMaterial, BoxGeometry, MeshRe
         import {
             Engine3D, Scene3D, Object3D, Camera3D, View3D, LitMaterial, 
             BoxGeometry, SphereGeometry, PlaneGeometry, MeshRenderer, 
-            AtmosphericComponent, DirectLight, HoverCameraController
+            AtmosphericComponent, DirectLight, HoverCameraController, Color
         } from 'https://unpkg.com/@rings/core/dist/rings.es.js';
 
         async function init() {
@@ -90,7 +90,7 @@ import { Engine3D, Scene3D, Object3D, Camera3D, LitMaterial, BoxGeometry, MeshRe
             // 创建光源
             const lightObj = new Object3D();
             const light = lightObj.addComponent(DirectLight);
-            light.lightColor = new Float32Array([1, 1, 1, 1]);
+            light.lightColor = new Color(1, 1, 1, 1);
             light.intensity = 1.2;
             light.castShadow = true;
             scene.addChild(lightObj);
@@ -100,7 +100,7 @@ import { Engine3D, Scene3D, Object3D, Camera3D, LitMaterial, BoxGeometry, MeshRe
             const renderer = ground.addComponent(MeshRenderer);
             renderer.geometry = new PlaneGeometry(10, 10);
             renderer.material = new LitMaterial();
-            renderer.material.baseColor = new Float32Array([0.3, 0.3, 0.3, 1]);
+            renderer.material.baseColor = new Color(0.3, 0.3, 0.3, 1);
             renderer.receiveShadow = true;
             scene.addChild(ground);
 
@@ -109,7 +109,7 @@ import { Engine3D, Scene3D, Object3D, Camera3D, LitMaterial, BoxGeometry, MeshRe
             const boxRenderer = box.addComponent(MeshRenderer);
             boxRenderer.geometry = new BoxGeometry(1, 1, 1);
             boxRenderer.material = new LitMaterial();
-            boxRenderer.material.baseColor = new Float32Array([0.8, 0.2, 0.2, 1]);
+            boxRenderer.material.baseColor = new Color(0.8, 0.2, 0.2, 1);
             boxRenderer.castShadow = true;
             box.y = 0.5;
             scene.addChild(box);
@@ -119,7 +119,7 @@ import { Engine3D, Scene3D, Object3D, Camera3D, LitMaterial, BoxGeometry, MeshRe
             const sphereRenderer = sphere.addComponent(MeshRenderer);
             sphereRenderer.geometry = new SphereGeometry(0.5, 32, 32);
             sphereRenderer.material = new LitMaterial();
-            sphereRenderer.material.baseColor = new Float32Array([0.2, 0.8, 0.2, 1]);
+            sphereRenderer.material.baseColor = new Color(0.2, 0.8, 0.2, 1);
             sphereRenderer.castShadow = true;
             sphere.x = 2;
             sphere.y = 0.5;
