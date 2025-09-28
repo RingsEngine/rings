@@ -27,6 +27,9 @@ import { Ctor, Parser } from "../util/Global";
 import { ParserBase } from "../loader/parser/ParserBase";
 import { GeometryBase } from "../core/geometry/GeometryBase";
 import { LitMaterial } from "../materials/LitMaterial";
+import { KMZParser } from "../loader/parser/kmz/KMZParser";
+import { WayLines3D } from "../loader/parser/kmz/3d/WayLines3D";
+
 
 export class Res {
   private _texturePool: Map<string, Texture>;
@@ -340,6 +343,15 @@ export class Res {
   ): Promise<FontInfo> {
     let loader = new FileLoader();
     let parser = await loader.load(url, AtlasParser, loaderFunctions, url);
+    return parser.data;
+  }
+
+  public async loadKMZ(
+    url: string,
+    loaderFunctions?: LoaderFunctions
+  ): Promise<WayLines3D> {
+    let loader = new FileLoader();
+    let parser = await loader.load(url, KMZParser, loaderFunctions);
     return parser.data;
   }
 
