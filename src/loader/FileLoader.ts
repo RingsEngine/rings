@@ -20,6 +20,7 @@ export class FileLoader extends LoaderBase {
               parser.userData = userData;
               parser.baseUrl = this.baseUrl;
               parser.initUrl = url;
+              parser.loaderFunctions = loaderFunctions;
               await parser.parseBuffer(data);
               if (parser.verification()) {
                 succ(parser);

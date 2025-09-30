@@ -172,6 +172,23 @@ export class Matrix4 {
   }
 
   /**
+   * Create a matrix from an array of 16 numbers
+   * @param array Array of 16 numbers
+   * @returns Matrix4 result
+   */
+  public static fromArray(array: number[]): Matrix4 {
+    if (array.length !== 16) {
+      throw new Error('Array must contain exactly 16 elements');
+    }
+    
+    const matrix = new Matrix4();
+    for (let i = 0; i < 16; i++) {
+      matrix.rawData[i] = array[i];
+    }
+    return matrix;
+  }
+
+  /**
    * Generate a matrix (rotate degrees with x,y,z as the center axis)
    * @param x x on the central axis
    * @param y y on the central axis
