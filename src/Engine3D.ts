@@ -21,6 +21,7 @@ import { FXAAPost } from "./gfx/renderJob/post/FXAAPost";
 import { PostProcessingComponent } from "./components/post/PostProcessingComponent";
 import { GBufferFrame } from "./gfx/renderJob/frame/GBufferFrame";
 import { version } from "../package.json";
+import { GSplatRuntime } from "./runtime/GSplatRuntime";
 
 /**
  * Engine3D是Rings WebGPU引擎的主类，负责初始化WebGPU上下文、管理渲染循环和处理输入。
@@ -483,6 +484,11 @@ export class Engine3D {
       view.scene.waitUpdate();
       let [w, h] = webGPUContext.presentationSize;
       view.camera.viewPort.setTo(0, 0, w, h);
+    }
+
+    // 帧开始统一调度 3DGS 排序（使用第一个视图的相机）
+    if (this.views && this.views.length > 0 && this.views[0]?.camera?.viewMatrix) {
+      GSplatRuntime.scheduleAll(this.views[0].camera.viewMatrix);
     }
 
     if (this._beforeRender) await this._beforeRender();
