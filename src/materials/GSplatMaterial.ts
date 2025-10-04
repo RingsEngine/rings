@@ -3,7 +3,7 @@ import { RenderShaderPass } from "../gfx/graphics/webGpu/shader/RenderShaderPass
 import { PassType } from "../gfx/renderJob/passRenderer/state/PassType";
 import { Material } from "./Material";
 import { ShaderLib } from "../assets/shader/ShaderLib";
-import { GSplat_VS_DC, GSplat_FS_DC } from "../assets/shader/materials/GSplat_dc_wgsl";
+import { GSplat_VS, GSplat_FS } from "../assets/shader/materials/GSplat";
 import { GPUPrimitiveTopology } from "../gfx/graphics/webGpu/WebGPUConst";
 import { Float32ArrayTexture } from "../textures/Float32ArrayTexture";
 import { Float16ArrayTexture } from "../textures/Float16ArrayTexture";
@@ -15,8 +15,8 @@ export class GSplatMaterial extends Material {
   constructor() {
     super();
     // register shaders if not exists
-    ShaderLib.register("gsplat_vs_dc", GSplat_VS_DC);
-    ShaderLib.register("gsplat_fs_dc", GSplat_FS_DC);
+    ShaderLib.register("gsplat_vs_dc", GSplat_VS);
+    ShaderLib.register("gsplat_fs_dc", GSplat_FS);
 
     const pass = new RenderShaderPass("gsplat_vs_dc", "gsplat_fs_dc");
     pass.passType = PassType.COLOR;

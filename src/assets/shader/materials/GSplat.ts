@@ -1,4 +1,4 @@
-export const GSplat_VS_DC: string = /* wgsl */ `
+export const GSplat_VS: string = /* wgsl */ `
     #include "GlobalUniform"
 
     struct VSOut {
@@ -173,7 +173,7 @@ export const GSplat_VS_DC: string = /* wgsl */ `
     }
 `;
 
-export const GSplat_FS_DC: string = /* wgsl */ `
+export const GSplat_FS: string = /* wgsl */ `
     #include "FragmentOutput"
 
     // mirror material uniform for FS access
