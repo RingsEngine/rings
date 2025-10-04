@@ -3,7 +3,7 @@ import { RenderShaderPass } from "../gfx/graphics/webGpu/shader/RenderShaderPass
 import { PassType } from "../gfx/renderJob/passRenderer/state/PassType";
 import { Material } from "./Material";
 import { ShaderLib } from "../assets/shader/ShaderLib";
-import { GSplat_VS, GSplat_FS } from "../assets/shader/materials/GSplat";
+import { GSplat_VS, GSplat_FS } from "../assets/shader/materials/GSplatShader";
 import { GPUPrimitiveTopology } from "../gfx/graphics/webGpu/WebGPUConst";
 import { Float32ArrayTexture } from "../textures/Float32ArrayTexture";
 import { Float16ArrayTexture } from "../textures/Float16ArrayTexture";
