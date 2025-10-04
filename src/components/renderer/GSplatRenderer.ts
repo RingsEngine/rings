@@ -1,0 +1,683 @@
+import { RenderNode } from "./RenderNode";
+import { GSplatMaterial } from "../../materials/GSplatMaterial";
+import { PlaneGeometry } from "../../shape/PlaneGeometry";
+import { View3D } from "../../core/View3D";
+import { RendererPassState } from "../../gfx/renderJob/passRenderer/state/RendererPassState";
+import { ClusterLightingBuffer } from "../../gfx/renderJob/passRenderer/cluster/ClusterLightingBuffer";
+import { PassType } from "../../gfx/renderJob/passRenderer/state/PassType";
+import { GPUContext } from "../../gfx/renderJob/GPUContext";
+import { GaussianSplatAsset } from "../../loader/parser/3dgs/GaussianSplatAsset";
+import { Uint8ArrayTexture } from "../../textures/Uint8ArrayTexture";
+import { Uint32ArrayTexture } from "../../textures/Uint32ArrayTexture";
+import { Float16ArrayTexture } from "../../textures/Float16ArrayTexture";
+import { Vector2 } from "../../math/Vector2";
+import { toHalfFloat } from "../../util/Convert";
+import { Matrix4 } from "../../math/Matrix4";
+import { RegisterComponent } from "../../util/SerializeDecoration";
+
+/**
+ * Gaussian Splat Renderer Component
+ * 
+ * Renders 3D Gaussian Splats with automatic depth sorting for correct alpha blending.
+ * Manages splat data, textures, and CPU-based sorting via Web Worker.
+ */
+@RegisterComponent(GSplatRenderer, "GSplatRenderer")
+export class GSplatRenderer extends RenderNode {
+  // Splat count and texture dimensions
+  public count: number = 0;
+  public size: Vector2 = new Vector2();
+  
+  // GPU textures for splat data
+  public splatColor: Uint8ArrayTexture;
+  public transformA: Uint32ArrayTexture;
+  public transformB: Float16ArrayTexture;
+  public texParams: Float32Array; // [numSplats, texWidth, validCount, visBoost]
+  public splatOrder: Uint32ArrayTexture;
+  
+  // Material and geometry
+  public gsplatMaterial: GSplatMaterial;
+  
+  // CPU-side data for sorting
+  private _positions: Float32Array; // xyz per splat
+  private _orderData: Uint32Array; // RGBA32U backing: size.x * size.y * 4
+  
+  // Web Worker for sorting
+  private _sortWorker: Worker;
+  private _lastSentTime: number = 0;
+  private _minIntervalMs: number = 0; // No throttle for immediate sorting
+  private _centersSent: boolean = false;
+  private _lastViewMatrixHash: number = 0;
+  
+  // Mapping support (optional subset rendering)
+  private _mapping: Uint32Array | null = null;
+  private _fullCount: number = 0; // Original total count
+  
+  constructor() {
+    super();
+  }
+  
+  /**
+   * Initialize from Gaussian Splat asset
+   */
+  public initAsset(asset: GaussianSplatAsset) {
+    this.count = asset.count;
+    this._fullCount = asset.count;
+    this.size = this.evalTextureSize(asset.count);
+    
+    // Build GPU textures
+    this.buildColor(asset);
+    this.buildTransform(asset);
+    
+    // Initialize parameters
+    this.texParams = new Float32Array([this.count, this.size.x, this.count, 1.0]);
+    
+    // Cache positions for CPU sorting
+    this._positions = asset.position;
+    
+    // Create initial order texture [0..count-1], padded with last index
+    const total = this.size.x * this.size.y;
+    this._orderData = new Uint32Array(total * 4);
+    for (let i = 0; i < total; i++) {
+      const src = i < this.count ? i : (this.count > 0 ? this.count - 1 : 0);
+      const base = i * 4;
+      this._orderData[base + 0] = src;
+      this._orderData[base + 1] = 0;
+      this._orderData[base + 2] = 0;
+      this._orderData[base + 3] = 0;
+    }
+    this.splatOrder = new Uint32ArrayTexture().create(this.size.x, this.size.y, this._orderData);
+    this.splatOrder.name = "splatOrder";
+    
+    // Initialize material and geometry
+    this.gsplatMaterial = new GSplatMaterial();
+    this.geometry = new PlaneGeometry(1, 1, 1, 1);
+    this.materials = [this.gsplatMaterial];
+  }
+  
+  /**
+   * Update splat sorting before rendering
+   * This runs every frame to ensure correct depth ordering for alpha blending
+   */
+  public onBeforeUpdate(view?: View3D) {
+    if (this.count > 0 && view?.camera?.viewMatrix) {
+      this.scheduleOrder(view.camera.viewMatrix);
+    }
+  }
+  
+  /**
+   * Set rendering subset mapping
+   * Pass null/undefined to cancel mapping
+   */
+  public setMapping(mapping?: Uint32Array | null) {
+    this._mapping = mapping && mapping.length > 0 ? mapping : null;
+    
+    // Update instance count
+    this.count = this._mapping ? this._mapping.length : this._fullCount;
+    this.texParams[0] = this.count;
+    this.texParams[2] = Math.min(this.texParams[0], this.count);
+    
+    // Reset order texture to [0..count-1]
+    const total = this.size.x * this.size.y;
+    for (let i = 0; i < total; i++) {
+      const src = i < this.count ? i : (this.count > 0 ? this.count - 1 : 0);
+      const base = i * 4;
+      this._orderData[base + 0] = src;
+      this._orderData[base + 1] = 0;
+      this._orderData[base + 2] = 0;
+      this._orderData[base + 3] = 0;
+    }
+    this.splatOrder.updateTexture(this.size.x, this.size.y, this._orderData);
+    
+    // Send new centers to worker
+    if (this._sortWorker) {
+      const centers = this._mapping ? new Float32Array(this._mapping.length * 3) : new Float32Array(this._positions);
+      if (this._mapping) {
+        for (let i = 0; i < this._mapping.length; ++i) {
+          const src = this._mapping[i] * 3;
+          const dst = i * 3;
+          centers[dst + 0] = this._positions[src + 0];
+          centers[dst + 1] = this._positions[src + 1];
+          centers[dst + 2] = this._positions[src + 2];
+        }
+      }
+      this._sortWorker.postMessage(
+        {
+          type: 'centers',
+          centers: centers.buffer,
+          mapping: this._mapping ? this._mapping : null,
+        },
+        [centers.buffer]
+      );
+      this._centersSent = true;
+    } else {
+      this._centersSent = false;
+    }
+  }
+  
+  /**
+   * Set visibility boost factor (material uniform tex_params.w)
+   */
+  public setVisBoost(v: number) {
+    this.texParams[3] = Math.max(0.0, v);
+  }
+  
+  /**
+   * Set sort throttle interval (milliseconds)
+   */
+  public setSortThrottle(ms: number) {
+    this._minIntervalMs = Math.max(0, (ms | 0));
+  }
+  
+  /**
+   * Calculate texture size for given splat count
+   */
+  private evalTextureSize(count: number): Vector2 {
+    let w = Math.ceil(Math.sqrt(count));
+    // Align width so that row bytes are multiples of 256 for all target formats
+    // RGBA8 (4B), RGBA16F (8B), RGBA32U (16B) -> width must be multiple of 64
+    const align = 64;
+    w = Math.ceil(w / align) * align;
+    const h = Math.ceil(count / w);
+    return new Vector2(w, h);
+  }
+  
+  /**
+   * Build color texture from asset
+   */
+  private buildColor(asset: GaussianSplatAsset) {
+    const w = this.size.x | 0;
+    const h = this.size.y | 0;
+    const data = new Uint8Array(w * h * 4);
+    const SH_C0 = 0.28209479177387814;
+    const count = asset.count;
+    const coeffs = asset.sh?.coeffs;
+    const coeffsPerColor = coeffs ? (coeffs.length / (3 * count)) : 1;
+
+    for (let i = 0; i < count; i++) {
+      let r = 0.5, g = 0.5, b = 0.5;
+      if (coeffs && coeffsPerColor >= 1) {
+        const baseIndex = i * coeffsPerColor * 3;
+        r = 0.5 + coeffs[baseIndex + 0] * SH_C0;
+        g = 0.5 + coeffs[baseIndex + coeffsPerColor + 0] * SH_C0;
+        b = 0.5 + coeffs[baseIndex + 2 * coeffsPerColor + 0] * SH_C0;
+      }
+      const a = asset.opacity ? 1 / (1 + Math.exp(-asset.opacity[i])) : 1.0;
+      const idx = i * 4;
+      data[idx + 0] = Math.max(0, Math.min(255, Math.floor(r * 255)));
+      data[idx + 1] = Math.max(0, Math.min(255, Math.floor(g * 255)));
+      data[idx + 2] = Math.max(0, Math.min(255, Math.floor(b * 255)));
+      data[idx + 3] = Math.max(0, Math.min(255, Math.floor(a * 255)));
+    }
+    this.splatColor = new Uint8ArrayTexture().create(w, h, data, false);
+    this.splatColor.name = "splatColor";
+  }
+  
+  /**
+   * Build transform textures from asset
+   */
+  private buildTransform(asset: GaussianSplatAsset) {
+    const w = this.size.x | 0;
+    const h = this.size.y | 0;
+    const count = asset.count;
+
+    // transformA: uint32 RGBA (xyz as floatBits, w packs half2 of covB.xy)
+    const tA = new Uint32Array(w * h * 4);
+    // transformB: half rgba16f (covA.xyz, covB.z)
+    const tB = new Array<number>(w * h * 4).fill(0);
+
+    // Pack floatBits safely
+    const fb = new ArrayBuffer(4);
+    const f32 = new Float32Array(fb);
+    const u32 = new Uint32Array(fb);
+    const setFloatBits = (v: number) => {
+      f32[0] = v;
+      return u32[0];
+    };
+
+    const pos = asset.position;
+    const rot = asset.rotation;
+    const scl = asset.scale;
+
+    for (let i = 0; i < count; i++) {
+      const idx = i * 4;
+      const x = pos[i * 3 + 0];
+      const y = pos[i * 3 + 1];
+      const z = pos[i * 3 + 2];
+      tA[idx + 0] = setFloatBits(x);
+      tA[idx + 1] = setFloatBits(y);
+      tA[idx + 2] = setFloatBits(z);
+
+      // Decode rotation (normalize if present)
+      let qx = 0, qy = 0, qz = 0, qw = 1;
+      if (rot) {
+        qx = rot[i * 4 + 0];
+        qy = rot[i * 4 + 1];
+        qz = rot[i * 4 + 2];
+        qw = rot[i * 4 + 3];
+        const inv = 1.0 / Math.hypot(qx, qy, qz, qw);
+        qx *= inv; qy *= inv; qz *= inv; qw *= inv;
+      }
+
+      // Decode anisotropic scale (exp to linear) if present
+      let sx = 1, sy = 1, sz = 1;
+      if (scl) {
+        sx = Math.exp(scl[i * 3 + 0]);
+        sy = Math.exp(scl[i * 3 + 1]);
+        sz = Math.exp(scl[i * 3 + 2]);
+      }
+
+      // Rotation matrix from quaternion
+      const xx = qx * qx, yy = qy * qy, zz = qz * qz;
+      const xy = qx * qy, xz = qx * qz, yz = qy * qz;
+      const wx = qw * qx, wy = qw * qy, wz = qw * qz;
+      const m00 = 1 - 2 * (yy + zz);
+      const m01 = 2 * (xy + wz);
+      const m02 = 2 * (xz - wy);
+      const m10 = 2 * (xy - wz);
+      const m11 = 1 - 2 * (xx + zz);
+      const m12 = 2 * (yz + wx);
+      const m20 = 2 * (xz + wy);
+      const m21 = 2 * (yz - wx);
+      const m22 = 1 - 2 * (xx + yy);
+
+      // Scale rows
+      const r00 = m00 * sx, r01 = m01 * sx, r02 = m02 * sx;
+      const r10 = m10 * sy, r11 = m11 * sy, r12 = m12 * sy;
+      const r20 = m20 * sz, r21 = m21 * sz, r22 = m22 * sz;
+
+      // Covariance terms
+      const cAx = r00 * r00 + r10 * r10 + r20 * r20;
+      const cAy = r00 * r01 + r10 * r11 + r20 * r21;
+      const cAz = r00 * r02 + r10 * r12 + r20 * r22;
+
+      const cBx = r01 * r01 + r11 * r11 + r21 * r21;
+      const cBy = r01 * r02 + r11 * r12 + r21 * r22;
+      const cBz = r02 * r02 + r12 * r12 + r22 * r22;
+
+      // Write transformB (covA.xyz, covB.z)
+      const bidx = idx;
+      tB[bidx + 0] = cAx;
+      tB[bidx + 1] = cAy;
+      tB[bidx + 2] = cAz;
+      tB[bidx + 3] = cBz;
+
+      // Pack transformA.w as half2(cB.x, cB.y)
+      const hx = toHalfFloat(cBx) & 0xffff;
+      const hy = toHalfFloat(cBy) & 0xffff;
+      tA[idx + 3] = hx | (hy << 16);
+    }
+
+    this.transformA = new Uint32ArrayTexture().create(w, h, tA);
+    this.transformA.name = "transformA";
+    this.transformB = new Float16ArrayTexture().create(w, h, tB, false);
+    this.transformB.name = "transformB";
+  }
+  
+  /**
+   * Schedule Web Worker-based sorting task
+   */
+  private scheduleOrder(viewMatrix: Matrix4) {
+    if (this.count === 0) return;
+
+    // Calculate camera position and direction
+    const r = viewMatrix.rawData;
+    const vx = r[2], vy = r[6], vz = r[10];
+    const px = -(r[0] * r[12] + r[1] * r[13] + r[2] * r[14]);
+    const py = -(r[4] * r[12] + r[5] * r[13] + r[6] * r[14]);
+    const pz = -(r[8] * r[12] + r[9] * r[13] + r[10] * r[14]);
+    
+    // Create hash using camera position and direction
+    const posHash = Math.floor(px * 1000) ^ Math.floor(py * 1000) ^ Math.floor(pz * 1000);
+    const dirHash = Math.floor(vx * 1000) ^ Math.floor(vy * 1000) ^ Math.floor(vz * 1000);
+    const hash = posHash ^ dirHash;
+    
+    // Skip if camera hasn't moved significantly (within 1mm)
+    if (hash === this._lastViewMatrixHash) {
+      return;
+    }
+    this._lastViewMatrixHash = hash;
+
+    const now = performance.now();
+    if (now - this._lastSentTime < this._minIntervalMs) return;
+    this._lastSentTime = now;
+
+    if (!this._sortWorker) {
+      this._sortWorker = this.createSortWorker();
+      this._sortWorker.onmessage = (ev: MessageEvent) => {
+        const newOrder = ev.data.order;
+        const oldOrder = this._orderData.buffer;
+
+        // Send vertex storage to worker (ping-pong buffer)
+        this._sortWorker.postMessage({
+          order: oldOrder
+        }, [oldOrder]);
+
+        // Write the new order data
+        const indices = new Uint32Array(newOrder);
+        const total = this.size.x * this.size.y;
+        const count = this.count;
+        
+        // Create new buffer for orderData
+        this._orderData = new Uint32Array(total * 4);
+        for (let i = 0; i < total; i++) {
+          const src = i < count ? indices[i] : (count > 0 ? count - 1 : 0);
+          const base = i * 4;
+          this._orderData[base + 0] = src;
+          this._orderData[base + 1] = 0;
+          this._orderData[base + 2] = 0;
+          this._orderData[base + 3] = 0;
+        }
+        
+        this.splatOrder.updateTexture(this.size.x, this.size.y, this._orderData);
+        
+        // Update valid instance count (camera back culling)
+        const valid = Math.max(0, Math.min(this.count, ev.data.count | 0));
+        this.texParams[2] = valid;
+      };
+      
+      // First send: centers + initial order buffer
+      const centers = this._mapping ? new Float32Array(this._mapping.length * 3) : new Float32Array(this._positions);
+      if (this._mapping) {
+        for (let i = 0; i < this._mapping.length; ++i) {
+          const src = this._mapping[i] * 3;
+          const dst = i * 3;
+          centers[dst + 0] = this._positions[src + 0];
+          centers[dst + 1] = this._positions[src + 1];
+          centers[dst + 2] = this._positions[src + 2];
+        }
+      }
+      
+      // Get initial order buffer and send to worker
+      const orderBuffer = new Uint32Array(this.count);
+      for (let i = 0; i < this.count; i++) {
+        orderBuffer[i] = i;
+      }
+      
+      this._sortWorker.postMessage({
+        order: orderBuffer.buffer,
+        centers: centers.buffer,
+        mapping: this._mapping
+      }, [orderBuffer.buffer, centers.buffer]);
+      
+      this._centersSent = true;
+    }
+
+    // Send sorting request (PlayCanvas style - no transfer)
+    this._sortWorker.postMessage({
+      cameraPosition: { x: px, y: py, z: pz },
+      cameraDirection: { x: -vx, y: -vy, z: -vz }
+    });
+  }
+  
+  /**
+   * Create Web Worker for sorting
+   */
+  private createSortWorker(): Worker {
+    // Match PlayCanvas SortWorker implementation exactly
+    function SortWorker() {
+      const compareBits = 16;
+      const bucketCount = (2 ** compareBits) + 1;
+
+      let order;
+      let centers;
+      let mapping;
+      let cameraPosition;
+      let cameraDirection;
+
+      let forceUpdate = false;
+
+      const lastCameraPosition = { x: 0, y: 0, z: 0 };
+      const lastCameraDirection = { x: 0, y: 0, z: 0 };
+
+      const boundMin = { x: 0, y: 0, z: 0 };
+      const boundMax = { x: 0, y: 0, z: 0 };
+
+      let distances;
+      let countBuffer;
+
+      const binarySearch = (m, n, compare_fn) => {
+        while (m <= n) {
+          const k = (n + m) >> 1;
+          const cmp = compare_fn(k);
+          if (cmp > 0) {
+            m = k + 1;
+          } else if (cmp < 0) {
+            n = k - 1;
+          } else {
+            return k;
+          }
+        }
+        return ~m;
+      };
+
+      const update = () => {
+        if (!order || !centers || !cameraPosition || !cameraDirection) return;
+
+        const px = cameraPosition.x;
+        const py = cameraPosition.y;
+        const pz = cameraPosition.z;
+        const dx = cameraDirection.x;
+        const dy = cameraDirection.y;
+        const dz = cameraDirection.z;
+
+        const epsilon = 0.001;
+
+        if (!forceUpdate &&
+            Math.abs(px - lastCameraPosition.x) < epsilon &&
+            Math.abs(py - lastCameraPosition.y) < epsilon &&
+            Math.abs(pz - lastCameraPosition.z) < epsilon &&
+            Math.abs(dx - lastCameraDirection.x) < epsilon &&
+            Math.abs(dy - lastCameraDirection.y) < epsilon &&
+            Math.abs(dz - lastCameraDirection.z) < epsilon) {
+          return;
+        }
+
+        forceUpdate = false;
+
+        lastCameraPosition.x = px;
+        lastCameraPosition.y = py;
+        lastCameraPosition.z = pz;
+        lastCameraDirection.x = dx;
+        lastCameraDirection.y = dy;
+        lastCameraDirection.z = dz;
+
+        // Create distance buffer
+        const numVertices = centers.length / 3;
+        if (distances?.length !== numVertices) {
+          distances = new Uint32Array(numVertices);
+        }
+
+        // Calc min/max distance using bound
+        let minDist;
+        let maxDist;
+        for (let i = 0; i < 8; ++i) {
+          const x = (i & 1 ? boundMin.x : boundMax.x) - px;
+          const y = (i & 2 ? boundMin.y : boundMax.y) - py;
+          const z = (i & 4 ? boundMin.z : boundMax.z) - pz;
+          const d = x * dx + y * dy + z * dz;
+          if (i === 0) {
+            minDist = maxDist = d;
+          } else {
+            minDist = Math.min(minDist, d);
+            maxDist = Math.max(maxDist, d);
+          }
+        }
+
+        if (!countBuffer) {
+          countBuffer = new Uint32Array(bucketCount);
+        } else {
+          countBuffer.fill(0);
+        }
+
+        // Generate per vertex distance to camera
+        const range = maxDist - minDist;
+        const divider = (range < 1e-6) ? 0 : 1 / range * (2 ** compareBits);
+        for (let i = 0; i < numVertices; ++i) {
+          const istride = i * 3;
+          const x = centers[istride + 0] - px;
+          const y = centers[istride + 1] - py;
+          const z = centers[istride + 2] - pz;
+          const d = x * dx + y * dy + z * dz;
+          const sortKey = Math.floor((d - minDist) * divider);
+
+          distances[i] = sortKey;
+          countBuffer[sortKey]++;
+        }
+
+        // Change countBuffer[i] so that it contains actual position
+        for (let i = 1; i < bucketCount; i++) {
+          countBuffer[i] += countBuffer[i - 1];
+        }
+
+        // Build the output array
+        for (let i = 0; i < numVertices; i++) {
+          const distance = distances[i];
+          const destIndex = --countBuffer[distance];
+          order[destIndex] = i;
+        }
+
+        // Find splat with distance 0 to limit rendering behind the camera
+        const dist = i => distances[order[i]] / divider + minDist;
+        const findZero = () => {
+          const result = binarySearch(0, numVertices - 1, i => -dist(i));
+          return Math.min(numVertices, Math.abs(result));
+        };
+        const count = dist(numVertices - 1) >= 0 ? findZero() : numVertices;
+
+        // Apply mapping
+        if (mapping) {
+          for (let i = 0; i < numVertices; ++i) {
+            order[i] = mapping[order[i]];
+          }
+        }
+
+        // Send results
+        (self as any).postMessage({
+          order: order.buffer,
+          count
+        }, [order.buffer]);
+
+        order = null;
+      };
+
+      (self as any).onmessage = (message) => {
+        if (message.data.order) {
+          order = new Uint32Array(message.data.order);
+        }
+        if (message.data.centers) {
+          centers = new Float32Array(message.data.centers);
+
+          // Calculate bounds
+          boundMin.x = boundMax.x = centers[0];
+          boundMin.y = boundMax.y = centers[1];
+          boundMin.z = boundMax.z = centers[2];
+
+          const numVertices = centers.length / 3;
+          for (let i = 1; i < numVertices; ++i) {
+            const x = centers[i * 3 + 0];
+            const y = centers[i * 3 + 1];
+            const z = centers[i * 3 + 2];
+
+            boundMin.x = Math.min(boundMin.x, x);
+            boundMin.y = Math.min(boundMin.y, y);
+            boundMin.z = Math.min(boundMin.z, z);
+
+            boundMax.x = Math.max(boundMax.x, x);
+            boundMax.y = Math.max(boundMax.y, y);
+            boundMax.z = Math.max(boundMax.z, z);
+          }
+          forceUpdate = true;
+        }
+        if (message.data.hasOwnProperty('mapping')) {
+          mapping = message.data.mapping ? new Uint32Array(message.data.mapping) : null;
+          forceUpdate = true;
+        }
+        if (message.data.cameraPosition) cameraPosition = message.data.cameraPosition;
+        if (message.data.cameraDirection) cameraDirection = message.data.cameraDirection;
+
+        update();
+      };
+    }
+
+    const code = `(${SortWorker.toString()})()`;
+    const blob = new Blob([code], { type: 'application/javascript' });
+    const url = URL.createObjectURL(blob);
+    return new Worker(url);
+  }
+  
+  /**
+   * Update node before rendering
+   */
+  public nodeUpdate(
+    view: View3D,
+    passType: PassType,
+    renderPassState: RendererPassState,
+    clusterLightingBuffer?: ClusterLightingBuffer
+  ) {
+    this.gsplatMaterial.setSplatTextures(
+      this.splatColor,
+      this.transformA,
+      this.transformB,
+      this.texParams,
+      this.splatOrder
+    );
+    super.nodeUpdate(view, passType, renderPassState, clusterLightingBuffer);
+  }
+
+  /**
+   * Render pass
+   */
+  public renderPass2(
+    view: View3D,
+    passType: PassType,
+    rendererPassState: RendererPassState,
+    clusterLightingBuffer: ClusterLightingBuffer,
+    encoder: GPURenderPassEncoder,
+    useBundle: boolean = false
+  ) {
+    for (let mat of this.materials) {
+      const passes = mat.getPass(passType);
+      if (!passes || passes.length === 0) continue;
+      for (const pass of passes) {
+        if (!pass.pipeline) continue;
+        pass.apply(this.geometry, rendererPassState);
+        GPUContext.bindPipeline(encoder, pass);
+        // 4 vertices per instance, instance count = splat count
+        GPUContext.draw(encoder, 4, this.count, 0, 0);
+      }
+    }
+  }
+
+  /**
+   * Render pass (fallback)
+   */
+  public renderPass(
+    view: View3D,
+    passType: PassType,
+    renderContext
+  ) {
+    const encoder: GPURenderPassEncoder = renderContext.encoder;
+    for (let mat of this.materials) {
+      const passes = mat.getPass(passType);
+      if (!passes || passes.length === 0) continue;
+      for (const pass of passes) {
+        if (!pass.pipeline) continue;
+        pass.apply(this.geometry, renderContext.rendererPassState || (renderContext as any));
+        GPUContext.bindPipeline(encoder, pass);
+        GPUContext.draw(encoder, 4, this.count, 0, 0);
+      }
+    }
+  }
+  
+  /**
+   * Clean up resources
+   */
+  public destroy(force?: boolean): void {
+    if (this._sortWorker) {
+      this._sortWorker.terminate();
+      this._sortWorker = null;
+    }
+    super.destroy(force);
+  }
+}
+

@@ -31,6 +31,10 @@ export default defineConfig((option) => ({
                 } else if (req.url === '/test') {
                   res.writeHead(302, { 'Location': '/test-dev.html' });
                   res.end();
+                } else if (req.url === '/examples/gsplat') {
+                  res.writeHead(302, { 'Location': '/examples/gsplat/index.html' });
+                  res.end();
+
                 } else {
                   next();
                 }

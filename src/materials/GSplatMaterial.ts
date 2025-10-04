@@ -9,6 +9,7 @@ import { Float32ArrayTexture } from "../textures/Float32ArrayTexture";
 import { Float16ArrayTexture } from "../textures/Float16ArrayTexture";
 import { Uint8ArrayTexture } from "../textures/Uint8ArrayTexture";
 import { Uint32ArrayTexture } from "../textures/Uint32ArrayTexture";
+import { BlendMode } from "./BlendMode";
 
 export class GSplatMaterial extends Material {
   constructor() {
@@ -23,7 +24,7 @@ export class GSplatMaterial extends Material {
     pass.topology = GPUPrimitiveTopology.triangle_strip;
     pass.depthWriteEnabled = false;
     pass.shaderState.transparent = true;
-    // 输出两路（color + gbuffer），匹配 FragmentOutput 定义
+    pass.shaderState.blendMode = BlendMode.NORMAL;
     pass.shaderState.writeMasks = [0xF, 0xF];
 
     const shader = new Shader();
@@ -39,8 +40,6 @@ export class GSplatMaterial extends Material {
     splatOrder?: Uint32ArrayTexture
   ) {
     const pass = this.shader.getDefaultColorShader();
-    // 指定第二个 RT 作为 gbuffer 输出目标
-    // 在默认管线下，ColorPass 常有两路 RT；若仅一路也可工作，因为 writeMasks 由 RenderShaderPass 根据 RT 数自动裁剪
     pass.setTexture("splatColor", splatColor);
     pass.setTexture("transformA", transformA);
     pass.setTexture("transformB", transformB);

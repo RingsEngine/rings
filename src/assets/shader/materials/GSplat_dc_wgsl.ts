@@ -50,11 +50,12 @@ export const GSplat_VS_DC: string = /* wgsl */ `
             o.member = vec4f(0.0, 0.0, 2.0, 1.0);
             return o;
         }
+        // Match PlayCanvas: vertex positions are [-2, 2] not [-1, 1]
         var corner = array<vec2f, 4>(
-            vec2f(-1.0, -1.0),
-            vec2f( 1.0, -1.0),
-            vec2f(-1.0,  1.0),
-            vec2f( 1.0,  1.0)
+            vec2f(-2.0, -2.0),
+            vec2f( 2.0, -2.0),
+            vec2f(-2.0,  2.0),
+            vec2f( 2.0,  2.0)
         );
 
         var splatId = iid;
@@ -90,48 +91,53 @@ export const GSplat_VS_DC: string = /* wgsl */ `
         let cBx = halfToFloat(half2 & 0xFFFFu);
         let cBy = halfToFloat((half2 >> 16u) & 0xFFFFu);
         let covB = vec3f(cBx, cBy, tB.w);
-        let Cw = mat3x3f(
+        let Vrk = mat3x3f(
             vec3f(covA.x, covA.y, covA.z),
             vec3f(covA.y, covB.x, covB.y),
             vec3f(covA.z, covB.y, covB.z)
         );
 
-        // transform covariance to camera space: Cc = R * Cw * R^T
-        let R = mat3x3f(viewMat[0].xyz, viewMat[1].xyz, viewMat[2].xyz);
-        let Cc = R * Cw * transpose(R);
-
-        // perspective Jacobian at splat center in camera space
-        let X = splat_cam.x; let Y = splat_cam.y; let Z = splat_cam.z;
+        // === EXACTLY match PlayCanvas calcV1V2 ===
+        // W = transpose(mat3(model_view)), model is identity so just transpose(view)
+        let W = transpose(mat3x3f(viewMat[0].xyz, viewMat[1].xyz, viewMat[2].xyz));
+        
+        // Single focal (PlayCanvas uses only x-axis!)
         let viewport = vec2f(globalUniform.windowWidth, globalUniform.windowHeight);
-        let fx = projMat[0][0] * 0.5 * viewport.x;
-        let fy = projMat[1][1] * 0.5 * viewport.y;
-        let invZ = 1.0 / max(abs(Z), 1e-4);
-        let t00 = fx * invZ;
-        let t01 = 0.0;
-        let t02 = -fx * X * invZ * invZ;
-        let t10 = 0.0;
-        let t11 = fy * invZ;
-        let t12 = -fy * Y * invZ * invZ;
+        let focal = viewport.x * projMat[0][0];
+        
+        // Jacobian matrix
+        let J1 = focal / splat_cam.z;
+        let J2 = -J1 / splat_cam.z * vec2f(splat_cam.x, splat_cam.y);
+        let J = mat3x3f(
+            vec3f(J1, 0.0, J2.x),
+            vec3f(0.0, J1, J2.y),
+            vec3f(0.0, 0.0, 0.0)
+        );
+        
+        // T = W * J, then cov = T^T * Vrk * T
+        let T = W * J;
+        let cov = transpose(T) * Vrk * T;
+        let A2 = cov[0][0];
+        let B2 = cov[0][1];
+        let C2 = cov[1][1];
 
-        // C2 = T * Cc * T^T, expanded manually
-        let m0 = vec3f(t00, t01, t02);
-        let m1 = vec3f(t10, t11, t12);
-        let v0 = Cc * m0;
-        let v1c = Cc * m1;
-        let A2 = dot(m0, v0);
-        let B2 = dot(m0, v1c);
-        let C2 = dot(m1, v1c);
+        // Add regularization (match PlayCanvas exactly)
+        let diagonal1 = A2 + 0.3;
+        let offDiagonal = B2;
+        let diagonal2 = C2 + 0.3;
 
-        // eigen decomposition of 2x2 symmetric [[A2, B2],[B2, C2]]
-        let tr = A2 + C2;
-        let det = A2 * C2 - B2 * B2;
-        let s = sqrt(max(tr * tr * 0.25 - det, 1e-8));
-        let l1 = max(tr * 0.5 + s, 1e-8);
-        let l2 = max(tr * 0.5 - s, 1e-8);
-        let e1 = normalize(vec2f(B2, l1 - A2));
+        // Eigendecomposition (match PlayCanvas method)
+        let mid = 0.5 * (diagonal1 + diagonal2);
+        let radius = length(vec2f((diagonal1 - diagonal2) / 2.0, offDiagonal));
+        let l1 = mid + radius;
+        let l2 = max(mid - radius, 0.1);
+        let diagonalVector = normalize(vec2f(offDiagonal, l1 - diagonal1));
+        let e1 = diagonalVector;
         let e2 = vec2f(-e1.y, e1.x);
-        var axis1 = e1 * sqrt(l1);
-        var axis2 = e2 * sqrt(l2);
+        // CRITICAL: Match PlayCanvas - use sqrt(2.0 * lambda) for correct Gaussian coverage
+        // This 2.0 factor is essential for the Gaussian falloff exp(-A*4.0) to work correctly
+        var axis1 = e1 * min(sqrt(2.0 * l1), 1024.0);
+        var axis2 = e2 * min(sqrt(2.0 * l2), 1024.0);
 
         // sample color early to compute alpha-based scale like PlayCanvas
         let color = textureLoad(splatColor, splatUV, 0);
@@ -151,14 +157,18 @@ export const GSplat_VS_DC: string = /* wgsl */ `
             return o;
         }
 
-        let v = vec2f(corner[vid & 3u].x * axis1.x + corner[vid & 3u].y * axis2.x,
-                      corner[vid & 3u].x * axis1.y + corner[vid & 3u].y * axis2.y);
-        let offset = vec2f(v.x, v.y) / viewport * splat_proj.w;
+        // Calculate vertex offset in screen space
+        // Match PlayCanvas: (vertex_position.x * v1 + vertex_position.y * v2) / viewport * w
+        let cornerPos = corner[vid & 3u];
+        let v = cornerPos.x * axis1 + cornerPos.y * axis2;
+        let offset = v / viewport * splat_proj.w;
 
-        o.member = splat_proj + vec4f(offset, 0.0, 0.0);
+        o.member = splat_proj + vec4f(offset.x, offset.y, 0.0, 0.0);
         o.vColor = color;
-        // Match PlayCanvas mapping: our corner is [-1,1], so use scale * VIS_BOOST (no 0.5 factor here)
-        o.vTexCoord = corner[vid & 3u] * (scale * VIS_BOOST);
+        // CRITICAL FIX: texCoord must NOT be affected by VIS_BOOST!
+        // VIS_BOOST only scales geometry (axis1/axis2), not the alpha falloff
+        // With corner ∈ [-2, 2], this gives texCoord ∈ [-1, 1] * scale at vertices
+        o.vTexCoord = corner[vid & 3u] * (scale / 2.0);
         return o;
     }
 `;
@@ -179,8 +189,12 @@ export const GSplat_FS_DC: string = /* wgsl */ `
         if (A > 1.0) {
             discard;
         }
-        // PlayCanvas-like falloff
+        // Match PlayCanvas falloff exactly
         let B = exp(-A * 4.0) * vColor.a;
+        // Early discard for nearly transparent fragments (performance optimization)
+        if (B < (1.0 / 255.0)) {
+            discard;
+        }
         var alpha = clamp(B, 0.0, 1.0);
 
         // Dither alpha-to-coverage (4x4 Bayer) if enabled via tex_params.w < 0
