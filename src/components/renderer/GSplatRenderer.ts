@@ -87,6 +87,11 @@ export class GSplatRenderer extends RenderNode {
     }
     this.splatOrder = new Uint32ArrayTexture().create(this.size.x, this.size.y, this._orderData);
     this.splatOrder.name = "splatOrder";
+
+    this.splatOrder.minFilter = "nearest";
+    this.splatOrder.magFilter = "nearest";
+    this.splatOrder.addressModeU = "clamp-to-edge";
+    this.splatOrder.addressModeV = "clamp-to-edge";
     
     // Initialize material and geometry
     this.gsplatMaterial = new GSplatMaterial();
@@ -210,6 +215,12 @@ export class GSplatRenderer extends RenderNode {
     }
     this.splatColor = new Uint8ArrayTexture().create(w, h, data, false);
     this.splatColor.name = "splatColor";
+
+    this.splatColor.minFilter = "nearest";
+    this.splatColor.magFilter = "nearest";
+    this.splatColor.mipmapFilter = "nearest";
+    this.splatColor.addressModeU = "clamp-to-edge";
+    this.splatColor.addressModeV = "clamp-to-edge";
   }
   
   /**
@@ -309,8 +320,20 @@ export class GSplatRenderer extends RenderNode {
 
     this.transformA = new Uint32ArrayTexture().create(w, h, tA);
     this.transformA.name = "transformA";
+
+    this.transformA.minFilter = "nearest";
+    this.transformA.magFilter = "nearest";
+    this.transformA.addressModeU = "clamp-to-edge";
+    this.transformA.addressModeV = "clamp-to-edge";
+    
     this.transformB = new Float16ArrayTexture().create(w, h, tB, false);
     this.transformB.name = "transformB";
+
+    this.transformB.minFilter = "nearest";
+    this.transformB.magFilter = "nearest";
+    this.transformB.mipmapFilter = "nearest";
+    this.transformB.addressModeU = "clamp-to-edge";
+    this.transformB.addressModeV = "clamp-to-edge";
   }
   
   /**
