@@ -126,18 +126,22 @@ export const GSplat_VS: string = /* wgsl */ `
         let offDiagonal = B2;
         let diagonal2 = C2 + 0.3;
 
-        // Eigendecomposition (match PlayCanvas method)
+        // Eigendecomposition
         let mid = 0.5 * (diagonal1 + diagonal2);
         let radius = length(vec2f((diagonal1 - diagonal2) / 2.0, offDiagonal));
-        let l1 = mid + radius;
-        let l2 = max(mid - radius, 0.1);
-        let diagonalVector = normalize(vec2f(offDiagonal, l1 - diagonal1));
-        let e1 = diagonalVector;
-        let e2 = vec2f(-e1.y, e1.x);
-        // CRITICAL: Match PlayCanvas - use sqrt(2.0 * lambda) for correct Gaussian coverage
-        // This 2.0 factor is essential for the Gaussian falloff exp(-A*4.0) to work correctly
-        var axis1 = e1 * min(sqrt(2.0 * l1), 1024.0);
-        var axis2 = e2 * min(sqrt(2.0 * l2), 1024.0);
+        let lambda1 = mid + radius;
+        let lambda2 = max(mid - radius, 0.1);
+        let diagonalVector = normalize(vec2f(offDiagonal, lambda1 - diagonal1));
+
+        // Calculate orthogonal axes
+        // CRITICAL: WebGPU NDC has inverted Y-axis compared to WebGL
+        // WebGL Y: -1(bottom) to +1(top), WebGPU Y: -1(top) to +1(bottom)
+        // So we flip the sign to compensate: vec2(-diagonalVector.y, diagonalVector.x)
+        let v1 = min(sqrt(2.0 * lambda1), 1024.0) * diagonalVector;
+        let v2 = min(sqrt(2.0 * lambda2), 1024.0) * vec2f(-diagonalVector.y, diagonalVector.x);
+
+        var axis1 = v1;
+        var axis2 = v2;
 
         // sample color early to compute alpha-based scale like PlayCanvas
         let color = textureLoad(splatColor, splatUV, 0);
