@@ -16,6 +16,7 @@ export const GSplat_VS: string = /* wgsl */ `
     // material uniform buffer (engine-managed)
     struct MaterialUniform {
         tex_params: vec4f,
+        modelMatrix: mat4x4<f32>,
     };
     @group(1) @binding(3) var<uniform> materialUniform : MaterialUniform;
 
@@ -74,7 +75,10 @@ export const GSplat_VS: string = /* wgsl */ `
 
         let viewMat = globalUniform.viewMat;
         let projMat = globalUniform.projMat;
-        let splat_cam = viewMat * vec4f(center, 1.0);
+        
+        // Transform splat center to world space using model matrix
+        let worldCenter = materialUniform.modelMatrix * vec4f(center, 1.0);
+        let splat_cam = viewMat * worldCenter;
         let splat_proj = projMat * splat_cam;
 
         if (splat_proj.z < -splat_proj.w) {
@@ -84,21 +88,30 @@ export const GSplat_VS: string = /* wgsl */ `
             return o;
         }
 
-        // build world-space 3x3 covariance from packed terms
+        // build local-space 3x3 covariance from packed terms
         let tB = textureLoad(transformB, splatUV, 0);
         let covA = tB.xyz;
         let half2 = tA.w;
         let cBx = halfToFloat(half2 & 0xFFFFu);
         let cBy = halfToFloat((half2 >> 16u) & 0xFFFFu);
         let covB = vec3f(cBx, cBy, tB.w);
-        let Vrk = mat3x3f(
+        let Vrk_local = mat3x3f(
             vec3f(covA.x, covA.y, covA.z),
             vec3f(covA.y, covB.x, covB.y),
             vec3f(covA.z, covB.y, covB.z)
         );
 
+        // Transform covariance to world space: Vrk_world = M * Vrk_local * M^T
+        // Extract 3x3 rotation-scale matrix from model matrix
+        let M = mat3x3f(
+            materialUniform.modelMatrix[0].xyz,
+            materialUniform.modelMatrix[1].xyz,
+            materialUniform.modelMatrix[2].xyz
+        );
+        let Vrk = M * Vrk_local * transpose(M);
+
         // === EXACTLY match PlayCanvas calcV1V2 ===
-        // W = transpose(mat3(model_view)), model is identity so just transpose(view)
+        // W = transpose(mat3(view)), covariance already in world space
         let W = transpose(mat3x3f(viewMat[0].xyz, viewMat[1].xyz, viewMat[2].xyz));
         
         // Single focal (PlayCanvas uses only x-axis!)
@@ -183,6 +196,7 @@ export const GSplat_FS: string = /* wgsl */ `
     // mirror material uniform for FS access
     struct MaterialUniform {
         tex_params: vec4f,
+        modelMatrix: mat4x4<f32>,
     };
     @group(1) @binding(3) var<uniform> materialUniform : MaterialUniform;
 

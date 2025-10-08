@@ -10,6 +10,7 @@ import { Float16ArrayTexture } from "../textures/Float16ArrayTexture";
 import { Uint8ArrayTexture } from "../textures/Uint8ArrayTexture";
 import { Uint32ArrayTexture } from "../textures/Uint32ArrayTexture";
 import { BlendMode } from "./BlendMode";
+import { Matrix4 } from "../math/Matrix4";
 
 export class GSplatMaterial extends Material {
   constructor() {
@@ -49,6 +50,14 @@ export class GSplatMaterial extends Material {
     if (splatOrder) {
       pass.setTexture("splatOrder", splatOrder);
     }
+  }
+
+  /**
+   * Set the model matrix for transforming splats to world space
+   */
+  public setTransformMatrix(matrix: Matrix4) {
+    const pass = this.shader.getDefaultColorShader();
+    pass.setUniform("modelMatrix", matrix.rawData);
   }
 }
 

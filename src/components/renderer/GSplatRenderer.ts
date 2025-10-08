@@ -38,7 +38,8 @@ export class GSplatRenderer extends RenderNode {
   public gsplatMaterial: GSplatMaterial;
   
   // CPU-side data for sorting
-  private _positions: Float32Array; // xyz per splat
+  private _positions: Float32Array; // xyz per splat (local space)
+  private _worldPositions: Float32Array; // xyz per splat (world space, cached)
   private _orderData: Uint32Array; // RGBA32U backing: size.x * size.y * 4
   
   // Web Worker for sorting
@@ -133,16 +134,17 @@ export class GSplatRenderer extends RenderNode {
     }
     this.splatOrder.updateTexture(this.size.x, this.size.y, this._orderData);
     
-    // Send new centers to worker
+    // Send new centers to worker (use world positions)
     if (this._sortWorker) {
-      const centers = this._mapping ? new Float32Array(this._mapping.length * 3) : new Float32Array(this._positions);
+      const worldPos = this._worldPositions || this._positions;
+      const centers = this._mapping ? new Float32Array(this._mapping.length * 3) : new Float32Array(worldPos);
       if (this._mapping) {
         for (let i = 0; i < this._mapping.length; ++i) {
           const src = this._mapping[i] * 3;
           const dst = i * 3;
-          centers[dst + 0] = this._positions[src + 0];
-          centers[dst + 1] = this._positions[src + 1];
-          centers[dst + 2] = this._positions[src + 2];
+          centers[dst + 0] = worldPos[src + 0];
+          centers[dst + 1] = worldPos[src + 1];
+          centers[dst + 2] = worldPos[src + 2];
         }
       }
       this._sortWorker.postMessage(
@@ -337,10 +339,49 @@ export class GSplatRenderer extends RenderNode {
   }
   
   /**
+   * Update world space positions when transform changes
+   */
+  private updateWorldPositions() {
+    if (!this._positions) return;
+    
+    const worldMatrix = this.object3D.transform.worldMatrix;
+    const localPos = this._positions;
+    const count = this._fullCount;
+    
+    // Allocate or reuse world positions buffer
+    if (!this._worldPositions) {
+      this._worldPositions = new Float32Array(localPos.length);
+    }
+    
+    const m = worldMatrix.rawData;
+    
+    // Transform each splat center to world space
+    for (let i = 0; i < count; i++) {
+      const idx = i * 3;
+      const x = localPos[idx + 0];
+      const y = localPos[idx + 1];
+      const z = localPos[idx + 2];
+      
+      // worldPos = modelMatrix * localPos
+      this._worldPositions[idx + 0] = m[0] * x + m[4] * y + m[8] * z + m[12];
+      this._worldPositions[idx + 1] = m[1] * x + m[5] * y + m[9] * z + m[13];
+      this._worldPositions[idx + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
+    }
+    
+    this._centersSent = false; // Need to send updated positions to worker
+  }
+  
+  /**
    * Schedule Web Worker-based sorting task
    */
   private scheduleOrder(viewMatrix: Matrix4) {
     if (this.count === 0) return;
+
+    // Check if transform has changed
+    const transformChanged = this.object3D.transform.localChange;
+    if (transformChanged || !this._worldPositions) {
+      this.updateWorldPositions();
+    }
 
     // Calculate camera position and direction
     const r = viewMatrix.rawData;
@@ -354,8 +395,8 @@ export class GSplatRenderer extends RenderNode {
     const dirHash = Math.floor(vx * 1000) ^ Math.floor(vy * 1000) ^ Math.floor(vz * 1000);
     const hash = posHash ^ dirHash;
     
-    // Skip if camera hasn't moved significantly (within 1mm)
-    if (hash === this._lastViewMatrixHash) {
+    // Skip if camera hasn't moved significantly (within 1mm) and transform unchanged
+    if (hash === this._lastViewMatrixHash && !transformChanged) {
       return;
     }
     this._lastViewMatrixHash = hash;
@@ -398,15 +439,17 @@ export class GSplatRenderer extends RenderNode {
         this.texParams[2] = valid;
       };
       
-      // First send: centers + initial order buffer
-      const centers = this._mapping ? new Float32Array(this._mapping.length * 3) : new Float32Array(this._positions);
+      // First send: world space centers + initial order buffer
+      // Use world positions for correct sorting
+      const worldPos = this._worldPositions || this._positions;
+      const centers = this._mapping ? new Float32Array(this._mapping.length * 3) : new Float32Array(worldPos);
       if (this._mapping) {
         for (let i = 0; i < this._mapping.length; ++i) {
           const src = this._mapping[i] * 3;
           const dst = i * 3;
-          centers[dst + 0] = this._positions[src + 0];
-          centers[dst + 1] = this._positions[src + 1];
-          centers[dst + 2] = this._positions[src + 2];
+          centers[dst + 0] = worldPos[src + 0];
+          centers[dst + 1] = worldPos[src + 1];
+          centers[dst + 2] = worldPos[src + 2];
         }
       }
       
@@ -422,6 +465,27 @@ export class GSplatRenderer extends RenderNode {
         mapping: this._mapping
       }, [orderBuffer.buffer, centers.buffer]);
       
+      this._centersSent = true;
+    }
+    
+    // If transform changed and centers not sent yet, update worker
+    if (!this._centersSent && this._sortWorker) {
+      const worldPos = this._worldPositions || this._positions;
+      const centers = this._mapping ? new Float32Array(this._mapping.length * 3) : new Float32Array(worldPos);
+      if (this._mapping) {
+        for (let i = 0; i < this._mapping.length; ++i) {
+          const src = this._mapping[i] * 3;
+          const dst = i * 3;
+          centers[dst + 0] = worldPos[src + 0];
+          centers[dst + 1] = worldPos[src + 1];
+          centers[dst + 2] = worldPos[src + 2];
+        }
+      }
+      this._sortWorker.postMessage({
+        type: 'centers',
+        centers: centers.buffer,
+        mapping: this._mapping ? this._mapping : null,
+      }, [centers.buffer]);
       this._centersSent = true;
     }
 
@@ -637,6 +701,10 @@ export class GSplatRenderer extends RenderNode {
     renderPassState: RendererPassState,
     clusterLightingBuffer?: ClusterLightingBuffer
   ) {
+    // Pass world matrix to shader for transforming splats
+    const worldMatrix = this.object3D.transform.worldMatrix;
+    this.gsplatMaterial.setTransformMatrix(worldMatrix);
+    
     this.gsplatMaterial.setSplatTextures(
       this.splatColor,
       this.transformA,
