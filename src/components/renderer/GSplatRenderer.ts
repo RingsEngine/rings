@@ -39,6 +39,9 @@ export class GSplatRenderer extends RenderNode {
   
   // CPU-side data for sorting
   private _positions: Float32Array; // xyz per splat (local space)
+  get positions(): Float32Array {
+    return this._positions;
+  }
   private _worldPositions: Float32Array; // xyz per splat (world space, cached)
   private _orderData: Uint32Array; // RGBA32U backing: size.x * size.y * 4
   
@@ -67,6 +70,9 @@ export class GSplatRenderer extends RenderNode {
   // Mapping support (optional subset rendering)
   private _mapping: Uint32Array | null = null;
   private _fullCount: number = 0; // Original total count
+  get fullCount(): number {
+    return this._fullCount;
+  }
   
   constructor() {
     super();

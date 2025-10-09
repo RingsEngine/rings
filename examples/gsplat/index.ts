@@ -16,12 +16,14 @@ import {
   FileLoader,
   GaussianSplatParser,
   GaussianSplatAsset,
-  GSplatRenderer
+  GSplatRenderer,
+  BoundUtil
 } from '../../index';
 
 export class GSplatBasicExample {
   private scene: Scene3D;
   private camera: Camera3D;
+  private cameraController: HoverCameraController;
   private renderer: GSplatRenderer;
   private gsplatObj: Object3D;
 
@@ -44,6 +46,7 @@ export class GSplatBasicExample {
     // 添加相机控制器
     const controller = cameraObj.addComponent(HoverCameraController);
     controller.setCamera(-90, 0, 2);
+    this.cameraController = controller;
 
     this.scene.addChild(cameraObj);
 
@@ -97,6 +100,7 @@ export class GSplatBasicExample {
       
       // 从 asset 初始化
       renderer.initAsset(asset);
+      this.gsplatObj.transform.rotationX = 180;
 
       // 添加到场景
       this.scene.addChild(this.gsplatObj);
@@ -109,6 +113,9 @@ export class GSplatBasicExample {
       // Save renderer reference and create control panel
       this.renderer = renderer;
       this.createControlPanel();
+
+      const gsplatBounds = BoundUtil.genGSplatBounds(this.gsplatObj);
+      this.cameraController.focusBound(gsplatBounds);
 
       return renderer;
     } catch (error) {

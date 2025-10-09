@@ -2,6 +2,7 @@ import { Vector3 } from "../math/Vector3";
 import { BoundingBox } from "../core/bound/BoundingBox";
 import { Object3D } from "../core/entities/Object3D";
 import { MeshRenderer } from "../components/renderer/MeshRenderer";
+import { GSplatRenderer } from "../components/renderer/GSplatRenderer";
 import { Matrix4 } from "../math/Matrix4";
 
 export class BoundUtil {
@@ -23,6 +24,44 @@ export class BoundUtil {
     new Vector3(),
     new Vector3(),
   ];
+
+  public static genGSplatBounds(obj: Object3D, bound?: BoundingBox) {
+    bound ||= new BoundingBox(Vector3.ZERO, Vector3.ZERO);
+    bound.setFromMinMax(this.maxVector, this.minVector);
+
+    let gsplatRenderer = obj.getComponent(GSplatRenderer);
+    if (!gsplatRenderer) {
+      console.warn('genGSplatBounds: No GSplatRenderer found on object');
+      return bound;
+    }
+
+    const positions = gsplatRenderer.positions;
+    const count = gsplatRenderer.fullCount;
+
+    if (!positions || count === 0) {
+      console.warn('genGSplatBounds: No position data available');
+      return bound;
+    }
+
+    const matrix = obj.transform.worldMatrix;
+    const point = new Vector3();
+    for (let i = 0; i < count; i++) {
+      const idx = i * 3;
+      point.set(
+        positions[idx + 0],
+        positions[idx + 1],
+        positions[idx + 2]
+      );
+      
+      matrix.transformPoint(point, point);
+      
+      bound.expandByPoint(point);
+    }
+
+    bound.setFromMinMax(bound.min, bound.max);
+
+    return bound;
+  }
 
   public static genMeshBounds(obj: Object3D, bound?: BoundingBox) {
     let tempMin = this.genMeshMinVector;

@@ -1,6 +1,7 @@
 import { Engine3D } from "../../Engine3D";
 import { Camera3D } from "../../core/Camera3D";
 import { View3D } from "../../core/View3D";
+import { BoundingBox } from "../../core/bound/BoundingBox";
 import { Object3D } from "../../core/entities/Object3D";
 import { PointerEvent3D } from "../../event/eventConst/PointerEvent3D";
 import { clamp } from "../../math/MathUtil";
@@ -134,7 +135,11 @@ export class HoverCameraController extends ComponentBase {
 
   public focusByBounds(obj: Object3D) {
     let bounds = BoundUtil.genMeshBounds(obj);
-    this.target = bounds.center;
+    this.focusBound(bounds);
+  }
+
+  public focusBound(bound: BoundingBox) {
+    this.target = bound.center;
   }
 
   public set target(target: Vector3) {
