@@ -91,15 +91,12 @@ export const GSplat_VS: string = /* wgsl */ `
     fn getCovariance() -> CovarianceData {
         let tB = textureLoad(transformB, splatUV, 0);
         
-        // unpackHalf2x16 equivalent
-        let h1 = tA.w & 0xFFFFu;
-        let h2 = (tA.w >> 16u) & 0xFFFFu;
-        let tCx = unpackHalf(h1);
-        let tCy = unpackHalf(h2);
+        // Use WGSL built-in unpack2x16float (equivalent to GLSL unpackHalf2x16)
+        let tC = unpack2x16float(tA.w);
         
         var result: CovarianceData;
         result.covA = tB.xyz;
-        result.covB = vec3f(tCx, tCy, tB.w);
+        result.covB = vec3f(tC.x, tC.y, tB.w);
         
         return result;
     }
@@ -112,10 +109,10 @@ export const GSplat_VS: string = /* wgsl */ `
             vec3f(covA.z, covB.y, covB.z)
         );
         
-        let focal = viewport.x * abs(projMat[0][0]);
+        let focal = viewport.x * projMat[0][0];
         
-        let J1 = focal / abs(splat_cam.z);
-        let J2 = -J1 / abs(splat_cam.z) * splat_cam.xy;
+        let J1 = focal / splat_cam.z;
+        let J2 = -J1 / splat_cam.z * splat_cam.xy;
         let J = mat3x3f(
             vec3f(J1, 0.0, J2.x),
             vec3f(0.0, J1, J2.y),
@@ -138,7 +135,8 @@ export const GSplat_VS: string = /* wgsl */ `
         let v1 = min(sqrt(2.0 * lambda1), 1024.0) * diagonalVector;
         let v2 = min(sqrt(2.0 * lambda2), 1024.0) * vec2f(diagonalVector.y, -diagonalVector.x);
         
-        return vec4f(v1, v2);
+        // WebGPU Y-axis flip: WebGPU NDC Y goes from top(-1) to bottom(1), opposite of WebGL
+        return vec4f(v1.x, -v1.y, v2.x, -v2.y);
     }
     
     // ===== SPLAT MAIN VS (from PlayCanvas gsplat-material.js) =====

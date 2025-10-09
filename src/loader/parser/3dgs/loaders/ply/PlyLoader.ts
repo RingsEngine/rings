@@ -121,16 +121,21 @@ export function parsePlyGaussianSplat(buffer: ArrayBuffer): PlyGaussianSplatData
       scale[v * 3 + 2] = readByType(payload, vOffset + propOffsets[s2], properties[s2].type);
     }
 
-    // Rotation
+    // Rotation (PLY format uses [w, x, y, z] order, we store as [x, y, z, w])
     if (rotation) {
       const r0 = propIndex('rot_0');
       const r1 = propIndex('rot_1');
       const r2 = propIndex('rot_2');
       const r3 = propIndex('rot_3');
-      rotation[v * 4 + 0] = readByType(payload, vOffset + propOffsets[r0], properties[r0].type);
-      rotation[v * 4 + 1] = readByType(payload, vOffset + propOffsets[r1], properties[r1].type);
-      rotation[v * 4 + 2] = readByType(payload, vOffset + propOffsets[r2], properties[r2].type);
-      rotation[v * 4 + 3] = readByType(payload, vOffset + propOffsets[r3], properties[r3].type);
+      const w = readByType(payload, vOffset + propOffsets[r0], properties[r0].type);
+      const x = readByType(payload, vOffset + propOffsets[r1], properties[r1].type);
+      const y = readByType(payload, vOffset + propOffsets[r2], properties[r2].type);
+      const z = readByType(payload, vOffset + propOffsets[r3], properties[r3].type);
+      // Store in [x, y, z, w] order
+      rotation[v * 4 + 0] = x;
+      rotation[v * 4 + 1] = y;
+      rotation[v * 4 + 2] = z;
+      rotation[v * 4 + 3] = w;
     }
 
     // Opacity

@@ -398,11 +398,6 @@ export class GSplatRenderer extends RenderNode {
     const pos = asset.position;
     const rot = asset.rotation;
     const scl = asset.scale;
-    
-    // 📊 Debug: Track scale and covariance ranges
-    let maxScale = 0;
-    let minScale = Infinity;
-    let maxCov = 0;
 
     for (let i = 0; i < count; i++) {
       const idx = i * 4;
@@ -431,31 +426,39 @@ export class GSplatRenderer extends RenderNode {
         sy = Math.exp(scl[i * 3 + 1]);
         sz = Math.exp(scl[i * 3 + 2]);
         
-        // 📊 Track scale range
-        maxScale = Math.max(maxScale, sx, sy, sz);
-        minScale = Math.min(minScale, sx, sy, sz);
       }
 
-      // Rotation matrix from quaternion
-      const xx = qx * qx, yy = qy * qy, zz = qz * qz;
-      const xy = qx * qy, xz = qx * qz, yz = qy * qz;
-      const wx = qw * qx, wy = qw * qy, wz = qw * qz;
-      const m00 = 1 - 2 * (yy + zz);
-      const m01 = 2 * (xy + wz);
-      const m02 = 2 * (xz - wy);
-      const m10 = 2 * (xy - wz);
-      const m11 = 1 - 2 * (xx + zz);
-      const m12 = 2 * (yz + wx);
-      const m20 = 2 * (xz + wy);
-      const m21 = 2 * (yz - wx);
-      const m22 = 1 - 2 * (xx + yy);
+      // Rotation matrix from quaternion - EXACTLY matching PlayCanvas Mat3.setFromQuat
+      const x2 = qx + qx;
+      const y2 = qy + qy;
+      const z2 = qz + qz;
+      const xx = qx * x2;
+      const xy = qx * y2;
+      const xz = qx * z2;
+      const yy = qy * y2;
+      const yz = qy * z2;
+      const zz = qz * z2;
+      const wx = qw * x2;
+      const wy = qw * y2;
+      const wz = qw * z2;
 
-      // Scale rows
-      const r00 = m00 * sx, r01 = m01 * sx, r02 = m02 * sx;
-      const r10 = m10 * sy, r11 = m11 * sy, r12 = m12 * sy;
-      const r20 = m20 * sz, r21 = m21 * sz, r22 = m22 * sz;
+      // Rotation matrix (column-major): [col0, col1, col2]
+      const data0 = 1 - (yy + zz);  // data[0]
+      const data1 = xy + wz;         // data[1]
+      const data2 = xz - wy;         // data[2]
+      const data3 = xy - wz;         // data[3]
+      const data4 = 1 - (xx + zz);   // data[4]
+      const data5 = yz + wx;         // data[5]
+      const data6 = xz + wy;         // data[6]
+      const data7 = yz - wx;         // data[7]
+      const data8 = 1 - (xx + yy);   // data[8]
 
-      // Covariance terms
+      // Apply scale to rotation matrix columns
+      const r00 = data0 * sx; const r01 = data1 * sx; const r02 = data2 * sx;
+      const r10 = data3 * sy; const r11 = data4 * sy; const r12 = data5 * sy;
+      const r20 = data6 * sz; const r21 = data7 * sz; const r22 = data8 * sz;
+
+      // Compute covariance: Σ = R * S * S^T * R^T
       const cAx = r00 * r00 + r10 * r10 + r20 * r20;
       const cAy = r00 * r01 + r10 * r11 + r20 * r21;
       const cAz = r00 * r02 + r10 * r12 + r20 * r22;
@@ -463,10 +466,6 @@ export class GSplatRenderer extends RenderNode {
       const cBx = r01 * r01 + r11 * r11 + r21 * r21;
       const cBy = r01 * r02 + r11 * r12 + r21 * r22;
       const cBz = r02 * r02 + r12 * r12 + r22 * r22;
-      
-      // 📊 Track covariance range
-      maxCov = Math.max(maxCov, Math.abs(cAx), Math.abs(cAy), Math.abs(cAz), 
-                                 Math.abs(cBx), Math.abs(cBy), Math.abs(cBz));
 
       // Write transformB (covA.xyz, covB.z)
       const bidx = idx;
@@ -480,30 +479,6 @@ export class GSplatRenderer extends RenderNode {
       const hy = toHalfFloat(cBy) & 0xffff;
       tA[idx + 3] = hx | (hy << 16);
     }
-    
-    // 📊 Output diagnostics
-    console.group('🔍 GSplat Data Statistics');
-    console.log('Splat count:', count);
-    console.log('Scale range:', minScale.toFixed(4), '~', maxScale.toFixed(4));
-    console.log('Max covariance:', maxCov.toFixed(4));
-    
-    if (maxScale > 50) {
-      console.error('❌ CRITICAL: Scale values are too large! This causes spikes.');
-      console.log('💡 Try reducing visBoost or clamping scale values');
-    } else if (maxScale > 20) {
-      console.warn('⚠️ WARNING: Scale values are large. May cause rendering issues.');
-    } else {
-      console.log('✅ Scale values look normal');
-    }
-    
-    if (maxCov > 100) {
-      console.error('❌ CRITICAL: Covariance values are too large!');
-    } else if (maxCov > 50) {
-      console.warn('⚠️ WARNING: Covariance values are large.');
-    } else {
-      console.log('✅ Covariance values look normal');
-    }
-    console.groupEnd();
 
     this.transformA = new Uint32ArrayTexture().create(w, h, tA);
     this.transformA.name = "transformA";
