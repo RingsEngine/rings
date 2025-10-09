@@ -24,6 +24,7 @@ export class GSplatMaterial extends Material {
     pass.setShaderEntry("VertMain", "FragMain");
     pass.topology = GPUPrimitiveTopology.triangle_strip;
     pass.depthWriteEnabled = false;
+    pass.cullMode = "none";
     pass.shaderState.transparent = true;
     pass.shaderState.blendMode = BlendMode.NORMAL;
     pass.shaderState.writeMasks = [0xF, 0xF];

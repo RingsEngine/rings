@@ -250,6 +250,11 @@ export class GSplatRenderer extends RenderNode {
     const pos = asset.position;
     const rot = asset.rotation;
     const scl = asset.scale;
+    
+    // 📊 Debug: Track scale and covariance ranges
+    let maxScale = 0;
+    let minScale = Infinity;
+    let maxCov = 0;
 
     for (let i = 0; i < count; i++) {
       const idx = i * 4;
@@ -277,6 +282,10 @@ export class GSplatRenderer extends RenderNode {
         sx = Math.exp(scl[i * 3 + 0]);
         sy = Math.exp(scl[i * 3 + 1]);
         sz = Math.exp(scl[i * 3 + 2]);
+        
+        // 📊 Track scale range
+        maxScale = Math.max(maxScale, sx, sy, sz);
+        minScale = Math.min(minScale, sx, sy, sz);
       }
 
       // Rotation matrix from quaternion
@@ -306,6 +315,10 @@ export class GSplatRenderer extends RenderNode {
       const cBx = r01 * r01 + r11 * r11 + r21 * r21;
       const cBy = r01 * r02 + r11 * r12 + r21 * r22;
       const cBz = r02 * r02 + r12 * r12 + r22 * r22;
+      
+      // 📊 Track covariance range
+      maxCov = Math.max(maxCov, Math.abs(cAx), Math.abs(cAy), Math.abs(cAz), 
+                                 Math.abs(cBx), Math.abs(cBy), Math.abs(cBz));
 
       // Write transformB (covA.xyz, covB.z)
       const bidx = idx;
@@ -319,6 +332,30 @@ export class GSplatRenderer extends RenderNode {
       const hy = toHalfFloat(cBy) & 0xffff;
       tA[idx + 3] = hx | (hy << 16);
     }
+    
+    // 📊 Output diagnostics
+    console.group('🔍 GSplat Data Statistics');
+    console.log('Splat count:', count);
+    console.log('Scale range:', minScale.toFixed(4), '~', maxScale.toFixed(4));
+    console.log('Max covariance:', maxCov.toFixed(4));
+    
+    if (maxScale > 50) {
+      console.error('❌ CRITICAL: Scale values are too large! This causes spikes.');
+      console.log('💡 Try reducing visBoost or clamping scale values');
+    } else if (maxScale > 20) {
+      console.warn('⚠️ WARNING: Scale values are large. May cause rendering issues.');
+    } else {
+      console.log('✅ Scale values look normal');
+    }
+    
+    if (maxCov > 100) {
+      console.error('❌ CRITICAL: Covariance values are too large!');
+    } else if (maxCov > 50) {
+      console.warn('⚠️ WARNING: Covariance values are large.');
+    } else {
+      console.log('✅ Covariance values look normal');
+    }
+    console.groupEnd();
 
     this.transformA = new Uint32ArrayTexture().create(w, h, tA);
     this.transformA.name = "transformA";
