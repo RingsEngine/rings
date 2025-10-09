@@ -49,6 +49,21 @@ export class GSplatRenderer extends RenderNode {
   private _centersSent: boolean = false;
   private _lastViewMatrixHash: number = 0;
   
+  // Adaptive sorting optimization
+  private _lastCameraSpeed: number = 0;
+  private _adaptiveSorting: boolean = true; // Enable adaptive sorting by default
+  
+  // LOD (Level of Detail) system
+  private _lodEnabled: boolean = false;
+  private _lodDistances: number[] = [5, 10, 20, 40]; // Distance thresholds
+  private _lodRatios: number[] = [1.0, 0.75, 0.5, 0.25, 0.1]; // Splat count ratios for each LOD level
+  private _currentLodLevel: number = 0;
+  
+  // Pixel coverage culling
+  private _minPixelCoverage: number = 4.0; // Minimum pixel coverage (cull tiny splats)
+  private _maxPixelCoverage: number = 0.0; // Maximum pixel coverage (0 = disabled)
+  private _maxPixelCullDistance: number = 0.0; // Only cull oversized splats within this distance (0 = always cull)
+  
   // Mapping support (optional subset rendering)
   private _mapping: Uint32Array | null = null;
   private _fullCount: number = 0; // Original total count
@@ -105,8 +120,80 @@ export class GSplatRenderer extends RenderNode {
    * This runs every frame to ensure correct depth ordering for alpha blending
    */
   public onBeforeUpdate(view?: View3D) {
-    if (this.count > 0 && view?.camera?.viewMatrix) {
-      this.scheduleOrder(view.camera.viewMatrix);
+    if (this.count > 0 && view?.camera) {
+      // Update LOD level based on camera distance
+      if (this._lodEnabled) {
+        this.updateLOD(view);
+      }
+      
+      if (view.camera.viewMatrix) {
+        this.scheduleOrder(view.camera.viewMatrix);
+      }
+    }
+  }
+  
+  /**
+   * Update LOD level based on camera distance to splat center
+   */
+  private updateLOD(view: View3D) {
+    if (!this._worldPositions || this._fullCount === 0) return;
+    
+    // Calculate camera position
+    const viewMat = view.camera.viewMatrix;
+    const r = viewMat.rawData;
+    const camX = -(r[0] * r[12] + r[1] * r[13] + r[2] * r[14]);
+    const camY = -(r[4] * r[12] + r[5] * r[13] + r[6] * r[14]);
+    const camZ = -(r[8] * r[12] + r[9] * r[13] + r[10] * r[14]);
+    
+    // Calculate bounding sphere center (rough approximation: avg of all splat positions)
+    let centerX = 0, centerY = 0, centerZ = 0;
+    const sampleCount = Math.min(100, this._fullCount); // Sample for performance
+    for (let i = 0; i < sampleCount; i++) {
+      const idx = Math.floor(i / sampleCount * this._fullCount) * 3;
+      centerX += this._worldPositions[idx + 0];
+      centerY += this._worldPositions[idx + 1];
+      centerZ += this._worldPositions[idx + 2];
+    }
+    centerX /= sampleCount;
+    centerY /= sampleCount;
+    centerZ /= sampleCount;
+    
+    // Calculate distance to camera
+    const dx = camX - centerX;
+    const dy = camY - centerY;
+    const dz = camZ - centerZ;
+    const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    
+    // Determine LOD level
+    let newLevel = this._lodDistances.length; // Start at lowest LOD
+    for (let i = 0; i < this._lodDistances.length; i++) {
+      if (distance < this._lodDistances[i]) {
+        newLevel = i;
+        break;
+      }
+    }
+    
+    // Update count if LOD level changed
+    if (newLevel !== this._currentLodLevel) {
+      this._currentLodLevel = newLevel;
+      const ratio = this._lodRatios[newLevel];
+      const newCount = Math.floor(this._fullCount * ratio);
+      
+      // Update rendering count
+      if (this._mapping) {
+        // If mapping exists, adjust mapping size
+        const oldMapping = this._mapping;
+        this._mapping = new Uint32Array(Math.min(newCount, oldMapping.length));
+        for (let i = 0; i < this._mapping.length; i++) {
+          this._mapping[i] = oldMapping[i];
+        }
+        this.setMapping(this._mapping);
+      } else {
+        // No mapping: directly adjust instance count
+        this.count = newCount;
+        this.texParams[0] = this.count;
+        this.texParams[2] = this.count;
+      }
     }
   }
   
@@ -173,6 +260,61 @@ export class GSplatRenderer extends RenderNode {
    */
   public setSortThrottle(ms: number) {
     this._minIntervalMs = Math.max(0, (ms | 0));
+  }
+  
+  /**
+   * Enable/disable adaptive sorting (auto-adjust sort frequency based on camera movement)
+   */
+  public setAdaptiveSorting(enabled: boolean) {
+    this._adaptiveSorting = enabled;
+  }
+  
+  /**
+   * Enable/disable LOD system
+   */
+  public setLOD(enabled: boolean, distances?: number[], ratios?: number[]) {
+    this._lodEnabled = enabled;
+    if (distances) this._lodDistances = distances;
+    if (ratios) this._lodRatios = ratios;
+  }
+  
+  /**
+   * Get current LOD statistics
+   */
+  public getLODStats() {
+    return {
+      enabled: this._lodEnabled,
+      currentLevel: this._currentLodLevel,
+      distances: this._lodDistances,
+      ratios: this._lodRatios,
+      currentRatio: this._lodRatios[this._currentLodLevel],
+      visibleCount: this._lodEnabled ? Math.floor(this._fullCount * this._lodRatios[this._currentLodLevel]) : this._fullCount
+    };
+  }
+  
+  /**
+   * Set pixel coverage culling thresholds
+   * @param minPixels Minimum pixel coverage (cull tiny splats), default: 4.0
+   * @param maxPixels Maximum pixel coverage (cull oversized splats), 0 = disabled
+   * @param maxPixelCullDistance Only cull oversized splats within this distance, 0 = always cull, recommended: 3-10
+   */
+  public setPixelCulling(minPixels: number, maxPixels: number = 0, maxPixelCullDistance: number = 0) {
+    this._minPixelCoverage = Math.max(0, minPixels);
+    this._maxPixelCoverage = Math.max(0, maxPixels);
+    this._maxPixelCullDistance = Math.max(0, maxPixelCullDistance);
+  }
+  
+  /**
+   * Get current pixel culling settings
+   */
+  public getPixelCullingStats() {
+    return {
+      minPixels: this._minPixelCoverage,
+      maxPixels: this._maxPixelCoverage,
+      maxPixelCullDistance: this._maxPixelCullDistance,
+      maxEnabled: this._maxPixelCoverage > 0,
+      distanceEnabled: this._maxPixelCullDistance > 0
+    };
   }
   
   /**
@@ -427,7 +569,11 @@ export class GSplatRenderer extends RenderNode {
     const py = -(r[4] * r[12] + r[5] * r[13] + r[6] * r[14]);
     const pz = -(r[8] * r[12] + r[9] * r[13] + r[10] * r[14]);
     
-    // Create hash using camera position and direction
+    // Adaptive sorting: calculate camera movement delta
+    const now = performance.now();
+    const deltaTime = (now - this._lastSentTime) / 1000.0; // seconds
+    
+    // Calculate hash for change detection
     const posHash = Math.floor(px * 1000) ^ Math.floor(py * 1000) ^ Math.floor(pz * 1000);
     const dirHash = Math.floor(vx * 1000) ^ Math.floor(vy * 1000) ^ Math.floor(vz * 1000);
     const hash = posHash ^ dirHash;
@@ -436,10 +582,36 @@ export class GSplatRenderer extends RenderNode {
     if (hash === this._lastViewMatrixHash && !transformChanged) {
       return;
     }
+    
+    // Adaptive throttle: sort more frequently when camera moves fast
+    let effectiveThrottle = this._minIntervalMs;
+    if (this._adaptiveSorting && this._minIntervalMs > 0) {
+      // Estimate camera speed (simple distance-based heuristic)
+      const hashDelta = Math.abs(hash - this._lastViewMatrixHash);
+      const speed = hashDelta / Math.max(deltaTime, 0.001);
+      
+      // Auto-adjust throttle: faster movement = more frequent sorting
+      // Speed thresholds (empirical):
+      //   0-1000: slow (use max throttle)
+      //   1000-10000: medium (reduce throttle by 50%)
+      //   10000+: fast (reduce throttle by 80%)
+      if (speed < 1000) {
+        effectiveThrottle = this._minIntervalMs; // Full throttle
+      } else if (speed < 10000) {
+        effectiveThrottle = this._minIntervalMs * 0.5; // 50% throttle
+      } else {
+        effectiveThrottle = this._minIntervalMs * 0.2; // 20% throttle (sort more often)
+      }
+      
+      this._lastCameraSpeed = speed;
+    }
+    
+    // Apply throttle
+    if (now - this._lastSentTime < effectiveThrottle) {
+      return;
+    }
+    
     this._lastViewMatrixHash = hash;
-
-    const now = performance.now();
-    if (now - this._lastSentTime < this._minIntervalMs) return;
     this._lastSentTime = now;
 
     if (!this._sortWorker) {
@@ -741,6 +913,9 @@ export class GSplatRenderer extends RenderNode {
     // Pass world matrix to shader for transforming splats
     const worldMatrix = this.object3D.transform.worldMatrix;
     this.gsplatMaterial.setTransformMatrix(worldMatrix);
+    
+    // Update pixel culling thresholds
+    this.gsplatMaterial.setPixelCulling(this._minPixelCoverage, this._maxPixelCoverage, this._maxPixelCullDistance);
     
     this.gsplatMaterial.setSplatTextures(
       this.splatColor,

@@ -22,6 +22,7 @@ export const GSplat_VS: string = /* wgsl */ `
     struct MaterialUniform {
         tex_params: vec4f,      // numSplats, textureWidth, validCount, visBoost
         modelMatrix: mat4x4<f32>,
+        pixelCull: vec4f,       // minPixels, maxPixels, maxPixelCullDistance, reserved
     };
     @group(1) @binding(3) var<uniform> materialUniform : MaterialUniform;
     
@@ -179,8 +180,21 @@ export const GSplat_VS: string = /* wgsl */ `
         let splat_cam = model_view * vec4f(center, 1.0);
         let splat_proj = matrix_projection * splat_cam;
         
-        // cull behind camera (WebGPU: NDC z in [0,1], cull if z/w < 0)
+        // Frustum culling: cull splats behind camera
         if (splat_proj.z < 0.0) {
+            o.member = discardVec;
+            o.vColor = vec4f(0.0);
+            o.vTexCoord = vec2f(0.0);
+            return o;
+        }
+        
+        // Frustum culling: cull splats outside screen bounds
+        // Add margin for splat radius (conservative: ~2x max splat size)
+        let ndc = splat_proj.xyz / splat_proj.w;
+        let margin = 0.5; // Allow splats near edges to be visible
+        if (ndc.x < -1.0 - margin || ndc.x > 1.0 + margin ||
+            ndc.y < -1.0 - margin || ndc.y > 1.0 + margin ||
+            ndc.z < 0.0 || ndc.z > 1.0) {
             o.member = discardVec;
             o.vColor = vec4f(0.0);
             o.vTexCoord = vec2f(0.0);
@@ -203,12 +217,38 @@ export const GSplat_VS: string = /* wgsl */ `
         let visBoost = materialUniform.tex_params.w;
         var v1v2_scaled = v1v2 * scale * visBoost;
         
-        // early out tiny splats
-        if (dot(v1v2_scaled.xy, v1v2_scaled.xy) < 4.0 && dot(v1v2_scaled.zw, v1v2_scaled.zw) < 4.0) {
+        // Pixel coverage culling (min and max thresholds)
+        let v1_len_sq = dot(v1v2_scaled.xy, v1v2_scaled.xy);
+        let v2_len_sq = dot(v1v2_scaled.zw, v1v2_scaled.zw);
+        
+        let minPixels = materialUniform.pixelCull.x;
+        let maxPixels = materialUniform.pixelCull.y;
+        let maxPixelCullDistance = materialUniform.pixelCull.z;
+        
+        // Early out tiny splats (below minimum pixel coverage)
+        if (v1_len_sq < minPixels && v2_len_sq < minPixels) {
             o.member = discardVec;
             o.vColor = vec4f(0.0);
             o.vTexCoord = vec2f(0.0);
             return o;
+        }
+        
+        // Cull oversized splats (above maximum pixel coverage)
+        // Only apply to splats close to camera (distance-based condition)
+        if (maxPixels > 0.0) {
+            // Calculate distance from splat to camera
+            let splatDistance = length(splat_cam.xyz);
+            
+            // Only cull oversized splats if they are close to camera
+            if (maxPixelCullDistance <= 0.0 || splatDistance < maxPixelCullDistance) {
+                let maxAxisSq = maxPixels * maxPixels;
+                if (v1_len_sq > maxAxisSq || v2_len_sq > maxAxisSq) {
+                    o.member = discardVec;
+                    o.vColor = vec4f(0.0);
+                    o.vTexCoord = vec2f(0.0);
+                    return o;
+                }
+            }
         }
         
         // gl_Position = splat_proj + vec4((vertex_position.x * v1v2.xy + vertex_position.y * v1v2.zw) / viewport * splat_proj.w, 0, 0);

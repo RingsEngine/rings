@@ -470,6 +470,98 @@ export class GSplatBasicExample {
           16: ~60fps | 33: ~30fps | 100: ~10fps
         </div>
       </div>
+      
+      <div class="control-group">
+        <div class="control-label">
+          <span class="control-label-name">Adaptive Sorting</span>
+          <span class="control-label-value" id="adaptive-value">ON</span>
+        </div>
+        <input 
+          type="range" 
+          class="control-slider" 
+          id="adaptive-slider"
+          min="0" 
+          max="1" 
+          step="1" 
+          value="1"
+        />
+        <div class="control-hint">
+          Auto-adjust sort frequency based on camera speed
+        </div>
+      </div>
+      
+      <div class="control-group">
+        <div class="control-label">
+          <span class="control-label-name">LOD System</span>
+          <span class="control-label-value" id="lod-value">OFF</span>
+        </div>
+        <input 
+          type="range" 
+          class="control-slider" 
+          id="lod-slider"
+          min="0" 
+          max="1" 
+          step="1" 
+          value="0"
+        />
+        <div class="control-hint">
+          Reduce splat count when far from camera
+        </div>
+      </div>
+      
+      <div class="control-group">
+        <div class="control-label">
+          <span class="control-label-name">Max Pixel Coverage</span>
+          <span class="control-label-value" id="maxpixel-value">OFF</span>
+        </div>
+        <input 
+          type="range" 
+          class="control-slider" 
+          id="maxpixel-slider"
+          min="0" 
+          max="500" 
+          step="10" 
+          value="0"
+        />
+        <div class="control-hint">
+          Cull oversized splats (0=disabled)<br>
+          Recommended: 200-300 for close-up scenes
+        </div>
+      </div>
+      
+      <div class="control-group">
+        <div class="control-label">
+          <span class="control-label-name">Cull Distance</span>
+          <span class="control-label-value" id="culldist-value">Always</span>
+        </div>
+        <input 
+          type="range" 
+          class="control-slider" 
+          id="culldist-slider"
+          min="0" 
+          max="20" 
+          step="1" 
+          value="0"
+        />
+        <div class="control-hint">
+          Only cull oversized splats within this distance<br>
+          0=Always | 5=Close only | 10=Medium range
+        </div>
+      </div>
+      
+      <!-- Performance Monitor -->
+      <div class="transform-section" style="background: rgba(76, 175, 80, 0.1);">
+        <div class="transform-title">📊 Performance Monitor</div>
+        <div id="perf-stats" style="font-size: 11px; line-height: 1.6; color: #aaa; font-family: 'Monaco', 'Menlo', monospace;">
+          <div>FPS: <span id="perf-fps" style="color: #4CAF50;">--</span></div>
+          <div>Frame Time: <span id="perf-frametime" style="color: #4CAF50;">--</span> ms</div>
+          <div>Splats: <span id="perf-splats" style="color: #4CAF50;">--</span></div>
+          <div>LOD Level: <span id="perf-lod" style="color: #4CAF50;">--</span></div>
+          <div>Sort Freq: <span id="perf-sortfreq" style="color: #4CAF50;">--</span> Hz</div>
+          <div>Max Pixels: <span id="perf-maxpix" style="color: #4CAF50;">--</span></div>
+          <div>Cull Dist: <span id="perf-culldist" style="color: #4CAF50;">--</span></div>
+        </div>
+      </div>
     `;
     
     // Add toggle button
@@ -500,6 +592,23 @@ export class GSplatBasicExample {
     const visBoostValue = document.getElementById('visboost-value');
     const throttleSlider = document.getElementById('throttle-slider') as HTMLInputElement;
     const throttleValue = document.getElementById('throttle-value');
+    const adaptiveSlider = document.getElementById('adaptive-slider') as HTMLInputElement;
+    const adaptiveValue = document.getElementById('adaptive-value');
+    const lodSlider = document.getElementById('lod-slider') as HTMLInputElement;
+    const lodValue = document.getElementById('lod-value');
+    const maxPixelSlider = document.getElementById('maxpixel-slider') as HTMLInputElement;
+    const maxPixelValue = document.getElementById('maxpixel-value');
+    const cullDistSlider = document.getElementById('culldist-slider') as HTMLInputElement;
+    const cullDistValue = document.getElementById('culldist-value');
+    
+    // Get performance monitor elements
+    const perfFPS = document.getElementById('perf-fps');
+    const perfFrameTime = document.getElementById('perf-frametime');
+    const perfSplats = document.getElementById('perf-splats');
+    const perfLOD = document.getElementById('perf-lod');
+    const perfSortFreq = document.getElementById('perf-sortfreq');
+    const perfMaxPix = document.getElementById('perf-maxpix');
+    const perfCullDist = document.getElementById('perf-culldist');
     
     // Transform controls - Position (support real-time input)
     const updatePosition = () => {
@@ -633,6 +742,134 @@ export class GSplatBasicExample {
       }
       console.log('💡 sortThrottle:', value);
     });
+    
+    // Update adaptive sorting
+    adaptiveSlider.addEventListener('input', (e) => {
+      const value = parseInt((e.target as HTMLInputElement).value);
+      const enabled = value === 1;
+      this.renderer.setAdaptiveSorting(enabled);
+      if (adaptiveValue) {
+        adaptiveValue.textContent = enabled ? 'ON' : 'OFF';
+      }
+      console.log('💡 Adaptive sorting:', enabled);
+    });
+    
+    // Update LOD system
+    lodSlider.addEventListener('input', (e) => {
+      const value = parseInt((e.target as HTMLInputElement).value);
+      const enabled = value === 1;
+      this.renderer.setLOD(enabled);
+      if (lodValue) {
+        lodValue.textContent = enabled ? 'ON' : 'OFF';
+      }
+      console.log('💡 LOD system:', enabled);
+    });
+    
+    // Update max pixel coverage culling
+    maxPixelSlider.addEventListener('input', (e) => {
+      const value = parseInt((e.target as HTMLInputElement).value);
+      const stats = this.renderer.getPixelCullingStats();
+      this.renderer.setPixelCulling(stats.minPixels, value, stats.maxPixelCullDistance);
+      if (maxPixelValue) {
+        maxPixelValue.textContent = value === 0 ? 'OFF' : value.toString();
+      }
+      console.log('💡 Max pixel coverage:', value === 0 ? 'disabled' : value);
+    });
+    
+    // Update cull distance threshold
+    cullDistSlider.addEventListener('input', (e) => {
+      const value = parseInt((e.target as HTMLInputElement).value);
+      const stats = this.renderer.getPixelCullingStats();
+      this.renderer.setPixelCulling(stats.minPixels, stats.maxPixels, value);
+      if (cullDistValue) {
+        if (value === 0) {
+          cullDistValue.textContent = 'Always';
+        } else {
+          cullDistValue.textContent = value.toString() + 'm';
+        }
+      }
+      console.log('💡 Cull distance:', value === 0 ? 'always' : value + 'm');
+    });
+    
+    // Performance monitoring (update every frame)
+    let lastTime = performance.now();
+    let frameCount = 0;
+    let fpsSum = 0;
+    let lastSortTime = 0;
+    let sortCount = 0;
+    
+    const updatePerformanceStats = () => {
+      const now = performance.now();
+      const deltaTime = now - lastTime;
+      lastTime = now;
+      
+      // Calculate FPS
+      const fps = 1000 / deltaTime;
+      frameCount++;
+      fpsSum += fps;
+      
+      // Update every 10 frames
+      if (frameCount >= 10) {
+        const avgFPS = fpsSum / frameCount;
+        if (perfFPS) perfFPS.textContent = avgFPS.toFixed(1);
+        if (perfFrameTime) perfFrameTime.textContent = (1000 / avgFPS).toFixed(2);
+        frameCount = 0;
+        fpsSum = 0;
+      }
+      
+      // Update splat count
+      if (perfSplats) {
+        perfSplats.textContent = `${this.renderer.count.toLocaleString()} / ${this.renderer['_fullCount'].toLocaleString()}`;
+      }
+      
+      // Update LOD level
+      if (perfLOD) {
+        const lodStats = this.renderer.getLODStats();
+        if (lodStats.enabled) {
+          perfLOD.textContent = `L${lodStats.currentLevel} (${(lodStats.currentRatio * 100).toFixed(0)}%)`;
+        } else {
+          perfLOD.textContent = 'Disabled';
+        }
+      }
+      
+      // Update sort frequency (estimate)
+      if (perfSortFreq) {
+        const currentSortTime = this.renderer['_lastSentTime'] || 0;
+        if (currentSortTime !== lastSortTime) {
+          sortCount++;
+          lastSortTime = currentSortTime;
+        }
+        // Calculate sort frequency every second
+        if (now % 1000 < 50) {
+          perfSortFreq.textContent = sortCount.toFixed(1);
+          sortCount = 0;
+        }
+      }
+      
+      // Update pixel culling stats
+      if (perfMaxPix) {
+        const pixelStats = this.renderer.getPixelCullingStats();
+        if (pixelStats.maxEnabled) {
+          perfMaxPix.textContent = pixelStats.maxPixels.toFixed(0);
+        } else {
+          perfMaxPix.textContent = 'Disabled';
+        }
+      }
+      
+      // Update cull distance stats
+      if (perfCullDist) {
+        const pixelStats = this.renderer.getPixelCullingStats();
+        if (pixelStats.distanceEnabled) {
+          perfCullDist.textContent = pixelStats.maxPixelCullDistance.toFixed(1) + 'm';
+        } else {
+          perfCullDist.textContent = 'Always';
+        }
+      }
+      
+      requestAnimationFrame(updatePerformanceStats);
+    };
+    
+    updatePerformanceStats();
     
     console.log('✅ Control panel created');
     console.log('💡 Tips:');

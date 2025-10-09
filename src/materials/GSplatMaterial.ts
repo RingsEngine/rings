@@ -60,6 +60,17 @@ export class GSplatMaterial extends Material {
     const pass = this.shader.getDefaultColorShader();
     pass.setUniform("modelMatrix", matrix.rawData);
   }
+  
+  /**
+   * Set pixel coverage culling thresholds
+   * @param minPixels Minimum pixel coverage (cull tiny splats), default: 2.0
+   * @param maxPixels Maximum pixel coverage (cull oversized splats), default: 0 (disabled)
+   * @param maxPixelCullDistance Only cull oversized splats within this distance, 0 = always cull
+   */
+  public setPixelCulling(minPixels: number, maxPixels: number, maxPixelCullDistance: number = 0) {
+    const pass = this.shader.getDefaultColorShader();
+    pass.setUniform("pixelCull", new Float32Array([minPixels, maxPixels, maxPixelCullDistance, 0]));
+  }
 }
 
 
