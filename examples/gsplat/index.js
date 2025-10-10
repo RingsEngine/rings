@@ -15,17 +15,16 @@ import {
   Color,
   FileLoader,
   GaussianSplatParser,
-  GaussianSplatAsset,
   GSplatRenderer,
   BoundUtil
 } from '../../index';
 
 export class GSplatBasicExample {
-  private scene: Scene3D;
-  private camera: Camera3D;
-  private cameraController: HoverCameraController;
-  private renderer: GSplatRenderer;
-  private gsplatObj: Object3D;
+  scene;
+  camera;
+  cameraController;
+  renderer;
+  gsplatObj;
 
   async init() {
     // 初始化引擎
@@ -73,14 +72,14 @@ export class GSplatBasicExample {
   /**
    * 加载并渲染 Gaussian Splat
    */
-  async loadGaussianSplat(plyPath: string) {
+  async loadGaussianSplat(plyPath) {
     console.log('📦 Loading Gaussian Splat:', plyPath);
 
     try {
       // 加载 PLY 文件
       const loader = new FileLoader();
       const parser = await loader.load(plyPath, GaussianSplatParser);
-      const asset = parser.data as GaussianSplatAsset;
+      const asset = parser.data;
 
       console.log('✅ Loaded asset:', {
         count: asset.count,
@@ -127,7 +126,7 @@ export class GSplatBasicExample {
   /**
    * 示例：使用映射渲染部分 splats
    */
-  async loadWithMapping(plyPath: string, splatCount: number) {
+  async loadWithMapping(plyPath, splatCount) {
     const renderer = await this.loadGaussianSplat(plyPath);
 
     // 创建映射（只渲染前 N 个 splats）
@@ -146,7 +145,7 @@ export class GSplatBasicExample {
   /**
    * 创建控制面板
    */
-  private createControlPanel() {
+  createControlPanel() {
     // Create panel container
     const panel = document.createElement('div');
     panel.id = 'gsplat-control-panel';
@@ -584,28 +583,28 @@ export class GSplatBasicExample {
     document.body.appendChild(panel);
     
     // Get transform control elements
-    const posX = document.getElementById('pos-x') as HTMLInputElement;
-    const posY = document.getElementById('pos-y') as HTMLInputElement;
-    const posZ = document.getElementById('pos-z') as HTMLInputElement;
-    const rotX = document.getElementById('rot-x') as HTMLInputElement;
-    const rotY = document.getElementById('rot-y') as HTMLInputElement;
-    const rotZ = document.getElementById('rot-z') as HTMLInputElement;
-    const scaleX = document.getElementById('scale-x') as HTMLInputElement;
-    const scaleY = document.getElementById('scale-y') as HTMLInputElement;
-    const scaleZ = document.getElementById('scale-z') as HTMLInputElement;
+    const posX = document.getElementById('pos-x');
+    const posY = document.getElementById('pos-y');
+    const posZ = document.getElementById('pos-z');
+    const rotX = document.getElementById('rot-x');
+    const rotY = document.getElementById('rot-y');
+    const rotZ = document.getElementById('rot-z');
+    const scaleX = document.getElementById('scale-x');
+    const scaleY = document.getElementById('scale-y');
+    const scaleZ = document.getElementById('scale-z');
     
     // Get rendering control elements
-    const visBoostSlider = document.getElementById('visboost-slider') as HTMLInputElement;
+    const visBoostSlider = document.getElementById('visboost-slider');
     const visBoostValue = document.getElementById('visboost-value');
-    const throttleSlider = document.getElementById('throttle-slider') as HTMLInputElement;
+    const throttleSlider = document.getElementById('throttle-slider');
     const throttleValue = document.getElementById('throttle-value');
-    const adaptiveSlider = document.getElementById('adaptive-slider') as HTMLInputElement;
+    const adaptiveSlider = document.getElementById('adaptive-slider');
     const adaptiveValue = document.getElementById('adaptive-value');
-    const lodSlider = document.getElementById('lod-slider') as HTMLInputElement;
+    const lodSlider = document.getElementById('lod-slider');
     const lodValue = document.getElementById('lod-value');
-    const maxPixelSlider = document.getElementById('maxpixel-slider') as HTMLInputElement;
+    const maxPixelSlider = document.getElementById('maxpixel-slider');
     const maxPixelValue = document.getElementById('maxpixel-value');
-    const cullDistSlider = document.getElementById('culldist-slider') as HTMLInputElement;
+    const cullDistSlider = document.getElementById('culldist-slider');
     const cullDistValue = document.getElementById('culldist-value');
     
     // Get performance monitor elements
@@ -660,7 +659,7 @@ export class GSplatBasicExample {
     scaleZ.addEventListener('input', updateScale);
     
     // Add mouse wheel support for all transform inputs
-    const addWheelSupport = (input: HTMLInputElement, step: number = 0.1) => {
+    const addWheelSupport = (input, step = 0.1) => {
       input.addEventListener('wheel', (e) => {
         e.preventDefault();
         const currentValue = parseFloat(input.value) || 0;
@@ -671,7 +670,7 @@ export class GSplatBasicExample {
     };
     
     // Add mouse drag support for all transform inputs (like Blender/Unity)
-    const addDragSupport = (input: HTMLInputElement, step: number = 0.1) => {
+    const addDragSupport = (input, step = 0.1) => {
       let isDragging = false;
       let startY = 0;
       let startValue = 0;
@@ -724,7 +723,7 @@ export class GSplatBasicExample {
     
     // Update visBoost
     visBoostSlider.addEventListener('input', (e) => {
-      const value = parseFloat((e.target as HTMLInputElement).value);
+      const value = parseFloat(e.target.value);
       this.renderer.setVisBoost(value);
       if (visBoostValue) {
         visBoostValue.textContent = value.toFixed(2);
@@ -734,7 +733,7 @@ export class GSplatBasicExample {
     
     // Update sortThrottle
     throttleSlider.addEventListener('input', (e) => {
-      const value = parseInt((e.target as HTMLInputElement).value);
+      const value = parseInt(e.target.value);
       this.renderer.setSortThrottle(value);
       
       let label = value.toString();
@@ -752,7 +751,7 @@ export class GSplatBasicExample {
     
     // Update adaptive sorting
     adaptiveSlider.addEventListener('input', (e) => {
-      const value = parseInt((e.target as HTMLInputElement).value);
+      const value = parseInt(e.target.value);
       const enabled = value === 1;
       this.renderer.setAdaptiveSorting(enabled);
       if (adaptiveValue) {
@@ -763,7 +762,7 @@ export class GSplatBasicExample {
     
     // Update LOD system
     lodSlider.addEventListener('input', (e) => {
-      const value = parseInt((e.target as HTMLInputElement).value);
+      const value = parseInt(e.target.value);
       const enabled = value === 1;
       this.renderer.setLOD(enabled);
       if (lodValue) {
@@ -774,7 +773,7 @@ export class GSplatBasicExample {
     
     // Update max pixel coverage culling
     maxPixelSlider.addEventListener('input', (e) => {
-      const value = parseInt((e.target as HTMLInputElement).value);
+      const value = parseInt(e.target.value);
       const stats = this.renderer.getPixelCullingStats();
       this.renderer.setPixelCulling(stats.minPixels, value, stats.maxPixelCullDistance);
       if (maxPixelValue) {
@@ -785,7 +784,7 @@ export class GSplatBasicExample {
     
     // Update cull distance threshold
     cullDistSlider.addEventListener('input', (e) => {
-      const value = parseInt((e.target as HTMLInputElement).value);
+      const value = parseInt(e.target.value);
       const stats = this.renderer.getPixelCullingStats();
       this.renderer.setPixelCulling(stats.minPixels, stats.maxPixels, value);
       if (cullDistValue) {
