@@ -3,12 +3,6 @@ import path from 'path';
 
 // 清理dist/packages和dist/src目录
 const dirsToClean = ['dist/packages', 'dist/src'];
-dirsToClean.forEach(dir => {
-  if (fs.existsSync(dir)) {
-    fs.rmSync(dir, { recursive: true, force: true });
-    console.log(`Cleaned: ${dir}`);
-  }
-});
 
 // 将dist/src重命名为dist/types
 const srcPath = 'dist/src';
@@ -19,3 +13,10 @@ if (fs.existsSync(srcPath)) {
 } else {
   console.log('src moved');
 }
+
+dirsToClean.forEach(dir => {
+  if (fs.existsSync(dir)) {
+    fs.rmSync(dir, { recursive: true, force: true });
+    console.log(`Cleaned: ${dir}`);
+  }
+});
