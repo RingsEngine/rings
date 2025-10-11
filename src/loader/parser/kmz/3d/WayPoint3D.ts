@@ -1,6 +1,6 @@
 import { MeshRenderer } from "../../../../components/renderer/MeshRenderer";
 import { Object3D } from "../../../../core/entities/Object3D";
-import { LitMaterial } from "../../../../materials/LitMaterial";
+import { UnLitMaterial } from "../../../../materials/UnLitMaterial";
 import { Color } from "../../../../math/Color";
 import { Vector3 } from "../../../../math/Vector3";
 import { SphereGeometry } from "../../../../shape/SphereGeometry";
@@ -43,7 +43,7 @@ export class WayPoint3D extends Object3D {
             this.marker = new Object3D();
             const markerRenderer = this.marker.addComponent(MeshRenderer);
             markerRenderer.geometry = new SphereGeometry(0.1, 32, 16);
-            markerRenderer.material = new LitMaterial();
+            markerRenderer.material = new UnLitMaterial();
             markerRenderer.material.baseColor = this.positionValid ? new Color(0, 1, 0, 1) : new Color(1, 0, 0, 1);
             this.addChild(this.marker);
             this.marker.name = "WayPoint3DMarker";
