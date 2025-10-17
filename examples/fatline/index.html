@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FatLine Example - Rings Engine</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100vh;
+        }
+        
+        /* Control Panel Styles */
+        #control-panel {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            z-index: 1000;
+            font-size: 14px;
+            width: 200px;
+        }
+        
+        #control-panel h2 {
+            margin: 0 0 15px 0;
+            font-size: 18px;
+            font-weight: 600;
+            border-bottom: 2px solid #4a9eff;
+            padding-bottom: 10px;
+        }
+        
+        .control-group {
+            margin-bottom: 18px;
+        }
+        
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #aaa;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .control-group input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #333;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        .control-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #4a9eff;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(74, 158, 255, 0.4);
+        }
+        
+        .control-group input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #4a9eff;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 8px rgba(74, 158, 255, 0.4);
+        }
+        
+        .value-display {
+            display: inline-block;
+            float: right;
+            color: #4a9eff;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+        
+        .toggle-container label {
+            margin: 0;
+            font-size: 14px;
+            color: #fff;
+            text-transform: none;
+            letter-spacing: normal;
+        }
+        
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 26px;
+        }
+        
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #555;
+            transition: .3s;
+            border-radius: 26px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: #4a9eff;
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+        
+        .compare-note {
+            background: rgba(74, 158, 255, 0.15);
+            border-left: 3px solid #4a9eff;
+            padding: 10px;
+            margin-top: 15px;
+            border-radius: 4px;
+            font-size: 12px;
+            line-height: 1.5;
+            color: #ccc;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+            background: #4a9eff;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+    <div id="control-panel">
+        <h2><span class="status-indicator"></span>FatLine Controls</h2>
+        
+        <div class="control-group">
+            <label>Line Width <span class="value-display" id="lineWidthValue">8.0</span></label>
+            <input type="range" id="lineWidth" min="1" max="20" step="0.5" value="8">
+        </div>
+        
+        <div class="control-group" style="display: none;">
+            <label>Curve Detail <span class="value-display" id="spiralPointsValue">50</span></label>
+            <input type="range" id="spiralPoints" min="10" max="200" step="10" value="50">
+        </div>
+        
+        <div class="control-group">
+            <label>Rotation Speed <span class="value-display" id="rotationSpeedValue">1.0x</span></label>
+            <input type="range" id="rotationSpeed" min="0" max="3" step="0.1" value="1">
+        </div>
+        
+        <div class="compare-note">
+            💡 <strong>Tip:</strong> This is the EXACT same Hilbert curve from ThreeJS webgl_lines_fat.html example. Compare the rendering quality!
+        </div>
+    </div>
+    
+    <script type="module" src="./index.js"></script>
+</body>
+</html>

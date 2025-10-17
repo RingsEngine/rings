@@ -34,7 +34,9 @@ export default defineConfig((option) => ({
                 } else if (req.url === '/examples/gsplat') {
                   res.writeHead(302, { 'Location': '/examples/gsplat/index.html' });
                   res.end();
-
+                } else if (req.url === '/examples/fatline') {
+                  res.writeHead(302, { 'Location': '/examples/fatline/index.html' });
+                  res.end();
                 } else {
                   next();
                 }

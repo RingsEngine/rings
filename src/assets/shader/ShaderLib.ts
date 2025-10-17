@@ -60,6 +60,7 @@ import { GBufferStand } from "./core/common/GBufferStand";
 import { ReflectionShader_shader } from "./materials/ReflectionShader_shader";
 import { ReflectionCG } from "./env/ReflectionCG";
 import { SHCommon_frag } from "./core/common/SHCommon_frag";
+import { FatLine_VS, FatLine_FS } from "./lines/FatLineShader";
 
 export class ShaderLib {
   public static init() {
@@ -130,6 +131,8 @@ export class ShaderLib {
     );
     ShaderLib.register("ZPass_shader_vs", ZPassShader_vs);
     ShaderLib.register("ZPass_shader_fs", ZPassShader_fs);
+    ShaderLib.register("FatLine_VS", FatLine_VS);
+    ShaderLib.register("FatLine_FS", FatLine_FS);
   }
 
   public static register(keyName: string, code: string) {
