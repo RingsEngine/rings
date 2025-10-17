@@ -1,18 +1,21 @@
 import { SkeletonAnimation_shader } from "../../anim/SkeletonAnimation_shader";
 import { MorphTarget_shader } from "../../../../components/anim/morphAnim/MorphTarget_shader";
 
-export let VertexAttributes_vert: string = `
+/**
+ * @internal
+ */
+export let VertexAttributes_vert: string = /*wgsl*/ `
     var<private> PI: f32 = 3.14159265359;
     #if USE_METAHUMAN
         ${MorphTarget_shader.getMorphTargetShaderBinding(3, 0)}
-        ${SkeletonAnimation_shader.groupBindingAndFunctions(3, 2)}
+        ${SkeletonAnimation_shader.groupBindingAndFunctions(3, 2)} 
     #else
         #if USE_MORPHTARGETS
             ${MorphTarget_shader.getMorphTargetShaderBinding(3, 0)}
         #endif
 
         #if USE_SKELETON
-            ${SkeletonAnimation_shader.groupBindingAndFunctions(3, 0)}
+            ${SkeletonAnimation_shader.groupBindingAndFunctions(3, 0)} 
         #endif
     #endif
 
@@ -47,6 +50,10 @@ export let VertexAttributes_vert: string = `
                 #endif
             #endif
         #else
+            #if USE_TANGENT
+                @location(auto) TANGENT: vec4<f32>,
+            #endif
+
             #if USE_SKELETON
                 #if USE_TANGENT
                     @location(auto) joints0: vec4<f32>,
@@ -93,6 +100,7 @@ export let VertexAttributes_vert: string = `
     #if USE_TANGENT
         @location(auto) varying_Tangent: vec4<f32>,
     #endif
+   
 
     @builtin(position) member: vec4<f32>
     };
@@ -142,20 +150,20 @@ export let VertexAttributes_vert: string = `
         clipPosition.z = log2Depth(clipPosition.w, globalUniform.near, globalUniform.far);
     #endif
 
-    ORI_CameraWorldDir = normalize(ORI_CAMERAMATRIX[3].xyz - worldPos.xyz);
+    ORI_CameraWorldDir = normalize(ORI_CAMERAMATRIX[3].xyz - worldPos.xyz) ;
 
-    ORI_VertexOut.index = f32(vertex.index);
+    ORI_VertexOut.index = f32(vertex.index) ;
 
-    ORI_VertexOut.varying_UV0 = vertex.uv.xy;
+    ORI_VertexOut.varying_UV0 = vertex.uv.xy ;
 
     ORI_VertexOut.varying_UV1 = vertex.TEXCOORD_1.xy;
 
-    ORI_VertexOut.varying_ViewPos = viewPosition;
-    ORI_VertexOut.varying_Clip = clipPosition;
-    ORI_VertexOut.varying_WPos = worldPos;
+    ORI_VertexOut.varying_ViewPos = viewPosition ;
+    ORI_VertexOut.varying_Clip = clipPosition ;
+    ORI_VertexOut.varying_WPos = worldPos ;
     ORI_VertexOut.varying_WPos.w = f32(vertex.index);
-    ORI_VertexOut.varying_WNormal = normalize(ORI_NORMALMATRIX * vertexNormal.xyz);
+    ORI_VertexOut.varying_WNormal = normalize(ORI_NORMALMATRIX * vertexNormal.xyz) ;
 
-    ORI_VertexOut.member = clipPosition;
+    ORI_VertexOut.member = clipPosition ;
     }
-`;
+`
