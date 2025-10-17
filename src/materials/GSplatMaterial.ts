@@ -1,17 +1,18 @@
-import { Shader } from "../gfx/graphics/webGpu/shader/Shader";
-import { RenderShaderPass } from "../gfx/graphics/webGpu/shader/RenderShaderPass";
-import { PassType } from "../gfx/renderJob/passRenderer/state/PassType";
 import { Material } from "./Material";
 import { ShaderLib } from "../assets/shader/ShaderLib";
-import { GSplat_VS, GSplat_FS } from "../assets/shader/materials/GSplatShader";
-import { GPUPrimitiveTopology } from "../gfx/graphics/webGpu/WebGPUConst";
+import { GSplat_VS, GSplat_FS } from "../assets/shader/gsplat/GSplatShader";
 import { Float32ArrayTexture } from "../textures/Float32ArrayTexture";
 import { Float16ArrayTexture } from "../textures/Float16ArrayTexture";
 import { Uint8ArrayTexture } from "../textures/Uint8ArrayTexture";
 import { Uint32ArrayTexture } from "../textures/Uint32ArrayTexture";
-import { BlendMode } from "./BlendMode";
 import { Matrix4 } from "../math/Matrix4";
+import { GSplatShader } from "../loader/parser/prefab/mats/shader/GSplatShader";
 
+/**
+ * GSplat Material
+ * Material for rendering 3D Gaussian Splats
+ * @group Material
+ */
 export class GSplatMaterial extends Material {
   constructor() {
     super();
@@ -19,19 +20,7 @@ export class GSplatMaterial extends Material {
     ShaderLib.register("gsplat_vs_dc", GSplat_VS);
     ShaderLib.register("gsplat_fs_dc", GSplat_FS);
 
-    const pass = new RenderShaderPass("gsplat_vs_dc", "gsplat_fs_dc");
-    pass.passType = PassType.COLOR;
-    pass.setShaderEntry("VertMain", "FragMain");
-    pass.topology = GPUPrimitiveTopology.triangle_strip;
-    pass.depthWriteEnabled = false;
-    pass.cullMode = "none";
-    pass.shaderState.transparent = true;
-    pass.shaderState.blendMode = BlendMode.NORMAL;
-    pass.shaderState.writeMasks = [0xF, 0xF];
-
-    const shader = new Shader();
-    shader.addRenderPass(pass);
-    this.shader = shader;
+    this.shader = new GSplatShader();
   }
 
   public setSplatTextures(
