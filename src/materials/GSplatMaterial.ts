@@ -5,8 +5,10 @@ import { Float32ArrayTexture } from "../textures/Float32ArrayTexture";
 import { Float16ArrayTexture } from "../textures/Float16ArrayTexture";
 import { Uint8ArrayTexture } from "../textures/Uint8ArrayTexture";
 import { Uint32ArrayTexture } from "../textures/Uint32ArrayTexture";
+import { R32UintTexture } from "../textures/R32UintTexture";
 import { Matrix4 } from "../math/Matrix4";
 import { GSplatShader } from "../loader/parser/prefab/mats/shader/GSplatShader";
+import { GPUCompareFunction } from "../gfx/graphics/webGpu/WebGPUConst";
 
 /**
  * GSplat Material
@@ -14,6 +16,8 @@ import { GSplatShader } from "../loader/parser/prefab/mats/shader/GSplatShader";
  * @group Material
  */
 export class GSplatMaterial extends Material {
+  private _pixelCullArray: Float32Array = new Float32Array(4);
+  
   constructor() {
     super();
     // register shaders if not exists
@@ -28,7 +32,7 @@ export class GSplatMaterial extends Material {
     transformA: Uint32ArrayTexture,
     transformB: Float16ArrayTexture,
     texParams: Float32Array,
-    splatOrder?: Uint32ArrayTexture
+    splatOrder?: R32UintTexture
   ) {
     const pass = this.shader.getDefaultColorShader();
     pass.setTexture("splatColor", splatColor);
@@ -40,6 +44,7 @@ export class GSplatMaterial extends Material {
     if (splatOrder) {
       pass.setTexture("splatOrder", splatOrder);
     }
+    pass.shaderState.depthCompare = GPUCompareFunction.less;
   }
 
   /**
@@ -56,9 +61,14 @@ export class GSplatMaterial extends Material {
    * @param maxPixels Maximum pixel coverage (cull oversized splats), default: 0 (disabled)
    * @param maxPixelCullDistance Only cull oversized splats within this distance, 0 = always cull
    */
-  public setPixelCulling(minPixels: number, maxPixels: number, maxPixelCullDistance: number = 0) {
+  public setPixelCulling(minPixels: number, maxPixels: number, maxPixelCullDistance: number = 0, batchSize: number = 128) {
+    this._pixelCullArray[0] = minPixels;
+    this._pixelCullArray[1] = maxPixels;
+    this._pixelCullArray[2] = maxPixelCullDistance;
+    this._pixelCullArray[3] = batchSize;
+    
     const pass = this.shader.getDefaultColorShader();
-    pass.setUniform("pixelCull", new Float32Array([minPixels, maxPixels, maxPixelCullDistance, 0]));
+    pass.setUniform("pixelCull", this._pixelCullArray);
   }
 }
 

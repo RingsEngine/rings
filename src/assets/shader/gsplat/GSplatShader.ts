@@ -1,60 +1,34 @@
 export const GSplat_VS: string = /* wgsl */ `
     #include "GlobalUniform"
-
-    struct VSOut {
-        @location(auto) vColor : vec4f,
-        @location(auto) vTexCoord : vec2f,
-        @builtin(position) member : vec4f
-    };
-
-    // ===== SPLAT CORE VS (from PlayCanvas shader-generator-gsplat.js) =====
-    
-    // Uniforms (mapped to WebGPU bindings)
-    // matrix_model, matrix_view, matrix_projection -> GlobalUniform + MaterialUniform
-    // viewport -> calculated from globalUniform.windowWidth/Height
-    // tex_params -> materialUniform.tex_params
-    
-    @group(1) @binding(0) var splatColor : texture_2d<f32>;
-    @group(1) @binding(1) var transformA : texture_2d<u32>;
-    @group(1) @binding(2) var transformB : texture_2d<f32>;
-    @group(1) @binding(4) var splatOrder : texture_2d<u32>;
     
     struct MaterialUniform {
-        tex_params: vec4f,      // numSplats, textureWidth, validCount, visBoost
         modelMatrix: mat4x4<f32>,
-        pixelCull: vec4f,       // minPixels, maxPixels, maxPixelCullDistance, reserved
+        tex_params: vec4<f32>,      // [numSplats, texWidth, validCount, visBoost]
+        pixelCull: vec4<f32>,        // [minPixels, maxPixels, maxPixelCullDistance, batchSize]
     };
-    @group(1) @binding(3) var<uniform> materialUniform : MaterialUniform;
+    @group(1) @binding(0) var<uniform> materialUniform: MaterialUniform;
     
-    // Global variables (like PlayCanvas)
-    var<private> orderId: u32;
-    var<private> splatId: u32;
+    struct VSOut {
+        @builtin(position) member: vec4<f32>,
+        @location(0) vColor: vec4<f32>,
+        @location(1) vTexCoord: vec2<f32>,
+    };
+    
+    // Textures (like PlayCanvas)
+    @group(1) @binding(1) var splatColor: texture_2d<f32>;
+    @group(1) @binding(2) var transformA: texture_2d<u32>;
+    @group(1) @binding(3) var transformB: texture_2d<f32>;
+    @group(1) @binding(4) var splatOrder: texture_2d<u32>;
+    
+    // Global variables for texture lookups
     var<private> splatUV: vec2<i32>;
+    var<private> splatId: u32;
     var<private> tA: vec4<u32>;
     
-    // Helper: decode 16-bit half float
-    fn unpackHalf(h: u32) -> f32 {
-        let s = (h >> 15u) & 0x1u;
-        let e = (h >> 10u) & 0x1fu;
-        let m = h & 0x3ffu;
-        let sign = select(1.0, -1.0, s == 1u);
-        if (e == 0u) {
-            if (m == 0u) { return 0.0; }
-            return sign * (f32(m) * exp2(-24.0));
-        } else if (e == 31u) {
-            return sign * 65504.0;
-        } else {
-            return sign * (1.0 + f32(m) / 1024.0) * exp2(f32(i32(e) - 15));
-        }
-    }
-    
     // === calcSplatUV() - returns bool ===
-    fn calcSplatUV(instance_id: u32) -> bool {
-        let numSplats = u32(materialUniform.tex_params.x);
+    fn calcSplatUV(orderId: u32) -> bool {
         let textureWidth = u32(materialUniform.tex_params.y);
-        
-        // calculate splat index
-        orderId = instance_id;
+        let numSplats = u32(materialUniform.tex_params.x);
         
         if (orderId >= numSplats) {
             return false;
@@ -101,6 +75,19 @@ export const GSplat_VS: string = /* wgsl */ `
         return result;
     }
     
+    // === getRotationMatrix() - returns mat3x3 ===
+    fn getRotationMatrix() -> mat3x3f {
+        let cov_data = getCovariance();
+        let covA = cov_data.covA;
+        let covB = cov_data.covB;
+        
+        return mat3x3f(
+            vec3f(1.0 - 2.0 * (covA.z * covA.z + covB.x * covB.x), 2.0 * (covA.y * covA.z + covB.y * covB.x), 2.0 * (covA.y * covB.x - covB.y * covA.z)),
+            vec3f(2.0 * (covA.y * covA.z - covB.y * covB.x), 1.0 - 2.0 * (covA.y * covA.y + covB.x * covB.x), 2.0 * (covA.z * covB.x + covA.y * covB.y)),
+            vec3f(2.0 * (covA.y * covB.x + covB.y * covA.z), 2.0 * (covA.z * covB.x - covA.y * covB.y), 1.0 - 2.0 * (covA.y * covA.y + covA.z * covA.z))
+        );
+    }
+    
     // === calcV1V2() - returns vec4 ===
     fn calcV1V2(splat_cam: vec3f, covA: vec3f, covB: vec3f, W: mat3x3f, viewport: vec2f, projMat: mat4x4f) -> vec4f {
         let Vrk = mat3x3f(
@@ -144,22 +131,25 @@ export const GSplat_VS: string = /* wgsl */ `
     @vertex
     fn VertMain(
         @builtin(vertex_index) vid : u32,
-        @builtin(instance_index) iid : u32
+        @builtin(instance_index) iid : u32,
+        @location(0) position: vec3<f32>  // vertex_position from mesh (x, y, local_index)
     ) -> VSOut {
         var o: VSOut;
         let discardVec = vec4f(0.0, 0.0, 2.0, 1.0);
         
-        // Vertex position array (PlayCanvas uses attribute vec3 with x,y in [-1,1])
-        let vertex_position = array<vec2f, 4>(
-            vec2f(-2.0, -2.0),
-            vec2f( 2.0, -2.0),
-            vec2f(-2.0,  2.0),
-            vec2f( 2.0,  2.0)
-        );
-        let vertex_pos = vertex_position[vid & 3u];
+        // Calculate splat ID
+        // orderId = vertex_id_attrib + uint(vertex_position.z)
+        // In our case: vertex_id_attrib = iid * batchSize
+        let batchSize = u32(materialUniform.pixelCull.w);
+        let base_splat_index = iid * batchSize;
+        let local_splat_index = u32(position.z);
+        let orderId = base_splat_index + local_splat_index;
+        
+        // Use vertex position from mesh
+        let vertex_pos = position.xy;
         
         // calculate splat uv
-        if (!calcSplatUV(iid)) {
+        if (!calcSplatUV(orderId)) {
             o.member = discardVec;
             o.vColor = vec4f(0.0);
             o.vTexCoord = vec2f(0.0);
@@ -187,9 +177,8 @@ export const GSplat_VS: string = /* wgsl */ `
         }
         
         // Frustum culling: cull splats outside screen bounds
-        // Add margin for splat radius (conservative: ~2x max splat size)
         let ndc = splat_proj.xyz / splat_proj.w;
-        let margin = 0.5; // Allow splats near edges to be visible
+        let margin = 0.0;
         if (ndc.x < -1.0 - margin || ndc.x > 1.0 + margin ||
             ndc.y < -1.0 - margin || ndc.y > 1.0 + margin ||
             ndc.z < 0.0 || ndc.z > 1.0) {
@@ -207,6 +196,12 @@ export const GSplat_VS: string = /* wgsl */ `
         
         // get color
         let color = textureLoad(splatColor, splatUV, 0);
+        if (color.a < 1.0 / 255.0) {
+            o.member = discardVec;
+            o.vColor = vec4f(0.0);
+            o.vTexCoord = vec2f(0.0);
+            return o;
+        }
         
         // calculate scale based on alpha
         let scale = min(1.0, sqrt(-log(1.0 / 255.0 / color.a)) / 2.0);
@@ -215,7 +210,7 @@ export const GSplat_VS: string = /* wgsl */ `
         let visBoost = materialUniform.tex_params.w;
         var v1v2_scaled = v1v2 * scale * visBoost;
         
-        // Pixel coverage culling (min and max thresholds)
+        // Pixel coverage culling
         let v1_len_sq = dot(v1v2_scaled.xy, v1v2_scaled.xy);
         let v2_len_sq = dot(v1v2_scaled.zw, v1v2_scaled.zw);
         
@@ -223,7 +218,7 @@ export const GSplat_VS: string = /* wgsl */ `
         let maxPixels = materialUniform.pixelCull.y;
         let maxPixelCullDistance = materialUniform.pixelCull.z;
         
-        // Early out tiny splats (below minimum pixel coverage)
+        // Early out tiny splats
         if (v1_len_sq < minPixels && v2_len_sq < minPixels) {
             o.member = discardVec;
             o.vColor = vec4f(0.0);
@@ -231,13 +226,9 @@ export const GSplat_VS: string = /* wgsl */ `
             return o;
         }
         
-        // Cull oversized splats (above maximum pixel coverage)
-        // Only apply to splats close to camera (distance-based condition)
+        // Cull oversized splats
         if (maxPixels > 0.0) {
-            // Calculate distance from splat to camera
             let splatDistance = length(splat_cam.xyz);
-            
-            // Only cull oversized splats if they are close to camera
             if (maxPixelCullDistance <= 0.0 || splatDistance < maxPixelCullDistance) {
                 let maxAxisSq = maxPixels * maxPixels;
                 if (v1_len_sq > maxAxisSq || v2_len_sq > maxAxisSq) {
@@ -249,12 +240,9 @@ export const GSplat_VS: string = /* wgsl */ `
             }
         }
         
-        // gl_Position = splat_proj + vec4((vertex_position.x * v1v2.xy + vertex_position.y * v1v2.zw) / viewport * splat_proj.w, 0, 0);
+        // Final position
         o.member = splat_proj + vec4f((vertex_pos.x * v1v2_scaled.xy + vertex_pos.y * v1v2_scaled.zw) / viewport * splat_proj.w, 0.0, 0.0);
-        
-        // texCoord = vertex_position.xy * scale / 2.0;
         o.vTexCoord = vertex_pos * scale / 2.0;
-        
         o.vColor = color;
         
         return o;
@@ -267,29 +255,25 @@ export const GSplat_FS: string = /* wgsl */ `
     // === evalSplat() - like PlayCanvas splatCoreFS ===
     fn evalSplat(texCoord: vec2f, color: vec4f) -> vec4f {
         let A = dot(texCoord, texCoord);
+        var B = exp(-A * 4.0) * color.a;
         if (A > 1.0) {
-            discard;
+            B = 0.0;
         }
         
-        let B = exp(-A * 4.0) * color.a;
         if (B < 1.0 / 255.0) {
-            discard;
+            B = 0.0;
         }
         
-        // TONEMAP_ENABLED branch not implemented (would call toneMap() and gammaCorrectOutput())
         return vec4f(color.rgb, B);
     }
-    
-    // === main() - like PlayCanvas splatMainFS ===
+
     @fragment
-    fn FragMain(@location(auto) vColor: vec4f, @location(auto) vTexCoord: vec2f) -> FragmentOutput {
-        let result = evalSplat(vTexCoord, vColor);
-        
+    fn FragMain(
+        @location(0) vColor: vec4<f32>,
+        @location(1) vTexCoord: vec2<f32>
+    ) -> FragmentOutput {
         var o: FragmentOutput;
-        o.color = result;
-        o.gBuffer = vec4f(0.0);
+        o.color = evalSplat(vTexCoord, vColor);
         return o;
     }
 `;
-
-

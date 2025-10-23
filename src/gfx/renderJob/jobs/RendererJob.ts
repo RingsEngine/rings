@@ -26,7 +26,15 @@ export class RendererJob {
   public shadowMapPassRenderer: ShadowMapPassRenderer;
   public pointLightShadowRenderer: PointLightShadowRenderer;
   public ddgiProbeRenderer: DDGIProbeRenderer;
-  public postRenderer: PostRenderer;
+  public _postRenderer: PostRenderer;
+  public get postRenderer(): PostRenderer {
+    if (!this._postRenderer) {
+      let gbufferFrame = GBufferFrame.getGBufferFrame("ColorPassGBuffer");
+      this._postRenderer = this.addRenderer(PostRenderer);
+      this._postRenderer.setRenderStates(gbufferFrame);
+    }
+    return this._postRenderer;
+  }
   public clusterLightingRender: ClusterLightingRender;
   public reflectionRenderer: ReflectionRenderer;
   public occlusionSystem: OcclusionSystem;
@@ -50,7 +58,10 @@ export class RendererJob {
     }
     this.shadowMapPassRenderer = new ShadowMapPassRenderer();
     this.pointLightShadowRenderer = new PointLightShadowRenderer();
-    this.addPost(new FXAAPost());
+    
+    if (Engine3D.setting.render.postProcessing.fxaa.enable) {
+      this.addPost(new FXAAPost());
+    }
   }
   public addRenderer<T extends RendererBase>(c: Ctor<T>, param?: any): T {
     let renderer: RendererBase;
@@ -79,12 +90,6 @@ export class RendererJob {
     this.pauseRender = false;
   }
   public addPost(post: PostBase): PostBase | PostBase[] {
-    if (!this.postRenderer) {
-      let gbufferFrame = GBufferFrame.getGBufferFrame("ColorPassGBuffer");
-      this.postRenderer = this.addRenderer(PostRenderer);
-      this.postRenderer.setRenderStates(gbufferFrame);
-    }
-
     if (post instanceof PostBase) {
       this.postRenderer.attachPost(this.view, post);
     }
@@ -104,18 +109,25 @@ export class RendererJob {
 
     ProfilerUtil.startView(view);
 
-    GlobalBindGroup.getLightEntries(view.scene).update(view);
-    GlobalBindGroup.getReflectionEntries(view.scene).update(view);
+    if (this.clusterLightingRender) {
+      GlobalBindGroup.getLightEntries(view.scene).update(view);
+      GlobalBindGroup.getReflectionEntries(view.scene).update(view);
+    }
 
-    this.occlusionSystem.update(view.camera, view.scene);
-    this.clusterLightingRender.render(view, this.occlusionSystem);
+    if (Engine3D.setting.occlusionQuery.enable && this.occlusionSystem) {
+      this.occlusionSystem.update(view.camera, view.scene);
+    }
 
-    if (this.shadowMapPassRenderer) {
+    if (this.clusterLightingRender) {
+      this.clusterLightingRender.render(view, this.occlusionSystem);
+    }
+
+    if (Engine3D.setting.shadow.enable && this.shadowMapPassRenderer) {
       ShadowLightsCollect.update(view);
       this.shadowMapPassRenderer.render(view, this.occlusionSystem);
     }
 
-    if (this.pointLightShadowRenderer) {
+    if (Engine3D.setting.shadow.enable && this.pointLightShadowRenderer) {
       this.pointLightShadowRenderer.render(view, this.occlusionSystem);
     }
 

@@ -1,4 +1,4 @@
-import { GPUPrimitiveTopology } from "../../../../../gfx/graphics/webGpu/WebGPUConst";
+import { GPUCullMode, GPUPrimitiveTopology } from "../../../../../gfx/graphics/webGpu/WebGPUConst";
 import { RenderShaderPass } from "../../../../../gfx/graphics/webGpu/shader/RenderShaderPass";
 import { Shader } from "../../../../../gfx/graphics/webGpu/shader/Shader";
 import { PassType } from "../../../../../gfx/renderJob/passRenderer/state/PassType";
@@ -20,9 +20,9 @@ export class GSplatShader extends Shader {
     const pass = new RenderShaderPass("gsplat_vs_dc", "gsplat_fs_dc");
     pass.passType = PassType.COLOR;
     pass.setShaderEntry("VertMain", "FragMain");
-    pass.topology = GPUPrimitiveTopology.triangle_strip;
+    pass.topology = GPUPrimitiveTopology.triangle_list;
     pass.depthWriteEnabled = false;
-    pass.cullMode = "none";
+    pass.cullMode = GPUCullMode.none;
     pass.shaderState.transparent = true;
     pass.shaderState.blendMode = BlendMode.NORMAL;
     pass.shaderState.writeMasks = [0xF, 0xF];

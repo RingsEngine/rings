@@ -1,6 +1,6 @@
 import { RenderNode } from "./RenderNode";
 import { GSplatMaterial } from "../../materials/GSplatMaterial";
-import { PlaneGeometry } from "../../shape/PlaneGeometry";
+import { GSplatGeometry } from "../../shape/GSplatGeometry";
 import { View3D } from "../../core/View3D";
 import { RendererPassState } from "../../gfx/renderJob/passRenderer/state/RendererPassState";
 import { ClusterLightingBuffer } from "../../gfx/renderJob/passRenderer/cluster/ClusterLightingBuffer";
@@ -9,11 +9,13 @@ import { GPUContext } from "../../gfx/renderJob/GPUContext";
 import { GaussianSplatAsset } from "../../loader/parser/3dgs/GaussianSplatAsset";
 import { Uint8ArrayTexture } from "../../textures/Uint8ArrayTexture";
 import { Uint32ArrayTexture } from "../../textures/Uint32ArrayTexture";
+import { R32UintTexture } from "../../textures/R32UintTexture";
 import { Float16ArrayTexture } from "../../textures/Float16ArrayTexture";
 import { Vector2 } from "../../math/Vector2";
 import { toHalfFloat } from "../../util/Convert";
 import { Matrix4 } from "../../math/Matrix4";
 import { RegisterComponent } from "../../util/SerializeDecoration";
+import { webGPUContext } from "../../gfx/graphics/webGpu/Context3D";
 
 /**
  * Gaussian Splat Renderer Component
@@ -32,7 +34,7 @@ export class GSplatRenderer extends RenderNode {
   public transformA: Uint32ArrayTexture;
   public transformB: Float16ArrayTexture;
   public texParams: Float32Array; // [numSplats, texWidth, validCount, visBoost]
-  public splatOrder: Uint32ArrayTexture;
+  public splatOrder: R32UintTexture;
   
   // Material and geometry
   public gsplatMaterial: GSplatMaterial;
@@ -48,13 +50,16 @@ export class GSplatRenderer extends RenderNode {
   // Web Worker for sorting
   private _sortWorker: Worker;
   private _lastSentTime: number = 0;
-  private _minIntervalMs: number = 0; // No throttle for immediate sorting
+  private _minIntervalMs: number = 16;
   private _centersSent: boolean = false;
   private _lastViewMatrixHash: number = 0;
   
   // Adaptive sorting optimization
   private _lastCameraSpeed: number = 0;
   private _adaptiveSorting: boolean = true; // Enable adaptive sorting by default
+  
+  private _lastPixelCullParams: string = '';
+  private _texturesInitialized: boolean = false;
   
   // LOD (Level of Detail) system
   private _lodEnabled: boolean = false;
@@ -73,6 +78,10 @@ export class GSplatRenderer extends RenderNode {
   get fullCount(): number {
     return this._fullCount;
   }
+  
+  // Batched rendering
+  private _batchSize: number = 128; // Splats per draw call
+  public instanceCount: number = 0; // For InstanceDrawComponent compatibility
   
   constructor() {
     super();
@@ -96,18 +105,14 @@ export class GSplatRenderer extends RenderNode {
     // Cache positions for CPU sorting
     this._positions = asset.position;
     
+    // Use R32U format (75% less memory than RGBA32U)
     // Create initial order texture [0..count-1], padded with last index
     const total = this.size.x * this.size.y;
-    this._orderData = new Uint32Array(total * 4);
+    this._orderData = new Uint32Array(total); // R32U: single channel
     for (let i = 0; i < total; i++) {
-      const src = i < this.count ? i : (this.count > 0 ? this.count - 1 : 0);
-      const base = i * 4;
-      this._orderData[base + 0] = src;
-      this._orderData[base + 1] = 0;
-      this._orderData[base + 2] = 0;
-      this._orderData[base + 3] = 0;
+      this._orderData[i] = i < this.count ? i : (this.count > 0 ? this.count - 1 : 0);
     }
-    this.splatOrder = new Uint32ArrayTexture().create(this.size.x, this.size.y, this._orderData);
+    this.splatOrder = new R32UintTexture().create(this.size.x, this.size.y, this._orderData);
     this.splatOrder.name = "splatOrder";
 
     this.splatOrder.minFilter = "nearest";
@@ -117,8 +122,12 @@ export class GSplatRenderer extends RenderNode {
     
     // Initialize material and geometry
     this.gsplatMaterial = new GSplatMaterial();
-    this.geometry = new PlaneGeometry(1, 1, 1, 1);
+    this.geometry = new GSplatGeometry(this._batchSize);
     this.materials = [this.gsplatMaterial];
+    
+    // Start with instanceCount = 0
+    // Will be updated after first sort
+    this.instanceCount = 0;
   }
   
   /**
@@ -218,12 +227,7 @@ export class GSplatRenderer extends RenderNode {
     // Reset order texture to [0..count-1]
     const total = this.size.x * this.size.y;
     for (let i = 0; i < total; i++) {
-      const src = i < this.count ? i : (this.count > 0 ? this.count - 1 : 0);
-      const base = i * 4;
-      this._orderData[base + 0] = src;
-      this._orderData[base + 1] = 0;
-      this._orderData[base + 2] = 0;
-      this._orderData[base + 3] = 0;
+      this._orderData[i] = i < this.count ? i : (this.count > 0 ? this.count - 1 : 0);
     }
     this.splatOrder.updateTexture(this.size.x, this.size.y, this._orderData);
     
@@ -252,6 +256,9 @@ export class GSplatRenderer extends RenderNode {
     } else {
       this._centersSent = false;
     }
+    
+    // Reset instance count (will be updated after next sort)
+    this.instanceCount = 0;
   }
   
   /**
@@ -320,6 +327,20 @@ export class GSplatRenderer extends RenderNode {
       maxPixelCullDistance: this._maxPixelCullDistance,
       maxEnabled: this._maxPixelCoverage > 0,
       distanceEnabled: this._maxPixelCullDistance > 0
+    };
+  }
+  
+  
+  /**
+   * Get batching statistics
+   */
+  public getBatchingStats() {
+    return {
+      enabled: true,
+      batchSize: this._batchSize,
+      instanceCount: this.instanceCount,
+      splatCount: this.count,
+      reduction: this.count > 0 ? (1 - this.instanceCount / this.count) * 100 : 0
     };
   }
   
@@ -606,20 +627,23 @@ export class GSplatRenderer extends RenderNode {
           order: oldOrder
         }, [oldOrder]);
 
-        // Write the new order data
         const indices = new Uint32Array(newOrder);
         const total = this.size.x * this.size.y;
         const count = this.count;
         
-        // Create new buffer for orderData
-        this._orderData = new Uint32Array(total * 4);
-        for (let i = 0; i < total; i++) {
-          const src = i < count ? indices[i] : (count > 0 ? count - 1 : 0);
-          const base = i * 4;
-          this._orderData[base + 0] = src;
-          this._orderData[base + 1] = 0;
-          this._orderData[base + 2] = 0;
-          this._orderData[base + 3] = 0;
+        // Reuse existing buffer if possible
+        if (!this._orderData || this._orderData.length !== total) {
+          this._orderData = new Uint32Array(total);
+        }
+        
+        // direct memory copy for valid indices
+        const validCount = Math.min(count, indices.length);
+        this._orderData.set(indices.subarray(0, validCount), 0);
+        
+        // Fast fill for padding (if needed)
+        if (validCount < total) {
+          const lastIndex = count > 0 ? count - 1 : 0;
+          this._orderData.fill(lastIndex, validCount, total);
         }
         
         this.splatOrder.updateTexture(this.size.x, this.size.y, this._orderData);
@@ -627,6 +651,10 @@ export class GSplatRenderer extends RenderNode {
         // Update valid instance count (camera back culling)
         const valid = Math.max(0, Math.min(this.count, ev.data.count | 0));
         this.texParams[2] = valid;
+        
+        // Only render instances needed for visible splats (exclude splats behind camera)
+        const newInstanceCount = Math.ceil(valid / this._batchSize);
+        this.instanceCount = newInstanceCount;
       };
       
       // First send: world space centers + initial order buffer
@@ -891,45 +919,27 @@ export class GSplatRenderer extends RenderNode {
     renderPassState: RendererPassState,
     clusterLightingBuffer?: ClusterLightingBuffer
   ) {
-    // Pass world matrix to shader for transforming splats
     const worldMatrix = this.object3D.transform.worldMatrix;
     this.gsplatMaterial.setTransformMatrix(worldMatrix);
     
-    // Update pixel culling thresholds
-    this.gsplatMaterial.setPixelCulling(this._minPixelCoverage, this._maxPixelCoverage, this._maxPixelCullDistance);
-    
-    this.gsplatMaterial.setSplatTextures(
-      this.splatColor,
-      this.transformA,
-      this.transformB,
-      this.texParams,
-      this.splatOrder
-    );
-    super.nodeUpdate(view, passType, renderPassState, clusterLightingBuffer);
-  }
-
-  /**
-   * Render pass
-   */
-  public renderPass2(
-    view: View3D,
-    passType: PassType,
-    rendererPassState: RendererPassState,
-    clusterLightingBuffer: ClusterLightingBuffer,
-    encoder: GPURenderPassEncoder,
-    useBundle: boolean = false
-  ) {
-    for (let mat of this.materials) {
-      const passes = mat.getPass(passType);
-      if (!passes || passes.length === 0) continue;
-      for (const pass of passes) {
-        if (!pass.pipeline) continue;
-        pass.apply(this.geometry, rendererPassState);
-        GPUContext.bindPipeline(encoder, pass);
-        // 4 vertices per instance, instance count = splat count
-        GPUContext.draw(encoder, 4, this.count, 0, 0);
-      }
+    const currentParams = `${this._minPixelCoverage},${this._maxPixelCoverage},${this._maxPixelCullDistance},${this._batchSize}`;
+    if (currentParams !== this._lastPixelCullParams) {
+      this.gsplatMaterial.setPixelCulling(this._minPixelCoverage, this._maxPixelCoverage, this._maxPixelCullDistance, this._batchSize);
+      this._lastPixelCullParams = currentParams;
     }
+    
+    if (!this._texturesInitialized) {
+      this.gsplatMaterial.setSplatTextures(
+        this.splatColor,
+        this.transformA,
+        this.transformB,
+        this.texParams,
+        this.splatOrder
+      );
+      this._texturesInitialized = true;
+    }
+    
+    super.nodeUpdate(view, passType, renderPassState, clusterLightingBuffer);
   }
 
   /**
@@ -941,14 +951,44 @@ export class GSplatRenderer extends RenderNode {
     renderContext
   ) {
     const encoder: GPURenderPassEncoder = renderContext.encoder;
+    
     for (let mat of this.materials) {
       const passes = mat.getPass(passType);
       if (!passes || passes.length === 0) continue;
+      
       for (const pass of passes) {
         if (!pass.pipeline) continue;
+        
         pass.apply(this.geometry, renderContext.rendererPassState || (renderContext as any));
         GPUContext.bindPipeline(encoder, pass);
-        GPUContext.draw(encoder, 4, this.count, 0, 0);
+        
+        // Bind geometry buffer AFTER apply
+        GPUContext.bindGeometryBuffer(encoder, this.geometry);
+        
+        // Get subgeometry info
+        const subGeometry = this.geometry.subGeometries[0];
+        const lodInfo = subGeometry.lodLevels[0];
+        
+        // drawIndexed with instancing
+        if (this.instanceCount > 0) {
+          GPUContext.drawIndexed(
+            encoder,
+            lodInfo.indexCount,
+            this.instanceCount,
+            lodInfo.indexStart,
+            0,
+            0
+          );
+        } else {
+          GPUContext.drawIndexed(
+            encoder,
+            lodInfo.indexCount,
+            1,
+            lodInfo.indexStart,
+            0,
+            0
+          );
+        }
       }
     }
   }
@@ -961,6 +1001,7 @@ export class GSplatRenderer extends RenderNode {
       this._sortWorker.terminate();
       this._sortWorker = null;
     }
+    
     super.destroy(force);
   }
 }

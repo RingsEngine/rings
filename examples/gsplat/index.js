@@ -30,12 +30,16 @@ export class GSplatBasicExample {
     // 初始化引擎
     await Engine3D.init();
 
+    Engine3D.setting.occlusionQuery.enable = false;
+    Engine3D.setting.shadow.enable = false;
+    Engine3D.setting.render.postProcessing.fxaa.enable = false;
+
     // 创建场景
     this.scene = new Scene3D();
 
     // 添加天空
-    const sky = this.scene.addComponent(AtmosphericComponent);
-    sky.sunY = 0.6;
+    // const sky = this.scene.addComponent(AtmosphericComponent);
+    // sky.sunY = 0.6;
 
     // 创建相机
     const cameraObj = new Object3D();
@@ -562,6 +566,8 @@ export class GSplatBasicExample {
           <div>FPS: <span id="perf-fps" style="color: #4CAF50;">--</span></div>
           <div>Frame Time: <span id="perf-frametime" style="color: #4CAF50;">--</span> ms</div>
           <div>Splats: <span id="perf-splats" style="color: #4CAF50;">--</span></div>
+          <div>Instances: <span id="perf-instances" style="color: #4CAF50;">--</span></div>
+          <div>Reduction: <span id="perf-reduction" style="color: #FF9800;">--</span></div>
           <div>LOD Level: <span id="perf-lod" style="color: #4CAF50;">--</span></div>
           <div>Sort Freq: <span id="perf-sortfreq" style="color: #4CAF50;">--</span> Hz</div>
           <div>Max Pixels: <span id="perf-maxpix" style="color: #4CAF50;">--</span></div>
@@ -611,6 +617,8 @@ export class GSplatBasicExample {
     const perfFPS = document.getElementById('perf-fps');
     const perfFrameTime = document.getElementById('perf-frametime');
     const perfSplats = document.getElementById('perf-splats');
+    const perfInstances = document.getElementById('perf-instances');
+    const perfReduction = document.getElementById('perf-reduction');
     const perfLOD = document.getElementById('perf-lod');
     const perfSortFreq = document.getElementById('perf-sortfreq');
     const perfMaxPix = document.getElementById('perf-maxpix');
@@ -869,6 +877,18 @@ export class GSplatBasicExample {
           perfCullDist.textContent = pixelStats.maxPixelCullDistance.toFixed(1) + 'm';
         } else {
           perfCullDist.textContent = 'Always';
+        }
+      }
+      
+      // Update batching stats
+      if (perfInstances && perfReduction) {
+        const batchStats = this.renderer.getBatchingStats();
+        if (batchStats.enabled) {
+          perfInstances.textContent = `${batchStats.instanceCount.toLocaleString()} (${batchStats.batchSize}x)`;
+          perfReduction.textContent = `↓ ${batchStats.reduction.toFixed(1)}%`;
+        } else {
+          perfInstances.textContent = batchStats.splatCount.toLocaleString() + ' (1:1)';
+          perfReduction.textContent = 'Disabled';
         }
       }
       
