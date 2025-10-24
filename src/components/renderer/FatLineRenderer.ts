@@ -21,6 +21,7 @@ import { ClusterLightingBuffer } from "../../gfx/renderJob/passRenderer/cluster/
 export class FatLineRenderer extends RenderNode {
   private _fatLineMaterial: FatLineMaterial | null = null;
   private _fatLineGeometry: FatLineGeometry | null = null;
+  private _cachedResolution: Vector2 = new Vector2(0, 0);
 
   constructor() {
     super();
@@ -103,13 +104,27 @@ export class FatLineRenderer extends RenderNode {
       const width = webGPUContext.presentationSize[0];
       const height = webGPUContext.presentationSize[1];
       
-      if (width > 0 && height > 0) {
-        this._fatLineMaterial.resolution = new Vector2(width, height);
+      if (width > 0 && height > 0 && 
+          (this._cachedResolution.x !== width || this._cachedResolution.y !== height)) {
+        this._cachedResolution.set(width, height);
+        this._fatLineMaterial.resolution = this._cachedResolution.clone();
       }
     }
 
     // Call parent nodeUpdate to handle standard rendering
     super.nodeUpdate(view, passType, renderPassState, clusterLightingBuffer);
+  }
+
+  public destroy(force?: boolean) {
+    // if (this._fatLineMaterial) { // beforeDestroy will destroy the material
+    //   this._fatLineMaterial.destroy(force);
+    //   this._fatLineMaterial = null;
+    // }
+    // if (this._fatLineGeometry) { // beforeDestroy will destroy the geometry
+    //   this._fatLineGeometry.destroy(force);
+    //   this._fatLineGeometry = null;
+    // }
+    super.destroy(force);
   }
 }
 

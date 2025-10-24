@@ -1019,10 +1019,10 @@ export class GSplatRenderer extends RenderNode {
       this.splatOrder = null;
     }
 
-    if (this.gsplatMaterial) {
-      this.gsplatMaterial.destroy(force);
-      this.gsplatMaterial = null;
-    }
+    // if (this.gsplatMaterial) { // beforeDestroy will destroy the material
+    //   this.gsplatMaterial.destroy(force);
+    //   this.gsplatMaterial = null;
+    // }
 
     this._positions = null;
     this._worldPositions = null;
