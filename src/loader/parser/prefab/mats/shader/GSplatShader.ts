@@ -26,6 +26,7 @@ export class GSplatShader extends Shader {
     pass.shaderState.transparent = true;
     pass.shaderState.blendMode = BlendMode.NORMAL;
     pass.shaderState.writeMasks = [0xF, 0xF];
+    pass.shaderState.castReflection = false;
 
     this.addRenderPass(pass);
     this.setDefault();
