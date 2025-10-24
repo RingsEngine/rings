@@ -1001,6 +1001,35 @@ export class GSplatRenderer extends RenderNode {
       this._sortWorker.terminate();
       this._sortWorker = null;
     }
+
+    if (this.splatColor) {
+      this.splatColor.destroy(force);
+      this.splatColor = null;
+    }
+    if (this.transformA) {
+      this.transformA.destroy(force);
+      this.transformA = null;
+    }
+    if (this.transformB) {
+      this.transformB.destroy(force);
+      this.transformB = null;
+    }
+    if (this.splatOrder) {
+      this.splatOrder.destroy(force);
+      this.splatOrder = null;
+    }
+
+    if (this.gsplatMaterial) {
+      this.gsplatMaterial.destroy(force);
+      this.gsplatMaterial = null;
+    }
+
+    this._positions = null;
+    this._worldPositions = null;
+    this._orderData = null;
+    this.texParams = null;
+
+    this._mapping = null;
     
     super.destroy(force);
   }

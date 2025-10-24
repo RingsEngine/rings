@@ -132,6 +132,10 @@ export class MeshRenderer extends RenderNode {
   }
 
   public destroy(force?: boolean): void {
+    if (this.morphData) {
+      this.morphData.destroy(force);
+      this.morphData = null;
+    }
     super.destroy(force);
   }
 }

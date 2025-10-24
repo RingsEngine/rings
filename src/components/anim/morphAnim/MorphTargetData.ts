@@ -277,4 +277,45 @@ export class MorphTargetData {
       usage
     );
   }
+
+  public destroy(force?: boolean): void {
+    if (this._computeConfigBuffer) {
+      this._computeConfigBuffer.destroy(force);
+      this._computeConfigBuffer = null;
+    }
+    if (this._morphInfluenceBuffer) {
+      this._morphInfluenceBuffer.destroy(force);
+      this._morphInfluenceBuffer = null;
+    }
+    if (this._computeShader) {
+      this._computeShader.destroy(force);
+      this._computeShader = null;
+    }
+
+    if (this._positionAttrDataGroup) {
+      if (this._positionAttrDataGroup.input) {
+        this._positionAttrDataGroup.input.destroy(force);
+      }
+      if (this._positionAttrDataGroup.output) {
+        this._positionAttrDataGroup.output.destroy(force);
+      }
+      this._positionAttrDataGroup = null;
+    }
+
+    if (this._normalAttrDataGroup) {
+      if (this._normalAttrDataGroup.input) {
+        this._normalAttrDataGroup.input.destroy(force);
+      }
+      if (this._normalAttrDataGroup.output) {
+        this._normalAttrDataGroup.output.destroy(force);
+      }
+      this._normalAttrDataGroup = null;
+    }
+
+    this._computeConfigArray = null;
+    this._morphInfluenceArray = null;
+    this._collectMorphTargetData = null;
+    this._blendTarget = null;
+    this._computeShaders = null;
+  }
 }
