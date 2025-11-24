@@ -5,7 +5,7 @@ import { B3DMLoader } from "./b3dm/B3DMLoader";
 import { GLBParser } from "./gltf/GLBParser";
 
 export class B3DMParser extends ParserBase {
-  static format: ParserFormat = ParserFormat.JSON;
+  static format: ParserFormat = ParserFormat.BIN;
 
   public async parseBuffer(buffer: ArrayBuffer) {
     let loader = new B3DMLoader();

@@ -8,6 +8,7 @@ import {
   Matrix4,
   PropertyAnimationClip,
   SkinnedMeshRenderer2,
+  UnLitMaterial,
 } from "../../..";
 import { Engine3D } from "../../../Engine3D";
 import { DirectLight } from "../../../components/lights/DirectLight";
@@ -181,11 +182,14 @@ export class GLTFSubParserConverter {
       if (md && this.gltf.resources[materialKey]) {
         mat = this.gltf.resources[materialKey];
       } else {
-        let newMat: Material = (mat = new LitMaterial());
+        let gltfMat = md as GLTFMaterial;
+        const isUnlit = gltfMat?.extensions?.KHR_materials_unlit !== undefined;
+        
+        let newMat: Material = isUnlit ? new UnLitMaterial() : new LitMaterial();
+        mat = newMat;
         this.gltf.resources[materialKey] = newMat;
         newMat.name = md.name;
 
-        let gltfMat = md as GLTFMaterial;
         if (gltfMat) {
           const {
             baseColorTexture,
@@ -206,127 +210,160 @@ export class GLTFSubParserConverter {
             gltfMat,
             newMat
           ));
-          if (`enableBlend` in gltfMat) {
-            if (gltfMat[`enableBlend`]) {
-              let defines = gltfMat.defines;
-              if (defines?.includes("ALPHA_BLEND")) {
-                physicMaterial.blendMode = BlendMode.ALPHA;
-              } else {
-                physicMaterial.blendMode = BlendMode.NORMAL;
-              }
-              physicMaterial.castShadow = false;
-            } else {
-              physicMaterial.blendMode = BlendMode.NONE;
-            }
-          }
-
-          if (`alphaCutoff` in gltfMat && alphaCutoff > 0 && alphaCutoff < 1) {
-            physicMaterial.setUniformFloat("alphaCutoff", alphaCutoff);
-            physicMaterial.blendMode = BlendMode.NORMAL;
-            physicMaterial.transparent = true;
-          }
-
-          if (gltfMat.baseMapOffsetSize) {
-            physicMaterial.setUniformVector4(
-              "baseMapOffsetSize",
-              gltfMat.baseMapOffsetSize
-            );
-          }
-          if (gltfMat.normalMapOffsetSize) {
-            physicMaterial.setUniformVector4(
-              "normalMapOffsetSize",
-              gltfMat.normalMapOffsetSize
-            );
-          }
-          if (gltfMat.emissiveMapOffsetSize) {
-            physicMaterial.setUniformVector4(
-              "emissiveMapOffsetSize",
-              gltfMat.emissiveMapOffsetSize
-            );
-          }
-          if (gltfMat.roughnessMapOffsetSize) {
-            physicMaterial.setUniformVector4(
-              "roughnessMapOffsetSize",
-              gltfMat.roughnessMapOffsetSize
-            );
-          }
-          if (gltfMat.metallicMapOffsetSize) {
-            physicMaterial.setUniformVector4(
-              "metallicMapOffsetSize",
-              gltfMat.metallicMapOffsetSize
-            );
-          }
-          if (gltfMat.aoMapOffsetSize) {
-            physicMaterial.setUniformVector4(
-              "aoMapOffsetSize",
-              gltfMat.aoMapOffsetSize
-            );
-          }
-
-          physicMaterial.setUniformColor(
-            "baseColor",
-            new Color(
+          
+          if (isUnlit) {
+            const unlitMat = physicMaterial as UnLitMaterial;
+            unlitMat.baseColor = new Color(
               baseColorFactor[0],
               baseColorFactor[1],
               baseColorFactor[2],
               baseColorFactor[3]
-            )
-          );
-          physicMaterial.setUniformFloat("roughness", roughnessFactor);
-          physicMaterial.setUniformFloat("metallic", metallicFactor);
-          physicMaterial.setUniformFloat("ao", 1);
-          physicMaterial.doubleSide = doubleSided;
+            );
+            if (baseColorTexture) {
+              unlitMat.baseMap = baseColorTexture;
+            }
+            physicMaterial.doubleSide = doubleSided;
+            if (`enableBlend` in gltfMat) {
+              if (gltfMat[`enableBlend`]) {
+                let defines = gltfMat.defines;
+                if (defines?.includes("ALPHA_BLEND")) {
+                  physicMaterial.blendMode = BlendMode.ALPHA;
+                } else {
+                  physicMaterial.blendMode = BlendMode.NORMAL;
+                }
+                physicMaterial.castShadow = false;
+              } else {
+                physicMaterial.blendMode = BlendMode.NONE;
+              }
+            }
+            if (`alphaCutoff` in gltfMat && alphaCutoff > 0 && alphaCutoff < 1) {
+              physicMaterial.setUniformFloat("alphaCutoff", alphaCutoff);
+              physicMaterial.blendMode = BlendMode.NORMAL;
+              physicMaterial.transparent = true;
+            }
+          } else {
+            if (`enableBlend` in gltfMat) {
+              if (gltfMat[`enableBlend`]) {
+                let defines = gltfMat.defines;
+                if (defines?.includes("ALPHA_BLEND")) {
+                  physicMaterial.blendMode = BlendMode.ALPHA;
+                } else {
+                  physicMaterial.blendMode = BlendMode.NORMAL;
+                }
+                physicMaterial.castShadow = false;
+              } else {
+                physicMaterial.blendMode = BlendMode.NONE;
+              }
+            }
 
-          if (baseColorTexture) {
-            physicMaterial.setTexture("baseMap", baseColorTexture);
-          }
+            if (`alphaCutoff` in gltfMat && alphaCutoff > 0 && alphaCutoff < 1) {
+              physicMaterial.setUniformFloat("alphaCutoff", alphaCutoff);
+              physicMaterial.blendMode = BlendMode.NORMAL;
+              physicMaterial.transparent = true;
+            }
 
-          if (normalTexture) {
-            physicMaterial.setTexture("normalMap", normalTexture);
-          }
-
-          if (metallicRoughnessTexture) {
-            physicMaterial.setTexture("maskMap", metallicRoughnessTexture);
-          }
-
-          if (
-            occlusionTexture &&
-            metallicRoughnessTexture != occlusionTexture
-          ) {
-          }
-
-          if (emissiveTexture) {
-            physicMaterial.setTexture("emissiveMap", emissiveTexture);
-          }
-
-          if (
-            emissiveFactor &&
-            (emissiveFactor[0] > 0 ||
-              emissiveFactor[1] > 0 ||
-              emissiveFactor[2] > 0)
-          ) {
-            if (!physicMaterial.shader.getTexture("emissiveMap")) {
-              physicMaterial.shader.setTexture(
-                "emissiveMap",
-                Engine3D.res.whiteTexture
+            if (gltfMat.baseMapOffsetSize) {
+              physicMaterial.setUniformVector4(
+                "baseMapOffsetSize",
+                gltfMat.baseMapOffsetSize
               );
             }
-            physicMaterial.shader.setDefine("USE_EMISSIVEMAP", true);
+            if (gltfMat.normalMapOffsetSize) {
+              physicMaterial.setUniformVector4(
+                "normalMapOffsetSize",
+                gltfMat.normalMapOffsetSize
+              );
+            }
+            if (gltfMat.emissiveMapOffsetSize) {
+              physicMaterial.setUniformVector4(
+                "emissiveMapOffsetSize",
+                gltfMat.emissiveMapOffsetSize
+              );
+            }
+            if (gltfMat.roughnessMapOffsetSize) {
+              physicMaterial.setUniformVector4(
+                "roughnessMapOffsetSize",
+                gltfMat.roughnessMapOffsetSize
+              );
+            }
+            if (gltfMat.metallicMapOffsetSize) {
+              physicMaterial.setUniformVector4(
+                "metallicMapOffsetSize",
+                gltfMat.metallicMapOffsetSize
+              );
+            }
+            if (gltfMat.aoMapOffsetSize) {
+              physicMaterial.setUniformVector4(
+                "aoMapOffsetSize",
+                gltfMat.aoMapOffsetSize
+              );
+            }
+
             physicMaterial.setUniformColor(
-              "emissiveColor",
+              "baseColor",
               new Color(
-                emissiveFactor[0],
-                emissiveFactor[1],
-                emissiveFactor[2],
-                emissiveFactor[3]
+                baseColorFactor[0],
+                baseColorFactor[1],
+                baseColorFactor[2],
+                baseColorFactor[3]
               )
             );
-            if (physicMaterial.blendMode != BlendMode.NONE) {
-              physicMaterial.blendMode = BlendMode.ADD;
+            physicMaterial.setUniformFloat("roughness", roughnessFactor);
+            physicMaterial.setUniformFloat("metallic", metallicFactor);
+            physicMaterial.setUniformFloat("ao", 1);
+            physicMaterial.doubleSide = doubleSided;
+
+            if (baseColorTexture) {
+              physicMaterial.setTexture("baseMap", baseColorTexture);
             }
-            let emissiveIntensity = mat.getUniformFloat("emissiveIntensity");
-            if (!emissiveIntensity || emissiveIntensity <= 0) {
-              mat.setUniformFloat("emissiveIntensity", 1.0);
+
+            if (normalTexture) {
+              physicMaterial.setTexture("normalMap", normalTexture);
+            }
+
+            if (metallicRoughnessTexture) {
+              physicMaterial.setTexture("maskMap", metallicRoughnessTexture);
+            }
+
+            if (
+              occlusionTexture &&
+              metallicRoughnessTexture != occlusionTexture
+            ) {
+            }
+
+            if (emissiveTexture) {
+              physicMaterial.setTexture("emissiveMap", emissiveTexture);
+            }
+
+            if (
+              emissiveFactor &&
+              (emissiveFactor[0] > 0 ||
+                emissiveFactor[1] > 0 ||
+                emissiveFactor[2] > 0)
+            ) {
+              if (!physicMaterial.shader.getTexture("emissiveMap")) {
+                physicMaterial.shader.setTexture(
+                  "emissiveMap",
+                  Engine3D.res.whiteTexture
+                );
+              }
+              physicMaterial.shader.setDefine("USE_EMISSIVEMAP", true);
+              physicMaterial.setUniformColor(
+                "emissiveColor",
+                new Color(
+                  emissiveFactor[0],
+                  emissiveFactor[1],
+                  emissiveFactor[2],
+                  emissiveFactor[3]
+                )
+              );
+              if (physicMaterial.blendMode != BlendMode.NONE) {
+                physicMaterial.blendMode = BlendMode.ADD;
+              }
+              let emissiveIntensity = mat.getUniformFloat("emissiveIntensity");
+              if (!emissiveIntensity || emissiveIntensity <= 0) {
+                mat.setUniformFloat("emissiveIntensity", 1.0);
+              }
             }
           }
         }

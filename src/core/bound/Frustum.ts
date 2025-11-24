@@ -215,4 +215,47 @@ export class Frustum {
     }
     return c === 6 ? 2 : 1;
   }
+
+  public containsBoxPrecise(box: BoundingBox): number {
+    const corners = [
+      new Vector3(box.min.x, box.min.y, box.min.z),
+      new Vector3(box.max.x, box.min.y, box.min.z),
+      new Vector3(box.min.x, box.max.y, box.min.z),
+      new Vector3(box.max.x, box.max.y, box.min.z),
+      new Vector3(box.min.x, box.min.y, box.max.z),
+      new Vector3(box.max.x, box.min.y, box.max.z),
+      new Vector3(box.min.x, box.max.y, box.max.z),
+      new Vector3(box.max.x, box.max.y, box.max.z),
+    ];
+
+    let fullyInsideCount = 0;
+
+    for (let p = 0; p < 6; p++) {
+      const plane = this.planes[p];
+      let maxDistance = -Infinity;
+      let minDistance = Infinity;
+
+      for (let i = 0; i < 8; i++) {
+        const corner = corners[i];
+        const distance =
+          plane.x * corner.x +
+          plane.y * corner.y +
+          plane.z * corner.z +
+          plane.w;
+
+        maxDistance = Math.max(maxDistance, distance);
+        minDistance = Math.min(minDistance, distance);
+      }
+
+      if (maxDistance < 0) {
+        return 0;
+      }
+
+      if (minDistance > 0) {
+        fullyInsideCount++;
+      }
+    }
+
+    return fullyInsideCount === 6 ? 2 : 1;
+  }
 }

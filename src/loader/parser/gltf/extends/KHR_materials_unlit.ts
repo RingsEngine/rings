@@ -4,9 +4,9 @@ export class KHR_materials_unlit {
   public static apply(gltf: any, dmaterial: any, tMaterial: any) {
     let extensions = dmaterial.extensions;
     if (extensions && extensions[`KHR_materials_unlit`]) {
-      tMaterial.supportLight = true;
-    } else {
       tMaterial.supportLight = false;
+    } else {
+      tMaterial.supportLight = true;
     }
   }
 }

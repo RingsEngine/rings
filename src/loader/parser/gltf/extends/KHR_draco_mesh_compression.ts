@@ -2,6 +2,7 @@
 import { GLTF_Primitives } from "../GLTFInfo";
 import { FileLoader } from "../../../FileLoader";
 import { GLTFSubParser } from "../GLTFSubParser";
+import { DRACO_DECODER_GLTF_JS } from "../utils/DracoUtils";
 
 export class KHR_draco_mesh_compression {
   private static _workerCode: string;
@@ -62,15 +63,10 @@ export class KHR_draco_mesh_compression {
     }
   }
 
-  // todo
   protected static async initDecoder() {
     if (!this._workerCode) {
-      // 后续替换
-      let dracoDecoderJs = await new FileLoader().loadTxt(
-        "https://cdn.rings.com/draco_decoder_gltf.js"
-      );
       const blob = new Blob(
-        [dracoDecoderJs["data"], "", `(${dracoDecoderWoeker})()`],
+        [DRACO_DECODER_GLTF_JS, "", `(${dracoDecoderWoeker})()`],
         { type: "application/javascript" }
       );
       this._workerCode = URL.createObjectURL(blob);

@@ -27,11 +27,11 @@ export class BoundingBox implements IBound {
   }
   public setFromMinMax(min: Vector3, max: Vector3): this {
     this.init();
-    max.subtract(min, this.size);
-    min.add(max, this.center).multiplyScalar(0.5);
-    this.extents.copyFrom(this.size).multiplyScalar(0.5);
     this.min.copyFrom(min);
     this.max.copyFrom(max);
+    this.max.subtract(this.min, this.size);
+    this.extents.copyFrom(this.size).multiplyScalar(0.5);
+    this.min.add(this.max, this.center).multiplyScalar(0.5);
     return this;
   }
   private init(): this {
@@ -43,10 +43,10 @@ export class BoundingBox implements IBound {
     return this;
   }
   public setFromCenterAndSize(center: Vector3, size: Vector3): this {
-    this.size = size;
-    this.center = center;
     this.init();
-    this.extents.copy(size).multiplyScalar(0.5);
+    this.center.copyFrom(center);
+    this.size.copyFrom(size);
+    this.extents.copyFrom(this.size).multiplyScalar(0.5);
     this.center.subtract(this.extents, this.min);
     this.center.add(this.extents, this.max);
     return this;
@@ -63,17 +63,17 @@ export class BoundingBox implements IBound {
     if (bound.max.y > this.max.y) this.max.y = bound.max.y;
     if (bound.max.z > this.max.z) this.max.z = bound.max.z;
 
-    this.size.x = bound.max.x - bound.min.x;
-    this.size.y = bound.max.y - bound.min.y;
-    this.size.z = bound.max.z - bound.min.z;
+    this.size.x = this.max.x - this.min.x;
+    this.size.y = this.max.y - this.min.y;
+    this.size.z = this.max.z - this.min.z;
 
     this.extents.x = this.size.x * 0.5;
     this.extents.y = this.size.y * 0.5;
     this.extents.z = this.size.z * 0.5;
 
-    this.center.x = this.extents.x + bound.min.x;
-    this.center.y = this.extents.y + bound.min.y;
-    this.center.z = this.extents.z + bound.min.z;
+    this.center.x = this.min.x + this.extents.x;
+    this.center.y = this.min.y + this.extents.y;
+    this.center.z = this.min.z + this.extents.z;
   }
   public intersects(bounds: IBound): boolean {
     return (
@@ -129,6 +129,18 @@ export class BoundingBox implements IBound {
     if (point.z > this.max.z) {
       this.max.z = point.z;
     }
+
+    this.size.x = this.max.x - this.min.x;
+    this.size.y = this.max.y - this.min.y;
+    this.size.z = this.max.z - this.min.z;
+
+    this.extents.x = this.size.x * 0.5;
+    this.extents.y = this.size.y * 0.5;
+    this.extents.z = this.size.z * 0.5;
+
+    this.center.x = this.min.x + this.extents.x;
+    this.center.y = this.min.y + this.extents.y;
+    this.center.z = this.min.z + this.extents.z;
   }
   public static fromPoints(points: Vector3[]): BoundingBox {
     var bounds: BoundingBox = new BoundingBox(new Vector3(), new Vector3());

@@ -44,14 +44,21 @@ export class PassGenerate {
         pass.setTexture("normalMap", colorPass.getTexture("normalMap"));
         pass.setTexture("emissiveMap", colorPass.getTexture("emissiveMap"));
 
-        pass.setUniform("baseColor", colorPass.getUniform("baseColor"));
-        pass.setUniform("envIntensity", colorPass.getUniform("envIntensity"));
-        pass.setUniform("emissiveColor", colorPass.getUniform("emissiveColor"));
-        pass.setUniform(
-          "emissiveIntensity",
-          colorPass.getUniform("emissiveIntensity")
-        );
-        pass.setUniform("alphaCutoff", colorPass.getUniform("alphaCutoff"));
+        if (colorPass.uniforms["baseColor"]) {
+          pass.setUniform("baseColor", colorPass.getUniform("baseColor"));
+        }
+        if (colorPass.uniforms["envIntensity"]) {
+          pass.setUniform("envIntensity", colorPass.getUniform("envIntensity"));
+        }
+        if (colorPass.uniforms["emissiveColor"]) {
+          pass.setUniform("emissiveColor", colorPass.getUniform("emissiveColor"));
+        }
+        if (colorPass.uniforms["emissiveIntensity"]) {
+          pass.setUniform("emissiveIntensity", colorPass.getUniform("emissiveIntensity"));
+        }
+        if (colorPass.uniforms["alphaCutoff"]) {
+          pass.setUniform("alphaCutoff", colorPass.getUniform("alphaCutoff"));
+        }
 
         pass.cullMode = colorPass.cullMode;
         pass.frontFace = colorPass.frontFace;
