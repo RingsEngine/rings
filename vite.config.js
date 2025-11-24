@@ -37,6 +37,9 @@ export default defineConfig((option) => ({
                 } else if (req.url === '/examples/fatline') {
                   res.writeHead(302, { 'Location': '/examples/fatline/index.html' });
                   res.end();
+                } else if (req.url === '/examples/b3dm') {
+                  res.writeHead(302, { 'Location': '/examples/b3dm/index.html' });
+                  res.end();
                 } else {
                   next();
                 }
