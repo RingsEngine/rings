@@ -8,6 +8,7 @@ import { BoundingVolumeData } from './TileSet';
 export type BoundingVolumeType = 'box' | 'sphere' | 'region';
 
 export class BoundingVolume {
+  static s_tmpMatrix:Matrix4 = null;
   private _type: BoundingVolumeType;
   private _data: BoundingVolumeData;
   private _box?: BoundingBox;
@@ -15,6 +16,9 @@ export class BoundingVolume {
   private _matrix?: Matrix4;
 
   constructor(data: BoundingVolumeData) {
+    if (!BoundingVolume.s_tmpMatrix) {
+      BoundingVolume.s_tmpMatrix = new Matrix4();
+    }
     this._data = data;
 
     if (data.box) {
@@ -165,7 +169,8 @@ export class BoundingVolume {
       return target;
     } else if (this._box) {
       // calculate the accumulated transform matrix: worldMatrix = parentTransform * localMatrix
-      const worldMatrix: Matrix4 = new Matrix4();
+      const worldMatrix: Matrix4 = BoundingVolume.s_tmpMatrix;
+      worldMatrix.identity();
       if (this._matrix) {
         if (parentTransform) {
           worldMatrix.multiplyMatrices(parentTransform, this._matrix);
