@@ -25,6 +25,8 @@ import { Orientation3D } from '../../../math/Orientation3D';
 import { Engine3D } from '../../../Engine3D';
 import { MeshRenderer } from '../../../components/renderer/MeshRenderer';
 import { Quaternion } from '../../../math/Quaternion';
+import { FileLoader } from '../../FileLoader';
+import { B3DMParser } from '../B3DMParser';
 
 /**
  * Plugin interface
@@ -660,12 +662,14 @@ export class TilesRenderer {
 
     // Calculate accumulated transform (for bounding volume calculation and distance calculation)
     // But scene's transform will be accumulated through the parent-child relationship automatically, no need to multiply manually
-    const worldTransform = transform.clone();
+    const worldTransform = new Matrix4();
+    worldTransform.copyFrom(transform);
     if (parentTile && parentTile.cached.worldTransform) {
       worldTransform.multiplyMatrices(parentTile.cached.worldTransform, transform);
     }
 
-    const transformInverse = worldTransform.clone();
+    const transformInverse = new Matrix4();
+    transformInverse.copyFrom(worldTransform);
     transformInverse.invert();
 
     // Store local transform (for applying to scene)
@@ -800,18 +804,16 @@ export class TilesRenderer {
     switch (extension.toLowerCase()) {
       case 'b3dm':
         // Use Rings B3DM loader
-        scene = (await Engine3D.res.loadB3DM(
-          fullUrl,
-          {
-            onProgress: (e: any) => {
-              // Progress callback
-            },
-            onComplete: (e: any) => {
-              // Complete callback
-            },
+        const loader = new FileLoader();
+        const parser = await loader.load(fullUrl, B3DMParser, {
+          onProgress: (e: any) => {
+            // Progress callback
           },
-            adjustmentTransform
-          )) as Object3D;
+          onComplete: (e: any) => {
+            // Complete callback
+          },
+        }, adjustmentTransform);
+        scene = parser.data;
         break;
 
       case 'i3dm':
@@ -1079,7 +1081,8 @@ export class TilesRenderer {
     this._upRotationMatrix = adjustmentTransform;
 
     // Apply root transform
-    const invertMatrix = adjustmentTransform.clone();
+    const invertMatrix = new Matrix4();
+    invertMatrix.copyFrom(adjustmentTransform);
     invertMatrix.invert();
     this._applyLocalTransform(this.group.transform, invertMatrix);
   }
