@@ -643,10 +643,19 @@ export class TilesRenderer {
       }
     }
 
+
     if (!parentTile) {
-      transform.rawData[12] -= boundCenter.x;
-      transform.rawData[13] -= boundCenter.y;
-      transform.rawData[14] -= boundCenter.z;
+      const tmpMat = new Matrix4();
+      tmpMat.copyFrom(transform);
+      tmpMat.rawData[12] = 0;
+      tmpMat.rawData[13] = 0;
+      tmpMat.rawData[14] = 0;
+      const position = new Vector3();
+      position.copyFrom(boundCenter);
+      position.applyMatrix4(tmpMat)
+      transform.rawData[12] = -position.x ;
+      transform.rawData[13] = -position.y ;
+      transform.rawData[14] = -position.z ;
     }
 
     // Calculate accumulated transform (for bounding volume calculation and distance calculation)
@@ -1316,6 +1325,7 @@ export class TilesRenderer {
 
     // Reset statistics
     this.resetCacheStats();
+    this.group.destroy();
   }
 
   /**

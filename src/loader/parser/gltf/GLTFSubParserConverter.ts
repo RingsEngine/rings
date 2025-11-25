@@ -308,8 +308,9 @@ export class GLTFSubParserConverter {
                 baseColorFactor[3]
               )
             );
-            physicMaterial.setUniformFloat("roughness", roughnessFactor);
-            physicMaterial.setUniformFloat("metallic", metallicFactor);
+            // glTF default: roughnessFactor = 1.0, metallicFactor = 0.0
+            physicMaterial.setUniformFloat("roughness", roughnessFactor ?? 1.0);
+            physicMaterial.setUniformFloat("metallic", metallicFactor ?? 0.0);
             physicMaterial.setUniformFloat("ao", 1);
             physicMaterial.doubleSide = doubleSided;
 
@@ -323,6 +324,14 @@ export class GLTFSubParserConverter {
 
             if (metallicRoughnessTexture) {
               physicMaterial.setTexture("maskMap", metallicRoughnessTexture);
+              // Enable texture-based roughness/metallic when texture is present
+              physicMaterial.shader.setDefine("USE_ROUGHNESS_G", true);
+              physicMaterial.shader.setDefine("USE_METALLIC_B", true);
+            } else {
+              // Disable texture-based roughness/metallic when no texture
+              // This ensures shader uses materialUniform.roughness/metallic directly
+              physicMaterial.shader.setDefine("USE_ROUGHNESS_G", false);
+              physicMaterial.shader.setDefine("USE_METALLIC_B", false);
             }
 
             if (
@@ -386,7 +395,9 @@ export class GLTFSubParserConverter {
           numComponents: 1,
         };
       }
-      if (!attribArrays[`normal`]) {
+      // Track if we need to compute normals (no normal data in glTF)
+      let needsNormalComputation = !attribArrays[`normal`];
+      if (needsNormalComputation) {
         let normal = [];
         let count = attribArrays["position"].data.length / 3;
         for (let i = 0; i < count; i++) {
@@ -424,6 +435,11 @@ export class GLTFSubParserConverter {
           );
           this.gltf.resources[meshName] = geometry;
 
+          // Compute normals if they were missing
+          if (needsNormalComputation && attribArrays[`indices`]?.data && attribArrays[`indices`].data.length > 0) {
+            geometry.computeNormals();
+          }
+
           let skeletonNode = this.gltf.nodes[nodeInfo.skin.skeleton];
           if (skeletonNode.dnode && skeletonNode.dnode["nodeObj"]) {
             this.convertSkeletonAnim(node, nodeInfo.skin);
@@ -441,6 +457,11 @@ export class GLTFSubParserConverter {
             primitive
           );
           this.gltf.resources[meshName] = geometry;
+
+          // Compute normals if they were missing
+          if (needsNormalComputation && attribArrays[`indices`]?.data && attribArrays[`indices`].data.length > 0) {
+            geometry.computeNormals();
+          }
 
           if (geometry.hasAttribute(VertexAttributeName.joints0)) {
             geometry.vertexAttributeMap.delete(VertexAttributeName.joints0);

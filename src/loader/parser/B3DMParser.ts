@@ -9,7 +9,9 @@ export class B3DMParser extends ParserBase {
 
   public async parseBuffer(buffer: ArrayBuffer) {
     let loader = new B3DMLoader();
-    loader.adjustmentTransform = this.userData;
+    if (this.userData) {
+      loader.adjustmentTransform = this.userData;
+    }
     this.data = await loader.parse(buffer);
   }
 
