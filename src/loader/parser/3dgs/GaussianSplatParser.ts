@@ -1,7 +1,8 @@
 import { ParserBase } from "../ParserBase";
 import { ParserFormat } from "../ParserFormat";
 import { GaussianSplatAsset, computeAABBFromPositions } from "./GaussianSplatAsset";
-import { detectGSplatFormat, GSplatFormat, parsePlyGaussianSplat } from "./loaders";
+import { detectGSplatFormat, GSplatFormat } from "./loaders";
+import { parsePlyGaussianSplat } from "../ply";
 
 export class GaussianSplatParser extends ParserBase {
   static format: ParserFormat = ParserFormat.BIN;

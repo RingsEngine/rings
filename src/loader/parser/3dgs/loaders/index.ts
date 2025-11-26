@@ -8,5 +8,4 @@
  */
 
 export * from './FormatDetector';
-export * from './ply';
 
