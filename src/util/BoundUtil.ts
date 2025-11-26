@@ -44,7 +44,7 @@ export class BoundUtil {
         return bound;
       }
 
-      const matrix = obj.transform.worldMatrix;
+      const matrix = gsplatRenderer.object3D.transform.worldMatrix;
       const point = new Vector3();
       for (let i = 0; i < count; i++) {
         const idx = i * 3;
