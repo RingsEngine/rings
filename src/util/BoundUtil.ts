@@ -29,36 +29,38 @@ export class BoundUtil {
     bound ||= new BoundingBox(Vector3.ZERO, Vector3.ZERO);
     bound.setFromMinMax(this.maxVector, this.minVector);
 
-    let gsplatRenderer = obj.getComponent(GSplatRenderer);
-    if (!gsplatRenderer) {
+    let gsplatRenderers = obj.getComponents(GSplatRenderer);
+    if (!gsplatRenderers) {
       console.warn('genGSplatBounds: No GSplatRenderer found on object');
       return bound;
     }
 
-    const positions = gsplatRenderer.positions;
-    const count = gsplatRenderer.fullCount;
+    for (const gsplatRenderer of gsplatRenderers) {
+      const positions = gsplatRenderer.positions;
+      const count = gsplatRenderer.fullCount;
 
-    if (!positions || count === 0) {
-      console.warn('genGSplatBounds: No position data available');
-      return bound;
+      if (!positions || count === 0) {
+        console.warn('genGSplatBounds: No position data available');
+        return bound;
+      }
+
+      const matrix = obj.transform.worldMatrix;
+      const point = new Vector3();
+      for (let i = 0; i < count; i++) {
+        const idx = i * 3;
+        point.set(
+          positions[idx + 0],
+          positions[idx + 1],
+          positions[idx + 2]
+        );
+        
+        matrix.transformPoint(point, point);
+        
+        bound.expandByPoint(point);
+      }
+
+      bound.setFromMinMax(bound.min, bound.max);
     }
-
-    const matrix = obj.transform.worldMatrix;
-    const point = new Vector3();
-    for (let i = 0; i < count; i++) {
-      const idx = i * 3;
-      point.set(
-        positions[idx + 0],
-        positions[idx + 1],
-        positions[idx + 2]
-      );
-      
-      matrix.transformPoint(point, point);
-      
-      bound.expandByPoint(point);
-    }
-
-    bound.setFromMinMax(bound.min, bound.max);
 
     return bound;
   }
