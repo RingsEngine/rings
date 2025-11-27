@@ -647,17 +647,35 @@ export class TilesRenderer {
 
 
     if (!parentTile) {
-      const tmpMat = new Matrix4();
-      tmpMat.copyFrom(transform);
-      tmpMat.rawData[12] = 0;
-      tmpMat.rawData[13] = 0;
-      tmpMat.rawData[14] = 0;
+      transform.copyFrom(this._upRotationMatrix);
       const position = new Vector3();
       position.copyFrom(boundCenter);
-      position.applyMatrix4(tmpMat)
+      position.applyMatrix4(transform)
+      
+      const box = tileObj.cached.boundingVolume.box;
+      const boundCorners = [
+        new Vector3(box.min.x, box.min.y, box.min.z),
+        new Vector3(box.max.x, box.min.y, box.min.z),
+        new Vector3(box.min.x, box.max.y, box.min.z),
+        new Vector3(box.max.x, box.max.y, box.min.z),
+        new Vector3(box.min.x, box.min.y, box.max.z),
+        new Vector3(box.max.x, box.min.y, box.max.z),
+        new Vector3(box.min.x, box.max.y, box.max.z),
+        new Vector3(box.max.x, box.max.y, box.max.z),
+      ];
+      for (const corner of boundCorners) {
+        corner.applyMatrix4(transform);
+      }
+      const newBox = new BoundingBox();
+      boundCorners.forEach(corner => {
+        newBox.expandByPoint(corner);
+      });
+      
       transform.rawData[12] = -position.x ;
       transform.rawData[13] = -position.y ;
       transform.rawData[14] = -position.z ;
+      const min = newBox.min;
+      transform.rawData[13] -= min.y;
     }
 
     // Calculate accumulated transform (for bounding volume calculation and distance calculation)
@@ -799,7 +817,6 @@ export class TilesRenderer {
     const fullUrl = url;
 
     let scene: Object3D | null = null;
-    const adjustmentTransform = this._upRotationMatrix;
 
     switch (extension.toLowerCase()) {
       case 'b3dm':
@@ -812,7 +829,7 @@ export class TilesRenderer {
           onComplete: (e: any) => {
             // Complete callback
           },
-        }, adjustmentTransform);
+        });
         scene = parser.data;
         break;
 
@@ -824,7 +841,6 @@ export class TilesRenderer {
             onProgress: (e: any) => {},
             onComplete: (e: any) => {},
           },
-            adjustmentTransform
           )) as Object3D;
         break;
 
@@ -1063,13 +1079,13 @@ export class TilesRenderer {
         break;
 
       case 'y':
-        // Y-axis up (default), need to rotate to Z-axis up (Rings uses Z-up)
-        adjustmentTransform.makeRotationAxis(Vector3.X_AXIS, Math.PI / 2);
+        // Y-axis up (Rings default), no rotation needed
+        adjustmentTransform.identity();
         break;
 
       case 'z':
-        // Z-axis up (Rings default), no rotation needed
-        adjustmentTransform.identity();
+        // Z-axis up, need to rotate to Y-axis up
+        adjustmentTransform.makeRotationAxis(Vector3.X_AXIS, -Math.PI / 2);
         break;
 
       default:
@@ -1081,10 +1097,10 @@ export class TilesRenderer {
     this._upRotationMatrix = adjustmentTransform;
 
     // Apply root transform
-    const invertMatrix = new Matrix4();
-    invertMatrix.copyFrom(adjustmentTransform);
-    invertMatrix.invert();
-    this._applyLocalTransform(this.group.transform, invertMatrix);
+    // const invertMatrix = new Matrix4();
+    // invertMatrix.copyFrom(adjustmentTransform);
+    // invertMatrix.invert();
+    // this._applyLocalTransform(this.group.transform, invertMatrix);
   }
 
   /**

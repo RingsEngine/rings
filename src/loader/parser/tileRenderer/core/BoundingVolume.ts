@@ -12,6 +12,9 @@ export class BoundingVolume {
   private _type: BoundingVolumeType;
   private _data: BoundingVolumeData;
   private _box?: BoundingBox;
+  get box(): BoundingBox {
+    return this._box;
+  }
   private _sphere?: BoundingSphere;
   private _matrix?: Matrix4;
 
