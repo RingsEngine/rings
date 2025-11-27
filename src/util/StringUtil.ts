@@ -75,9 +75,39 @@ export class StringUtil {
   }
 
   public static normalizePath(url: string): string {
-    var tmp: string = url.replaceAll(`//`, `\/`);
-    tmp = tmp.replaceAll(`\\`, `\/`);
-    return tmp;
+    if (!url) {
+      return url;
+    }
+
+    let normalized = url.replace(/\\/g, "/");
+    const preserveLeadingDoubleSlash = normalized.startsWith("//");
+    const protectedTokens: string[] = [];
+    let tokenIndex = 0;
+
+    normalized = normalized.replace(
+      /([a-zA-Z][a-zA-Z0-9+\-.]*):\/{2}/g,
+      (match: string, scheme: string, offset: number) => {
+        if (scheme.length === 1 && offset === 0) {
+          return match;
+        }
+
+        const token = `__SCHEME_SLASH_${tokenIndex++}__`;
+        protectedTokens.push(token);
+        return `${scheme}:${token}`;
+      }
+    );
+
+    normalized = normalized.replace(/\/{2,}/g, "/");
+
+    protectedTokens.forEach((token) => {
+      normalized = normalized.replace(token, "//");
+    });
+
+    if (preserveLeadingDoubleSlash) {
+      normalized = `//${normalized.replace(/^\/+/, "")}`;
+    }
+
+    return normalized;
   }
 
   public static getStringList(str: string, char: string = ";"): string[] {
