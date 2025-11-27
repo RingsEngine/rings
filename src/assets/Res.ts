@@ -203,7 +203,12 @@ export class Res {
     }
     let texture = new BitmapTexture2D();
     texture.flipY = flipY;
-    await texture.load(url, loaderFunctions);
+    try {
+      await texture.load(url, loaderFunctions);
+    } catch (error) {
+      console.error(`Failed to load texture: ${url}`, error);
+      return null;
+    }
     this._texturePool.set(url, texture);
     return texture;
   }

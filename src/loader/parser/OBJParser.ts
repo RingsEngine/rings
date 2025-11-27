@@ -3,6 +3,7 @@ import { MeshRenderer } from "../../components/renderer/MeshRenderer";
 import { Object3D } from "../../core/entities/Object3D";
 import { GeometryBase } from "../../core/geometry/GeometryBase";
 import { VertexAttributeName } from "../../core/geometry/VertexAttributeName";
+import { Texture } from "../../gfx/graphics/webGpu/core/texture/Texture";
 import { LitMaterial } from "../../materials/LitMaterial";
 import { StringUtil } from "../../util/StringUtil";
 import { FileLoader } from "../FileLoader";
@@ -237,6 +238,7 @@ export class OBJParser extends ParserBase {
       }
     }
 
+    const promiseList: Promise<Texture>[] = [];
     for (const key in this.matLibs) {
       const mat = this.matLibs[key];
       if (mat.textures && mat.textures.length > 0) {
@@ -244,10 +246,16 @@ export class OBJParser extends ParserBase {
           const texUrl = StringUtil.normalizePath(
             this.baseUrl + mat.textures[i]
           );
-          await Engine3D.res.loadTexture(texUrl);
+          promiseList.push(Engine3D.res.loadTexture(texUrl).catch(
+            (error) => {
+              console.error(`Failed to load texture: ${texUrl}`, error);
+              return null;
+            }
+          ));
         }
       }
     }
+    await Promise.all(promiseList);
 
     sourceData = null;
     return true;
