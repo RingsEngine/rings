@@ -6,6 +6,10 @@ export class Texture implements GPUSamplerDescriptor {
   public name: string;
   public url: string;
   protected gpuTexture: GPUTexture;
+  private _isDestroyed: boolean = false;
+  public get isDestroyed(): boolean {
+    return this._isDestroyed;
+  }
   public pid: number;
   public view: GPUTextureView | GPUExternalTexture; // Assigned later
   public gpuSampler: GPUSampler;
@@ -289,6 +293,7 @@ export class Texture implements GPUSamplerDescriptor {
       this.textureDescriptor = null;
       this.gpuTexture.destroy();
       this.gpuTexture = null;
+      this._isDestroyed = true;
     }
     this._stateChangeRef.clear();
   }

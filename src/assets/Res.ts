@@ -213,6 +213,27 @@ export class Res {
     return texture;
   }
 
+  destroyTexture(url: string) {
+    const texture = this._texturePool.get(url);
+    if (texture) {
+      if (!Reference.getInstance().hasReference(texture)) {
+        if (!texture.isDestroyed) {
+          texture.destroy();
+        }
+        this._texturePool.delete(url);
+        return true;
+      }
+      return false;
+    }
+    return false;
+  }
+
+  destroyTextureAllUnUsed() {
+    for (const [url, texture] of this._texturePool.entries()) {
+      this.destroyTexture(url);
+    }
+  }
+
   private async loadTextureCount(
     urls: string[],
     count: number,

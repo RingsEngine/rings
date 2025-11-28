@@ -670,7 +670,7 @@ export class TilesRenderer {
       boundCorners.forEach(corner => {
         newBox.expandByPoint(corner);
       });
-      
+
       transform.rawData[12] = -position.x ;
       transform.rawData[13] = -position.y ;
       transform.rawData[14] = -position.z ;
@@ -937,7 +937,7 @@ export class TilesRenderer {
             sceneObj.parent.object3D.removeChild(sceneObj);
           }
           // Destroy scene object
-          sceneObj.destroy();
+          sceneObj.destroy(true);
           tileItem.cached.scene = null;
           }
           tileItem.loadingState = UNLOADED;
@@ -1325,7 +1325,7 @@ export class TilesRenderer {
   /**
    * Clean up resources
    */
-  dispose(): void {
+  dispose(force?: boolean): void {
     // Clean up plugins
     const plugins = [...this.plugins];
     plugins.forEach(plugin => this.unregisterPlugin(plugin));
@@ -1344,7 +1344,7 @@ export class TilesRenderer {
 
     // Reset statistics
     this.resetCacheStats();
-    this.group.destroy();
+    this.group.destroy(force);
   }
 
   /**
