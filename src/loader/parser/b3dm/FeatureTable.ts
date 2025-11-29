@@ -127,6 +127,13 @@ export class FeatureTable {
       return data;
     }
   }
+
+  public destroy() {
+    this.buffer = null;
+    this.header = null;
+    this.binOffset = null;
+    this.binLength = null;
+  }
 }
 
 export class BatchTable extends FeatureTable {

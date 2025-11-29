@@ -224,11 +224,24 @@ export class Entity extends CEventDispatcher {
         c.destroy(force);
       });
       this.components.clear();
-      this.entityChildren.forEach((c) => {
-        c.destroy(force);
-      });
+      this.components.clear();
+      
+      if (this.entityChildren) {
+        this.entityChildren.forEach((c) => {
+          c.destroy(force);
+        });
+        this.removeAllChild();
+        this.entityChildren = [];
+      }
 
-      this.removeAllChild();
+      if (this._bound && (this._bound as any).destroy) {
+        (this._bound as any).destroy();
+        this._bound = null;
+      }
+      if (this._boundWorld && (this._boundWorld as any).destroy) {
+        (this._boundWorld as any).destroy();
+        this._boundWorld = null;
+      }
 
       this.transform.parent = null;
       this._dispose = true;

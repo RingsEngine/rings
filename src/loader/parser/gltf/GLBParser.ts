@@ -86,6 +86,7 @@ export class GLBParser extends ParserBase {
       this._gltf,
       this._gltf.scene
     );
+    subParser.destroy();
     if (nodes) {
       this.data = nodes.rootNode;
       return nodes.rootNode;
@@ -126,6 +127,7 @@ export class GLBParser extends ParserBase {
       this._gltf,
       this._gltf.scene
     );
+    subParser.destroy();
     if (nodes) {
       this.data = nodes.rootNode;
       return nodes.rootNode;

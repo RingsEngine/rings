@@ -330,6 +330,17 @@ export class Object3D extends Entity {
       this.onTransformLocalChange,
       this
     );
+    // 清理动态添加的属性，防止内存泄漏（如 b3dm 的 batchTable 和 featureTable）
+    const batchTable = (this as any).batchTable;
+    if (batchTable && typeof batchTable.destroy === 'function') {
+      batchTable.destroy();
+      (this as any).batchTable = null;
+    }
+    const featureTable = (this as any).featureTable;
+    if (featureTable && typeof featureTable.destroy === 'function') {
+      featureTable.destroy();
+      (this as any).featureTable = null;
+    }
     super.destroy(force);
   }
 }

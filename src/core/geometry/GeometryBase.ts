@@ -368,7 +368,15 @@ export class GeometryBase {
       this._bounds = null;
     }
 
-    this._attributeMap = null;
+    if (this._attributeMap) {
+      this._attributeMap.forEach((vertexInfo) => {
+        if (vertexInfo && vertexInfo.data) {
+          vertexInfo.data = null;
+        }
+      });
+      this._attributeMap.clear();
+      this._attributeMap = null;
+    }
     this._attributes = null;
 
     if (this._indicesBuffer) {
