@@ -43,6 +43,7 @@ export class GeometryBase {
   private _vertexBuffer: GeometryVertexBuffer;
   private _onChange: boolean = true;
   private _wireframeLines: Vector3[];
+  private _isDestroyed: boolean = false;
 
   constructor() {
     this.instanceID = UUID();
@@ -350,21 +351,34 @@ export class GeometryBase {
   }
 
   destroy(force?: boolean) {
+    if (this._isDestroyed) {
+      return;
+    }
     this.instanceID = null;
     this.name = null;
     this.subGeometries = null;
     this.morphTargetDictionary = null;
+    this.skinNames = null;
+    this.bindPose = null;
+    this.blendShapeData = null;
+    this._wireframeLines = null;
 
-    this._bounds.destroy();
-    this._bounds = null;
+    if (this._bounds) {
+      this._bounds.destroy();
+      this._bounds = null;
+    }
 
     this._attributeMap = null;
     this._attributes = null;
 
-    this._indicesBuffer.destroy();
-    this._vertexBuffer.destroy();
-
-    this._indicesBuffer = null;
-    this._vertexBuffer = null;
+    if (this._indicesBuffer) {
+      this._indicesBuffer.destroy();
+      this._indicesBuffer = null;
+    }
+    if (this._vertexBuffer) {
+      this._vertexBuffer.destroy();
+      this._vertexBuffer = null;
+    }
+    this._isDestroyed = true;
   }
 }

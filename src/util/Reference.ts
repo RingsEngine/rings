@@ -33,9 +33,13 @@ export class Reference {
      * @param target reference parent
      */
     public detached(ref: any, target: any) {
+        if (!this.reference) return;
         let refMap = this.reference.get(ref);
         if (refMap) {
             refMap.delete(target);
+            if (refMap.size === 0) {
+                this.reference.delete(ref);
+            }
         }
     }
 

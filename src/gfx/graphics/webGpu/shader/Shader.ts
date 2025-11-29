@@ -231,7 +231,14 @@ export class Shader {
   }
 
   public destroy(force?: boolean) {
-    this.getDefaultColorShader().destroy(force);
+    for (const pass of this.passShader) {
+      for (const rd of pass[1]) {
+        rd.destroy(force);
+      }
+    }
+    this.passShader.clear();
+    this.passShader = null;
+    this.computes = null;
   }
 
   public clone() {

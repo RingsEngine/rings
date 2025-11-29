@@ -295,6 +295,14 @@ export class Texture implements GPUSamplerDescriptor {
       this.gpuTexture = null;
       this._isDestroyed = true;
     }
+    if (this._sourceImageData && this._sourceImageData instanceof ImageBitmap) {
+      try {
+        this._sourceImageData.close();
+      } catch (e) {
+        // ImageBitmap 可能已经被关闭，忽略错误
+      }
+      this._sourceImageData = null;
+    }
     this._stateChangeRef.clear();
   }
 

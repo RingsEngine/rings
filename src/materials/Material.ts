@@ -17,6 +17,7 @@ export class Material {
   public enable: boolean = true;
   private _defaultSubShader: RenderShaderPass;
   protected _shader: Shader;
+  private _isDestroyed: boolean = false;
 
   constructor() {
     this.instanceID = UUID();
@@ -161,10 +162,17 @@ export class Material {
   }
 
   destroy(force: boolean) {
+    if (this._isDestroyed) {
+      return;
+    }
     this.name = null;
     this.instanceID = null;
-    this._shader.destroy(force);
-    this._shader = null;
+    if (this._shader) {
+      this._shader.destroy(force);
+      this._shader = null;
+    }
+    this._defaultSubShader = null;
+    this._isDestroyed = true;
   }
 
   public setDefine(define: string, value: boolean) {

@@ -714,18 +714,29 @@ export class RenderNode extends ComponentBase {
   }
 
   public beforeDestroy(force?: boolean) {
-    Reference.getInstance().detached(this._geometry, this);
-    if (!Reference.getInstance().hasReference(this._geometry)) {
-      this._geometry.destroy(force);
+    if (this._geometry) {
+      Reference.getInstance().detached(this._geometry, this);
+      if (!Reference.getInstance().hasReference(this._geometry)) {
+        this._geometry.destroy(force);
+      }
     }
 
     for (let i = 0; i < this._materials.length; i++) {
       const mat = this._materials[i];
-      Reference.getInstance().detached(mat, this);
-      if (!Reference.getInstance().hasReference(mat)) {
-        mat.destroy(force);
+      if (mat) {
+        Reference.getInstance().detached(mat, this);
+        if (!Reference.getInstance().hasReference(mat)) {
+          mat.destroy(force);
+        }
       }
     }
+    
+    if (this._computes) {
+      this._computes.length = 0;
+    }
+    
+    this.detachSceneOctree();
+    
     super.beforeDestroy(force);
   }
 
@@ -733,6 +744,11 @@ export class RenderNode extends ComponentBase {
     super.destroy(force);
     this._geometry = undefined;
     this._materials.length = 0;
+    this._computes = null;
+    if (this._passInit) {
+      this._passInit.clear();
+      this._passInit = null;
+    }
     this._combineShaderRefection = undefined;
   }
 }

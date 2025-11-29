@@ -30,6 +30,13 @@ export class BitmapTexture2D extends Texture {
   public set source(
     value: HTMLCanvasElement | ImageBitmap | OffscreenCanvas | HTMLImageElement
   ) {
+    if (this._source && this._source instanceof ImageBitmap) {
+      try {
+        this._source.close();
+      } catch (e) {
+        // ImageBitmap 可能已经被关闭，忽略错误
+      }
+    }
     this._source = value;
 
     if (this._source instanceof HTMLImageElement) {
@@ -103,15 +110,33 @@ export class BitmapTexture2D extends Texture {
     if (imageBitmap.width < 32 || imageBitmap.height < 32) {
       let width = Math.max(imageBitmap.width, 32);
       let height = Math.max(imageBitmap.height, 32);
+      const oldImageBitmap = imageBitmap;
       imageBitmap = await createImageBitmap(imageBitmap, {
         resizeWidth: width,
         resizeHeight: height,
         imageOrientation: this.flipY ? "flipY" : "from-image",
         premultiplyAlpha: "none",
       });
+      try {
+        oldImageBitmap.close();
+      } catch (e) {
+        // ImageBitmap 可能已经被关闭，忽略错误
+      }
     }
     this.format = GPUTextureFormat.rgba8unorm;
     this.generate(imageBitmap);
     return true;
+  }
+
+  public destroy(force?: boolean) {
+    if (this._source && this._source instanceof ImageBitmap) {
+      try {
+        this._source.close();
+      } catch (e) {
+        // ImageBitmap 可能已经被关闭，忽略错误
+      }
+      this._source = null;
+    }
+    super.destroy(force);
   }
 }
