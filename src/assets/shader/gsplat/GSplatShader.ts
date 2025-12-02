@@ -21,7 +21,7 @@ export const GSplat_VS: string = /* wgsl */ `
         @location(1) vTexCoord: vec2<f32>,
     };
     
-    // Textures (like PlayCanvas)
+    // Textures
     @group(1) @binding(1) var splatColor: texture_2d<f32>;
     @group(1) @binding(2) var transformA: texture_2d<u32>;
     @group(1) @binding(3) var transformB: texture_2d<f32>;
@@ -118,7 +118,7 @@ export const GSplat_VS: string = /* wgsl */ `
         return vec4f(v1.x, -v1.y, v2.x, -v2.y);
     }
     
-    // ===== SPLAT MAIN VS (from PlayCanvas gsplat-material.js) =====
+    // ===== SPLAT MAIN VS =====
     
     @vertex
     fn VertMain(

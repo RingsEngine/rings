@@ -449,7 +449,7 @@ export class GSplatRenderer extends RenderNode {
         
       }
 
-      // Rotation matrix from quaternion - EXACTLY matching PlayCanvas Mat3.setFromQuat
+      // Rotation matrix from quaternion
       const x2 = qx + qx;
       const y2 = qy + qy;
       const z2 = qz + qz;
@@ -707,7 +707,7 @@ export class GSplatRenderer extends RenderNode {
       this._centersSent = true;
     }
 
-    // Send sorting request (PlayCanvas style - no transfer)
+    // Send sorting request
     this._sortWorker.postMessage({
       cameraPosition: { x: px, y: py, z: pz },
       cameraDirection: { x: -vx, y: -vy, z: -vz }
@@ -718,7 +718,6 @@ export class GSplatRenderer extends RenderNode {
    * Create Web Worker for sorting
    */
   private createSortWorker(): Worker {
-    // Match PlayCanvas SortWorker implementation exactly
     function SortWorker() {
       const compareBits = 16;
       const bucketCount = (2 ** compareBits) + 1;

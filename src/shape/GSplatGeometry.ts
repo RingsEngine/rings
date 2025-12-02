@@ -2,9 +2,7 @@ import { GeometryBase } from "../core/geometry/GeometryBase";
 import { VertexAttributeName } from "../core/geometry/VertexAttributeName";
 
 /**
- * GSplat Geometry (PlayCanvas Style)
- * 
- * Exactly like PlayCanvas gsplat-instance.js:
+ * GSplat Geometry
  * - batchSize splats per draw call (default 128)
  * - Each splat = 4 vertices (x, y, local_index)
  * - Each splat = 6 indices (2 triangles)
@@ -17,7 +15,7 @@ export class GSplatGeometry extends GeometryBase {
     
     this.batchSize = batchSize;
     
-    // Build vertex positions (exactly like PlayCanvas)
+    // Build vertex positions
     // Each vertex: (x, y, local_splat_index)
     const meshPositions = new Float32Array(12 * batchSize);
     for (let i = 0; i < batchSize; ++i) {
@@ -29,7 +27,7 @@ export class GSplatGeometry extends GeometryBase {
       ], i * 12);
     }
     
-    // Build index buffer (exactly like PlayCanvas)
+    // Build index buffer
     const meshIndices = new Uint32Array(6 * batchSize);
     for (let i = 0; i < batchSize; ++i) {
       const b = i * 4;
