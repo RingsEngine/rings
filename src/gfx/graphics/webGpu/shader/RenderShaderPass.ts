@@ -202,6 +202,11 @@ export class RenderShaderPass extends ShaderPassBase {
     this.fsEntryPoint = fsEntryPoint;
   }
 
+  public setUniformArray(name: string, value: Float32Array) {
+    super.setUniformArray(name, value);
+    this.materialDataUniformBuffer.onChange();
+  }
+
   public setUniform(name: string, value: UniformValue) {
     super.setUniform(name, value);
     this.materialDataUniformBuffer.onChange();
@@ -529,16 +534,21 @@ export class RenderShaderPass extends ShaderPassBase {
               buffer.bufferType == GPUBufferType.MaterialDataUniformGPUBuffer
             ) {
               let uniforms: UniformNode[] = [];
-              for (let i = 0; i < refs.dataFields.length; i++) {
-                const field = refs.dataFields[i];
-                if (!this.uniforms[field.name]) {
-                  console.error(
-                    `shader-${this.vsName}:${this.fsName} ${field.name}is empty`
-                  );
+              if (refs.dataFields) {
+                for (let i = 0; i < refs.dataFields.length; i++) {
+                  const field = refs.dataFields[i];
+                  if (!this.uniforms[field.name]) {
+                    console.error(
+                      `shader-${this.vsName}:${this.fsName} ${field.name}is empty`
+                    );
+                  } else {
+                    uniforms.push(this.uniforms[field.name]);
+                  }
                 }
-                uniforms.push(this.uniforms[field.name]);
               }
-              this.materialDataUniformBuffer.initDataUniform(uniforms);
+              if (uniforms.length > 0) {
+                this.materialDataUniformBuffer.initDataUniform(uniforms);
+              }
             }
 
             let entry: GPUBindGroupEntry = {

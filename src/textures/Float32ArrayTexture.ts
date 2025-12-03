@@ -10,7 +10,7 @@ export class Float32ArrayTexture extends Texture {
     height: number,
     data: Float32Array,
     filtering: boolean = true
-  ) {
+  ): this {
     let device = webGPUContext.device;
     const bytesPerRow = width * 4 * 4;
     this.format = GPUTextureFormat.rgba32float;
@@ -23,7 +23,7 @@ export class Float32ArrayTexture extends Texture {
       usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
     });
 
-    device.queue.writeBuffer(textureDataBuffer, 0, data);
+    device.queue.writeBuffer(textureDataBuffer, 0, data.buffer as ArrayBuffer);
     const commandEncoder = GPUContext.beginCommandEncoder();
     commandEncoder.copyBufferToTexture(
       {
@@ -49,6 +49,7 @@ export class Float32ArrayTexture extends Texture {
     this.gpuSampler = device.createSampler({});
 
     if (mipmapCount > 1) TextureMipmapGenerator.webGPUGenerateMipmap(this);
+    return this;
   }
 
   public fromBuffer(

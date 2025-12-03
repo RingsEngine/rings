@@ -4,6 +4,7 @@ import { Object3D } from "../core/entities/Object3D";
 import { MeshRenderer } from "../components/renderer/MeshRenderer";
 import { GSplatRenderer } from "../components/renderer/GSplatRenderer";
 import { Matrix4 } from "../math/Matrix4";
+import { PointCloudRenderer } from "../components/renderer/PointCloudRenderer";
 
 export class BoundUtil {
   private static readonly maxVector = new Vector3(
@@ -24,6 +25,44 @@ export class BoundUtil {
     new Vector3(),
     new Vector3(),
   ];
+
+  public static genPointCloudBounds(obj: Object3D, bound?: BoundingBox) {
+    bound ||= new BoundingBox(Vector3.ZERO, Vector3.ZERO);
+    bound.setFromMinMax(this.maxVector, this.minVector);
+
+    let pointCloudRenderers = obj.getComponents(PointCloudRenderer);
+    if (!pointCloudRenderers) {
+      console.warn('genPointCloudBounds: No PointCloudRenderer found on object');
+      return bound;
+    }
+
+    for (const pointCloudRenderer of pointCloudRenderers) {
+      const positions = pointCloudRenderer.positions;
+      const count = pointCloudRenderer.fullCount;
+
+      if (!positions || count === 0) {
+        console.warn('genPointCloudBounds: No position data available');
+        continue;
+      }
+
+      const matrix = pointCloudRenderer.object3D.transform.worldMatrix;
+      const point = new Vector3();
+      for (let i = 0; i < count; i++) {
+        const idx = i * 3;
+        point.set(
+          positions[idx + 0],
+          positions[idx + 1],
+          positions[idx + 2]
+        );
+        
+        matrix.transformPoint(point, point);
+        
+        bound.expandByPoint(point);
+      }
+    }
+
+    return bound;
+  }
 
   public static genGSplatBounds(obj: Object3D, bound?: BoundingBox) {
     bound ||= new BoundingBox(Vector3.ZERO, Vector3.ZERO);
