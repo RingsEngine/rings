@@ -17,7 +17,7 @@ export const PointCloud_VS: string = /* wgsl */ `
     };
     
     @group(1) @binding(1) var pointColor: texture_2d<f32>;
-    @group(1) @binding(2) var pointPosition: texture_2d<u32>;
+    @group(1) @binding(2) var pointPosition: texture_2d<f32>;
     @group(1) @binding(3) var pointOrder: texture_2d<u32>;
     
     fn discardPoint() -> VSOut {
@@ -54,9 +54,9 @@ export const PointCloud_VS: string = /* wgsl */ `
         
         let posData = textureLoad(pointPosition, pointUV, 0);
         let pointPos = vec3f(
-            bitcast<f32>(posData.x),
-            bitcast<f32>(posData.y),
-            bitcast<f32>(posData.z)
+            posData.x,
+            posData.y,
+            posData.z
         );
         
         let matrix_model = materialUniform.modelMatrix;

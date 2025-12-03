@@ -61,3 +61,12 @@ export type PlyMeshData = {
   triangleTexnumbers?: number[]; // Texture number for each triangle (mapped to indices, 3 indices per triangle)
 };
 
+/**
+ * Parsed PLY data for Point Cloud
+ */
+export type PlyPointCloudData = {
+  vertexCount: number;
+  position: Float32Array;
+  color?: Uint8Array; // RGBA color per point (0-255)
+};
+

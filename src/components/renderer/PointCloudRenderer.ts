@@ -7,12 +7,13 @@ import { ClusterLightingBuffer } from "../../gfx/renderJob/passRenderer/cluster/
 import { PassType } from "../../gfx/renderJob/passRenderer/state/PassType";
 import { GPUContext } from "../../gfx/renderJob/GPUContext";
 import { Uint8ArrayTexture } from "../../textures/Uint8ArrayTexture";
-import { Uint32ArrayTexture } from "../../textures/Uint32ArrayTexture";
+import { Float32ArrayTexture } from "../../textures/Float32ArrayTexture";
 import { R32UintTexture } from "../../textures/R32UintTexture";
 import { Vector2 } from "../../math/Vector2";
 import { RegisterComponent } from "../../util/SerializeDecoration";
 import { RenderContext } from "../../gfx/renderJob/passRenderer/RenderContext";
 import { Reference } from "../../util/Reference";
+import { Vector3 } from "../../math/Vector3";
 
 /**
  * Point Cloud Renderer Component
@@ -26,7 +27,7 @@ export class PointCloudRenderer extends RenderNode {
   public size: Vector2 = new Vector2();
   
   public pointColor: Uint8ArrayTexture;
-  public pointPosition: Uint32ArrayTexture;
+  public pointPosition: Float32ArrayTexture;
   public pointOrder: R32UintTexture;
   public texParams: Float32Array; // [numPoints, texWidth, validCount, pointSize]
   
@@ -48,6 +49,11 @@ export class PointCloudRenderer extends RenderNode {
   
   private _texturesInitialized: boolean = false;
   private _debugFullScreen: boolean = false;
+  
+  private _centerOffset: Vector3 = new Vector3();
+  get centerOffset(): Vector3 {
+    return this._centerOffset;
+  }
   
   constructor() {
     super();
@@ -86,6 +92,7 @@ export class PointCloudRenderer extends RenderNode {
     this._positions = positions;
     this._colors = colors;
     
+    this.centerizePositions();
     this.buildPositionTexture();
     this.buildColorTexture();
     
@@ -118,25 +125,49 @@ export class PointCloudRenderer extends RenderNode {
     return new Vector2(w, h);
   }
   
+  /**
+   * Centerize positions to improve precision for large values
+   * Subtracts the center point from all positions to keep values near zero
+   */
+  private centerizePositions() {
+    if (this.count === 0) return;
+    
+    let sumX = 0, sumY = 0, sumZ = 0;
+    for (let i = 0; i < this.count; i++) {
+      const idx = i * 3;
+      sumX += this._positions[idx + 0];
+      sumY += this._positions[idx + 1];
+      sumZ += this._positions[idx + 2];
+    }
+    
+    const centerX = sumX / this.count;
+    const centerY = sumY / this.count;
+    const centerZ = sumZ / this.count;
+    
+    this._centerOffset.set(centerX, centerY, centerZ);
+    
+    for (let i = 0; i < this.count; i++) {
+      const idx = i * 3;
+      this._positions[idx + 0] -= centerX;
+      this._positions[idx + 1] -= centerY;
+      this._positions[idx + 2] -= centerZ;
+    }
+    this.object3D.localPosition = this._centerOffset;
+  }
+  
   private buildPositionTexture() {
     const w = this.size.x | 0;
     const h = this.size.y | 0;
     const count = this.count;
     
-    const data = new Uint32Array(w * h * 4);
-    const floatBuffer = new Float32Array(1);
-    const uintBuffer = new Uint32Array(floatBuffer.buffer);
-    const setFloatBits = (value: number) => {
-      floatBuffer[0] = value;
-      return uintBuffer[0];
-    };
+    const data = new Float32Array(w * h * 4);
     
     for (let i = 0; i < count; i++) {
       const idx = i * 4;
       const posIdx = i * 3;
-      data[idx + 0] = setFloatBits(this._positions[posIdx + 0]);
-      data[idx + 1] = setFloatBits(this._positions[posIdx + 1]);
-      data[idx + 2] = setFloatBits(this._positions[posIdx + 2]);
+      data[idx + 0] = this._positions[posIdx + 0];
+      data[idx + 1] = this._positions[posIdx + 1];
+      data[idx + 2] = this._positions[posIdx + 2];
       data[idx + 3] = 0;
     }
     
@@ -151,17 +182,13 @@ export class PointCloudRenderer extends RenderNode {
       }
     }
     
-    this.pointPosition = new Uint32ArrayTexture().create(w, h, data);
+    this.pointPosition = new Float32ArrayTexture().create(w, h, data);
     this.pointPosition.name = "pointPosition";
     
     this.pointPosition.minFilter = "nearest";
     this.pointPosition.magFilter = "nearest";
     this.pointPosition.addressModeU = "clamp-to-edge";
     this.pointPosition.addressModeV = "clamp-to-edge";
-    
-    if (!this.pointPosition.textureBindingLayout.sampleType) {
-      this.pointPosition.textureBindingLayout.sampleType = 'float';
-    }
   }
   
   private buildColorTexture() {

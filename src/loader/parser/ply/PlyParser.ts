@@ -1,5 +1,6 @@
 import { GSplatRenderer } from "../../../components/renderer/GSplatRenderer";
 import { MeshRenderer } from "../../../components/renderer/MeshRenderer";
+import { PointCloudRenderer } from "../../../components/renderer/PointCloudRenderer";
 import { Object3D } from "../../../core/entities/Object3D";
 import { GeometryBase } from "../../../core/geometry/GeometryBase";
 import { VertexAttributeName } from "../../../core/geometry/VertexAttributeName";
@@ -9,7 +10,7 @@ import { StringUtil } from "../../../util/StringUtil";
 import { computeAABBFromPositions, GaussianSplatAsset } from "../3dgs/GaussianSplatAsset";
 import { ParserBase } from "../ParserBase";
 import { ParserFormat } from "../ParserFormat";
-import { parsePlyGaussianSplat, parsePlyHeader, parsePlyMesh } from "./PlyLoader";
+import { parsePlyGaussianSplat, parsePlyHeader, parsePlyMesh, parsePlyPointCloud } from "./PlyLoader";
 import { PlyMode } from "./PlyTypes";
 
 export class PlyParser extends ParserBase {
@@ -37,20 +38,37 @@ export class PlyParser extends ParserBase {
                 break;
             }
             case PlyMode.PointCloud: {
+                const plyData = parsePlyPointCloud(buffer);
+                
+                const pointCloudObj = new Object3D();
+                pointCloudObj.name = 'PLYPointCloud';
+                const pointCloudObjRoot= new Object3D(); // use for center offset
+                pointCloudObjRoot.name = 'PLYPointCloudRoot';
+                pointCloudObj.addChild(pointCloudObjRoot);
+                const renderer = pointCloudObjRoot.addComponent(PointCloudRenderer);
+                
+                if (plyData.color) {
+                    renderer.initFromData(plyData.position, plyData.color, plyData.vertexCount);
+                } else {
+                    const defaultColors = new Uint8Array(plyData.vertexCount * 4);
+                    defaultColors.fill(255);
+                    renderer.initFromData(plyData.position, defaultColors, plyData.vertexCount);
+                }
+                renderer.setPointShape('circle');
+                renderer.setPointSize(4);
+                
+                this.data = pointCloudObj;
                 break;
             }
             case PlyMode.Mesh: {
                 const plyData = parsePlyMesh(buffer);
                 
-                // Create root object
                 const rootObj = new Object3D();
                 rootObj.name = 'PLYMesh';
                 
-                // Group triangles by texture number
-                const textureGroups = new Map<number, number[]>(); // texnumber -> triangle indices
+                const textureGroups = new Map<number, number[]>();
                 
                 if (plyData.triangleTexnumbers && plyData.triangleTexnumbers.length > 0) {
-                    // Group triangles by texture number
                     for (let i = 0; i < plyData.triangleTexnumbers.length; i++) {
                         const texnum = plyData.triangleTexnumbers[i];
                         if (!textureGroups.has(texnum)) {
@@ -59,7 +77,6 @@ export class PlyParser extends ParserBase {
                         textureGroups.get(texnum)!.push(i);
                     }
                 } else {
-                    // No texture numbers, use single group with all triangles
                     const triangleCount = plyData.indices.length / 3;
                     const allTriangles: number[] = [];
                     for (let i = 0; i < triangleCount; i++) {
@@ -68,7 +85,6 @@ export class PlyParser extends ParserBase {
                     textureGroups.set(0, allTriangles);
                 }
                 
-                // Create materials for each texture
                 const materials = new Map<number, LitMaterial>();
                 if (plyData.textureFiles && plyData.textureFiles.length > 0) {
                     const promiseList = [];
@@ -77,11 +93,6 @@ export class PlyParser extends ParserBase {
                         const texturePath = StringUtil.normalizePath(
                             this.baseUrl + plyData.textureFiles[texnum]
                         );
-                        // const texture = Engine3D.res.getTexture(texturePath);
-                        // if (texture) {
-                        //     material.baseMap = texture;
-                        // }
-                        // materials.set(texnum, material);
                         promiseList.push(Engine3D.res.loadTexture(texturePath).then((texture) => {
                             material.baseMap = texture;
                             materials.set(texnum, material);
@@ -90,14 +101,11 @@ export class PlyParser extends ParserBase {
                     await Promise.all(promiseList);
                 }
                 
-                // Create default material if no textures
                 if (materials.size === 0) {
                     materials.set(0, new LitMaterial());
                 }
                 
-                // Create geometry and MeshRenderer for each texture group
                 for (const [texnum, triangleIndices] of textureGroups) {
-                    // Build indices for this texture group
                     const groupIndices: number[] = [];
                     for (const triIdx of triangleIndices) {
                         const baseIdx = triIdx * 3;
@@ -108,7 +116,6 @@ export class PlyParser extends ParserBase {
                         );
                     }
                     
-                    // Create geometry for this group
                     const geometry = new GeometryBase();
                     geometry.setAttribute(
                         VertexAttributeName.position,
@@ -146,14 +153,11 @@ export class PlyParser extends ParserBase {
                         topology: 0,
                     });
                     
-                    // Get or create material for this texture
                     let material = materials.get(texnum);
                     if (!material) {
-                        // Fallback: use first available material or create default
                         material = materials.values().next().value || new LitMaterial();
                     }
                     
-                    // Create mesh object for this group
                     const meshObj = new Object3D();
                     meshObj.name = `PLYMesh_Texture_${texnum}`;
                     const renderer = meshObj.addComponent(MeshRenderer);

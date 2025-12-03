@@ -1,4 +1,4 @@
-import { PlyHeader, PlyProperty, PlyGaussianSplatData, PlyMeshData, splatProperties, splatColorProperties, PlyMode } from './PlyTypes';
+import { PlyHeader, PlyProperty, PlyGaussianSplatData, PlyMeshData, PlyPointCloudData, splatProperties, splatColorProperties, PlyMode } from './PlyTypes';
 import { byteSizeOfType, readByType, inferSHOrder } from './PlyUtils';
 
 /**
@@ -154,7 +154,6 @@ function parsePlyGaussianSplatBinary(buffer: ArrayBuffer, header: PlyHeader): Pl
     stride += byteSizeOfType(p.type);
   }
 
-  // Iterate vertices
   let base = 0;
   for (let v = 0; v < vertexCount; v++) {
     const vOffset = base;
@@ -170,7 +169,7 @@ function parsePlyGaussianSplatBinary(buffer: ArrayBuffer, header: PlyHeader): Pl
     position[v * 3 + 1] = readByType(payload, vOffset + propOffsets[iy], properties[iy].type);
     position[v * 3 + 2] = readByType(payload, vOffset + propOffsets[iz], properties[iz].type);
 
-    // Scale
+    // Scale (optional)
     if (scale) {
       const s0 = propIndex('scale_0');
       const s1 = propIndex('scale_1');
@@ -197,7 +196,7 @@ function parsePlyGaussianSplatBinary(buffer: ArrayBuffer, header: PlyHeader): Pl
       rotation[v * 4 + 3] = w;
     }
 
-    // Opacity
+    // Opacity (optional)
     if (opacity) {
       const oi = propIndex('opacity');
       opacity[v] = readByType(payload, vOffset + propOffsets[oi], properties[oi].type);
@@ -1143,5 +1142,192 @@ function parsePlyMeshASCII(buffer: ArrayBuffer, header: PlyHeader): PlyMeshData 
     indices: finalIndices,
     textureFiles: textureFiles.length > 0 ? textureFiles : undefined,
     triangleTexnumbers: triangleTexnumbers.length > 0 ? triangleTexnumbers : undefined,
+  };
+}
+
+/**
+ * Parse PLY data for Point Cloud (supports both binary and ASCII)
+ */
+export function parsePlyPointCloud(buffer: ArrayBuffer): PlyPointCloudData {
+  const header = parsePlyHeader(buffer);
+  const { format } = header;
+  
+  if (format === 'ascii') {
+    return parsePlyPointCloudASCII(buffer, header);
+  } else {
+    return parsePlyPointCloudBinary(buffer, header);
+  }
+}
+
+/**
+ * Parse PLY binary data for Point Cloud
+ */
+function parsePlyPointCloudBinary(buffer: ArrayBuffer, header: PlyHeader): PlyPointCloudData {
+  const { vertexCount, properties, headerByteLength } = header;
+  
+  const payload = new DataView(buffer, headerByteLength);
+
+  const has = (n: string) => properties.find((p) => p.name === n) != null;
+  const propIndex = (n: string) => properties.findIndex((p) => p.name === n);
+
+  const position = new Float32Array(vertexCount * 3);
+  const hasColor = (has('red') || has('r')) && (has('green') || has('g')) && (has('blue') || has('b'));
+  const hasAlpha = has('alpha') || has('a');
+  const color = hasColor ? new Uint8Array(vertexCount * 4) : undefined;
+
+  const propOffsets: number[] = [];
+  let stride = 0;
+  for (const p of properties) {
+    propOffsets.push(stride);
+    stride += byteSizeOfType(p.type);
+  }
+
+  let base = 0;
+  for (let v = 0; v < vertexCount; v++) {
+    const vOffset = base;
+    
+    const ix = propIndex('x');
+    const iy = propIndex('y');
+    const iz = propIndex('z');
+    if (ix < 0 || iy < 0 || iz < 0) {
+      throw new Error('PLY: Missing x/y/z for vertex');
+    }
+    position[v * 3 + 0] = readByType(payload, vOffset + propOffsets[ix], properties[ix].type);
+    position[v * 3 + 1] = readByType(payload, vOffset + propOffsets[iy], properties[iy].type);
+    position[v * 3 + 2] = readByType(payload, vOffset + propOffsets[iz], properties[iz].type);
+
+    if (color) {
+      const rIdx = propIndex('red') >= 0 ? propIndex('red') : propIndex('r');
+      const gIdx = propIndex('green') >= 0 ? propIndex('green') : propIndex('g');
+      const bIdx = propIndex('blue') >= 0 ? propIndex('blue') : propIndex('b');
+      const aIdx = hasAlpha ? (propIndex('alpha') >= 0 ? propIndex('alpha') : propIndex('a')) : -1;
+      
+      if (rIdx >= 0 && gIdx >= 0 && bIdx >= 0) {
+        let r = readByType(payload, vOffset + propOffsets[rIdx], properties[rIdx].type);
+        let g = readByType(payload, vOffset + propOffsets[gIdx], properties[gIdx].type);
+        let b = readByType(payload, vOffset + propOffsets[bIdx], properties[bIdx].type);
+        let a = 255;
+        
+        if (properties[rIdx].type === 'float' || properties[rIdx].type === 'float32' || properties[rIdx].type === 'double' || properties[rIdx].type === 'float64') {
+          r = Math.round(r * 255);
+          g = Math.round(g * 255);
+          b = Math.round(b * 255);
+        }
+        
+        if (aIdx >= 0) {
+          a = readByType(payload, vOffset + propOffsets[aIdx], properties[aIdx].type);
+          if (properties[aIdx].type === 'float' || properties[aIdx].type === 'float32' || properties[aIdx].type === 'double' || properties[aIdx].type === 'float64') {
+            a = Math.round(a * 255);
+          }
+        }
+        
+        color[v * 4 + 0] = Math.max(0, Math.min(255, r));
+        color[v * 4 + 1] = Math.max(0, Math.min(255, g));
+        color[v * 4 + 2] = Math.max(0, Math.min(255, b));
+        color[v * 4 + 3] = Math.max(0, Math.min(255, a));
+      }
+    }
+
+    base += stride;
+  }
+
+  return {
+    vertexCount,
+    position,
+    color,
+  };
+}
+
+/**
+ * Parse PLY ASCII data for Point Cloud
+ */
+function parsePlyPointCloudASCII(buffer: ArrayBuffer, header: PlyHeader): PlyPointCloudData {
+  const { vertexCount, properties } = header;
+  
+  const text = new TextDecoder('utf-8').decode(buffer);
+  
+  const headerEnd = text.indexOf('end_header');
+  if (headerEnd < 0) {
+    throw new Error('PLY: Invalid PLY header');
+  }
+  
+  let bodyStart = headerEnd + 'end_header'.length;
+  while (bodyStart < text.length && (text[bodyStart] === ' ' || text[bodyStart] === '\n' || text[bodyStart] === '\r')) {
+    bodyStart++;
+  }
+  
+  const bodyText = text.substring(bodyStart);
+  const tokens = bodyText.split(/\s+/).filter(token => token.length > 0);
+  
+  let tokenIndex = 0;
+  
+  const has = (n: string) => properties.find((p) => p.name === n) != null;
+  
+  const parseASCIINumber = (type: string): number => {
+    if (tokenIndex >= tokens.length) {
+      throw new Error('PLY: Unexpected end of file');
+    }
+    const value = tokens[tokenIndex++];
+    
+    switch (type) {
+      case 'char': case 'uchar': case 'short': case 'ushort': case 'int': case 'uint':
+      case 'int8': case 'uint8': case 'int16': case 'uint16': case 'int32': case 'uint32':
+        return parseInt(value);
+      case 'float': case 'double': case 'float32': case 'float64':
+        return parseFloat(value);
+      default:
+        return parseFloat(value);
+    }
+  };
+  
+  const position = new Float32Array(vertexCount * 3);
+  const hasColor = (has('red') || has('r')) && (has('green') || has('g')) && (has('blue') || has('b'));
+  const hasAlpha = has('alpha') || has('a');
+  const color = hasColor ? new Uint8Array(vertexCount * 4) : undefined;
+  
+  const propIndex = (n: string) => properties.findIndex((p) => p.name === n);
+  const xIdx = propIndex('x');
+  const yIdx = propIndex('y');
+  const zIdx = propIndex('z');
+  const rIdx = hasColor ? (propIndex('red') >= 0 ? propIndex('red') : propIndex('r')) : -1;
+  const gIdx = hasColor ? (propIndex('green') >= 0 ? propIndex('green') : propIndex('g')) : -1;
+  const bIdx = hasColor ? (propIndex('blue') >= 0 ? propIndex('blue') : propIndex('b')) : -1;
+  const aIdx = hasAlpha ? (propIndex('alpha') >= 0 ? propIndex('alpha') : propIndex('a')) : -1;
+  
+  for (let v = 0; v < vertexCount; v++) {
+    for (let pIdx = 0; pIdx < properties.length; pIdx++) {
+      const prop = properties[pIdx];
+      const value = parseASCIINumber(prop.type);
+      
+      if (pIdx === xIdx) {
+        position[v * 3 + 0] = value;
+      } else if (pIdx === yIdx) {
+        position[v * 3 + 1] = value;
+      } else if (pIdx === zIdx) {
+        position[v * 3 + 2] = value;
+      } else if (pIdx === rIdx && color) {
+        const r = prop.type === 'uchar' || prop.type === 'uint8' ? value : Math.round(value * 255);
+        color[v * 4 + 0] = Math.max(0, Math.min(255, r));
+      } else if (pIdx === gIdx && color) {
+        const g = prop.type === 'uchar' || prop.type === 'uint8' ? value : Math.round(value * 255);
+        color[v * 4 + 1] = Math.max(0, Math.min(255, g));
+      } else if (pIdx === bIdx && color) {
+        const b = prop.type === 'uchar' || prop.type === 'uint8' ? value : Math.round(value * 255);
+        color[v * 4 + 2] = Math.max(0, Math.min(255, b));
+      } else if (pIdx === aIdx && color) {
+        const a = prop.type === 'uchar' || prop.type === 'uint8' ? value : Math.round(value * 255);
+        color[v * 4 + 3] = Math.max(0, Math.min(255, a));
+      }
+    }
+    
+    if (color && aIdx < 0) {
+      color[v * 4 + 3] = 255;
+    }
+  }
+  
+  return {
+    vertexCount,
+    position,
+    color,
   };
 }

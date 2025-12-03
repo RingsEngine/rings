@@ -1,5 +1,5 @@
 import { Material } from "./Material";
-import { Uint32ArrayTexture } from "../textures/Uint32ArrayTexture";
+import { Float32ArrayTexture } from "../textures/Float32ArrayTexture";
 import { Uint8ArrayTexture } from "../textures/Uint8ArrayTexture";
 import { R32UintTexture } from "../textures/R32UintTexture";
 import { Matrix4 } from "../math/Matrix4";
@@ -28,7 +28,7 @@ export class PointCloudMaterial extends Material {
    * @param pointOrder Optional sorting texture (R32U format)
    */
   public setPointTextures(
-    pointPosition: Uint32ArrayTexture,
+    pointPosition: Float32ArrayTexture,
     pointColor: Uint8ArrayTexture,
     texParams: Float32Array,
     pointOrder?: R32UintTexture
