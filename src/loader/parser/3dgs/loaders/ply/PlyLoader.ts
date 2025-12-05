@@ -208,3 +208,175 @@ export function parsePlyGaussianSplat(buffer: ArrayBuffer): PlyGaussianSplatData
   };
 }
 
+/**
+ * Parse partial PLY binary data for Gaussian Splatting
+ * Uses actual buffer content to determine vertexCount and headerByteLength
+ */
+export function parsePartPlyGaussianSplat(buffer: ArrayBuffer): PlyGaussianSplatData {
+  // First parse the header to get properties and headerByteLength
+  const header = parsePlyHeader(buffer);
+  const { properties, headerByteLength } = header;
+  
+  // Calculate actual vertexCount based on available buffer data
+  // Each vertex has a stride determined by the sum of property sizes
+  let stride = 0;
+  for (const p of properties) {
+    stride += byteSizeOfType(p.type);
+  }
+  
+  // Calculate how many complete vertices we can parse from the available data
+  const availableDataBytes = buffer.byteLength - headerByteLength;
+  const actualVertexCount = stride > 0 ? Math.floor(availableDataBytes / stride) : 0;
+
+  
+  // Ensure we don't try to parse more vertices than the file claims to have
+  const vertexCount = Math.min(actualVertexCount, header.vertexCount);
+  
+  const payload = new DataView(buffer, headerByteLength);
+
+  const has = (n: string) => properties.find((p) => p.name === n) != null;
+  const propIndex = (n: string) => properties.findIndex((p) => p.name === n);
+
+  // Prepare output arrays with actual vertex count
+  const position = new Float32Array(vertexCount * 3);
+  const scale = has('scale_0') ? new Float32Array(vertexCount * 3) : undefined;
+  const rotation = has('rot_0') ? new Float32Array(vertexCount * 4) : undefined;
+  const opacity = has('opacity') ? new Float32Array(vertexCount) : undefined;
+
+  // SH coefficients layout
+  const dcIdx = [propIndex('f_dc_0'), propIndex('f_dc_1'), propIndex('f_dc_2')];
+  const restIndices: number[] = [];
+  for (let i = 0; i < properties.length; i++) {
+    if (properties[i].name.startsWith('f_rest_')) restIndices.push(i);
+  }
+
+  const hasSH = dcIdx[0] >= 0 && dcIdx[1] >= 0 && dcIdx[2] >= 0;
+  let shCoeffs: Float32Array | undefined = undefined;
+  let shOrder = 0;
+  if (hasSH) {
+    const coeffsPerColor = 1 /*dc*/ + restIndices.length / 3;
+    shOrder = inferSHOrder(coeffsPerColor);
+    shCoeffs = new Float32Array(vertexCount * coeffsPerColor * 3);
+  }
+
+  // Build per-vertex reader map
+  const propOffsets: number[] = [];
+  let currentStride = 0;
+  for (const p of properties) {
+    propOffsets.push(currentStride);
+    currentStride += byteSizeOfType(p.type);
+  }
+
+  // Iterate vertices up to the actual available count
+  let base = 0;
+  for (let v = 0; v < vertexCount; v++) {
+    const vOffset = base;
+    
+    // Position (required)
+    const ix = propIndex('x');
+    const iy = propIndex('y');
+    const iz = propIndex('z');
+    if (ix < 0 || iy < 0 || iz < 0) {
+      throw new Error('PLY: Missing x/y/z for vertex');
+    }
+    position[v * 3 + 0] = readByType(payload, vOffset + propOffsets[ix], properties[ix].type);
+    position[v * 3 + 1] = readByType(payload, vOffset + propOffsets[iy], properties[iy].type);
+    position[v * 3 + 2] = readByType(payload, vOffset + propOffsets[iz], properties[iz].type);
+
+    // Scale
+    if (scale) {
+      const s0 = propIndex('scale_0');
+      const s1 = propIndex('scale_1');
+      const s2 = propIndex('scale_2');
+      scale[v * 3 + 0] = readByType(payload, vOffset + propOffsets[s0], properties[s0].type);
+      scale[v * 3 + 1] = readByType(payload, vOffset + propOffsets[s1], properties[s1].type);
+      scale[v * 3 + 2] = readByType(payload, vOffset + propOffsets[s2], properties[s2].type);
+    }
+
+    // Rotation (PLY format uses [w, x, y, z] order, we store as [x, y, z, w])
+    if (rotation) {
+      const r0 = propIndex('rot_0');
+      const r1 = propIndex('rot_1');
+      const r2 = propIndex('rot_2');
+      const r3 = propIndex('rot_3');
+      const w = readByType(payload, vOffset + propOffsets[r0], properties[r0].type);
+      const x = readByType(payload, vOffset + propOffsets[r1], properties[r1].type);
+      const y = readByType(payload, vOffset + propOffsets[r2], properties[r2].type);
+      const z = readByType(payload, vOffset + propOffsets[r3], properties[r3].type);
+      // Store in [x, y, z, w] order
+      rotation[v * 4 + 0] = x;
+      rotation[v * 4 + 1] = y;
+      rotation[v * 4 + 2] = z;
+      rotation[v * 4 + 3] = w;
+    }
+
+    // Opacity
+    if (opacity) {
+      const oi = propIndex('opacity');
+      opacity[v] = readByType(payload, vOffset + propOffsets[oi], properties[oi].type);
+    }
+
+    // Spherical Harmonics
+    if (hasSH && shCoeffs) {
+      const coeffsPerColor = 1 + restIndices.length / 3;
+      const baseIndex = v * coeffsPerColor * 3;
+      
+      // DC components
+      shCoeffs[baseIndex + 0] = readByType(
+        payload,
+        vOffset + propOffsets[dcIdx[0]],
+        properties[dcIdx[0]].type
+      );
+      shCoeffs[baseIndex + coeffsPerColor + 0] = readByType(
+        payload,
+        vOffset + propOffsets[dcIdx[1]],
+        properties[dcIdx[1]].type
+      );
+      shCoeffs[baseIndex + 2 * coeffsPerColor + 0] = readByType(
+        payload,
+        vOffset + propOffsets[dcIdx[2]],
+        properties[dcIdx[2]].type
+      );
+      
+      // Rest coefficients packed R/G/B sequentially
+      let rPtr = 1;
+      let gPtr = 1;
+      let bPtr = 1;
+      for (let i = 0; i < restIndices.length; i += 3) {
+        const ri = restIndices[i + 0];
+        const gi = restIndices[i + 1];
+        const bi = restIndices[i + 2];
+        shCoeffs[baseIndex + rPtr] = readByType(
+          payload,
+          vOffset + propOffsets[ri],
+          properties[ri].type
+        );
+        shCoeffs[baseIndex + coeffsPerColor + gPtr] = readByType(
+          payload,
+          vOffset + propOffsets[gi],
+          properties[gi].type
+        );
+        shCoeffs[baseIndex + 2 * coeffsPerColor + bPtr] = readByType(
+          payload,
+          vOffset + propOffsets[bi],
+          properties[bi].type
+        );
+        rPtr++;
+        gPtr++;
+        bPtr++;
+      }
+    }
+
+    base += stride;
+  }
+
+  return {
+    vertexCount,
+    position,
+    scale,
+    rotation,
+    opacity,
+    sh: hasSH && shCoeffs ? { order: shOrder, coeffs: shCoeffs } : undefined,
+  };
+}
+

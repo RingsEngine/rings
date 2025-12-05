@@ -148,11 +148,13 @@ export class LoaderBase {
 
       if (contentLength > 0) {
         if (loaderFunctions && loaderFunctions.onProgress) {
+          // 传递当前数据块给onProgress回调
           loaderFunctions.onProgress.call(
             this,
             receivedLength,
             contentLength,
-            url
+            url,
+            value // 传递当前下载的数据块
           );
         }
       } else {
@@ -162,11 +164,13 @@ export class LoaderBase {
     if (receivedArr.length > 0) {
       for (let i = 0; i < chunks.length; i++) {
         if (loaderFunctions && loaderFunctions.onProgress) {
+          // 传递当前数据块给onProgress回调
           loaderFunctions.onProgress.call(
             this,
             receivedArr[i],
             receivedLength,
-            url
+            url,
+            chunks[i] // 传递当前处理的数据块
           );
         }
 

@@ -16,7 +16,8 @@ import {
   FileLoader,
   GaussianSplatParser,
   GSplatRenderer,
-  BoundUtil
+  WorkerManager,
+  loadGaussianSplatProgressive
 } from '../../index';
 
 export class GSplatBasicExample {
@@ -62,7 +63,7 @@ export class GSplatBasicExample {
     const view = new View3D();
     view.scene = this.scene;
     view.camera = this.camera;
-    
+
     // 开始渲染
     Engine3D.startRenderView(view);
 
@@ -81,40 +82,21 @@ export class GSplatBasicExample {
       const parser = await loader.load(plyPath, GaussianSplatParser);
       const asset = parser.data;
 
-      console.log('✅ Loaded asset:', {
-        count: asset.count,
-        bbox: asset.bbox,
-        hasScale: !!asset.scale,
-        hasRotation: !!asset.rotation,
-        hasOpacity: !!asset.opacity,
-        shOrder: asset.sh?.order
-      });
-
       // 创建 Object3D
       this.gsplatObj = new Object3D();
       this.gsplatObj.name = 'GaussianSplat';
 
       // 添加 GSplatRenderer 组件（新的 ECS 风格 API）
       const renderer = this.gsplatObj.addComponent(GSplatRenderer);
-      
+
+      console.log(asset, 'asset');
       // 从 asset 初始化
       renderer.initAsset(asset);
-      this.gsplatObj.transform.rotationX = 180;
 
       // 添加到场景
       this.scene.addChild(this.gsplatObj);
 
-      console.log('✅ GSplatRenderer initialized:', {
-        count: renderer.count,
-        textureSize: renderer.size
-      });
-
-      // Save renderer reference and create control panel
       this.renderer = renderer;
-      this.createControlPanel();
-
-      const gsplatBounds = BoundUtil.genGSplatBounds(this.gsplatObj);
-      this.cameraController.focusBound(gsplatBounds);
 
       return renderer;
     } catch (error) {
@@ -124,22 +106,13 @@ export class GSplatBasicExample {
   }
 
   /**
-   * 示例：使用映射渲染部分 splats
+   * 渐进式加载 Gaussian Splat
+   * @param {*} plyPath PLY 文件路径
+   * @param {*} chunkSize 每次加载的 chunk 大小
+   * @param {*} that 上下文对象，用于在回调中访问场景和渲染器，包括 that.scene, that.renderer, that.gsplatObj
    */
-  async loadWithMapping(plyPath, splatCount) {
-    const renderer = await this.loadGaussianSplat(plyPath);
-
-    // 创建映射（只渲染前 N 个 splats）
-    const count = Math.min(splatCount, renderer.count);
-    const mapping = new Uint32Array(count);
-    for (let i = 0; i < count; i++) {
-      mapping[i] = i;
-    }
-
-    renderer.setMapping(mapping);
-    console.log('✅ Applied mapping, rendering', count, 'splats');
-
-    return renderer;
+  loadGaussianSplatProgressive(plyPath, chunkSize = 10000000, that ) {
+    loadGaussianSplatProgressive(plyPath, chunkSize, that);
   }
 
   /**
@@ -569,7 +542,7 @@ export class GSplatBasicExample {
         </div>
       </div>
     `;
-    
+
     // Add toggle button
     const toggleBtn = document.createElement('button');
     toggleBtn.className = 'toggle-btn';
@@ -578,10 +551,10 @@ export class GSplatBasicExample {
       const isHidden = panel.classList.toggle('panel-hidden');
       toggleBtn.textContent = isHidden ? 'Show Panel' : 'Hide Panel';
     };
-    
+
     document.body.appendChild(toggleBtn);
     document.body.appendChild(panel);
-    
+
     // Get transform control elements
     const posX = document.getElementById('pos-x');
     const posY = document.getElementById('pos-y');
@@ -592,7 +565,7 @@ export class GSplatBasicExample {
     const scaleX = document.getElementById('scale-x');
     const scaleY = document.getElementById('scale-y');
     const scaleZ = document.getElementById('scale-z');
-    
+
     // Get rendering control elements
     const visBoostSlider = document.getElementById('visboost-slider');
     const visBoostValue = document.getElementById('visboost-value');
@@ -606,7 +579,7 @@ export class GSplatBasicExample {
     const maxPixelValue = document.getElementById('maxpixel-value');
     const cullDistSlider = document.getElementById('culldist-slider');
     const cullDistValue = document.getElementById('culldist-value');
-    
+
     // Get performance monitor elements
     const perfFPS = document.getElementById('perf-fps');
     const perfFrameTime = document.getElementById('perf-frametime');
@@ -615,7 +588,7 @@ export class GSplatBasicExample {
     const perfSortFreq = document.getElementById('perf-sortfreq');
     const perfMaxPix = document.getElementById('perf-maxpix');
     const perfCullDist = document.getElementById('perf-culldist');
-    
+
     // Transform controls - Position (support real-time input)
     const updatePosition = () => {
       const x = parseFloat(posX.value) || 0;
@@ -625,11 +598,11 @@ export class GSplatBasicExample {
       this.gsplatObj.transform.y = y;
       this.gsplatObj.transform.z = z;
     };
-    
+
     posX.addEventListener('input', updatePosition);
     posY.addEventListener('input', updatePosition);
     posZ.addEventListener('input', updatePosition);
-    
+
     // Transform controls - Rotation (support real-time input)
     const updateRotation = () => {
       const x = parseFloat(rotX.value) || 0;
@@ -639,11 +612,11 @@ export class GSplatBasicExample {
       this.gsplatObj.transform.rotationY = y;
       this.gsplatObj.transform.rotationZ = z;
     };
-    
+
     rotX.addEventListener('input', updateRotation);
     rotY.addEventListener('input', updateRotation);
     rotZ.addEventListener('input', updateRotation);
-    
+
     // Transform controls - Scale (support real-time input)
     const updateScale = () => {
       const x = parseFloat(scaleX.value) || 1;
@@ -653,11 +626,11 @@ export class GSplatBasicExample {
       this.gsplatObj.transform.scaleY = y;
       this.gsplatObj.transform.scaleZ = z;
     };
-    
+
     scaleX.addEventListener('input', updateScale);
     scaleY.addEventListener('input', updateScale);
     scaleZ.addEventListener('input', updateScale);
-    
+
     // Add mouse wheel support for all transform inputs
     const addWheelSupport = (input, step = 0.1) => {
       input.addEventListener('wheel', (e) => {
@@ -668,13 +641,13 @@ export class GSplatBasicExample {
         input.dispatchEvent(new Event('input'));
       });
     };
-    
+
     // Add mouse drag support for all transform inputs (like Blender/Unity)
     const addDragSupport = (input, step = 0.1) => {
       let isDragging = false;
       let startY = 0;
       let startValue = 0;
-      
+
       input.addEventListener('mousedown', (e) => {
         // Only drag when not focused (focused = typing mode)
         if (document.activeElement !== input) {
@@ -686,7 +659,7 @@ export class GSplatBasicExample {
           document.body.style.cursor = 'ns-resize';
         }
       });
-      
+
       document.addEventListener('mousemove', (e) => {
         if (isDragging) {
           e.preventDefault();
@@ -697,7 +670,7 @@ export class GSplatBasicExample {
           input.dispatchEvent(new Event('input'));
         }
       });
-      
+
       document.addEventListener('mouseup', () => {
         if (isDragging) {
           isDragging = false;
@@ -706,7 +679,7 @@ export class GSplatBasicExample {
         }
       });
     };
-    
+
     // Add wheel support to all transform inputs
     [posX, posY, posZ].forEach(input => {
       addWheelSupport(input, 0.1);
@@ -720,7 +693,7 @@ export class GSplatBasicExample {
       addWheelSupport(input, 0.05);
       addDragSupport(input, 0.05);
     });
-    
+
     // Update visBoost
     visBoostSlider.addEventListener('input', (e) => {
       const value = parseFloat(e.target.value);
@@ -730,25 +703,25 @@ export class GSplatBasicExample {
       }
       console.log('💡 visBoost:', value);
     });
-    
+
     // Update sortThrottle
     throttleSlider.addEventListener('input', (e) => {
       const value = parseInt(e.target.value);
       this.renderer.setSortThrottle(value);
-      
+
       let label = value.toString();
       if (value === 0) label = '0 (∞fps)';
       else if (value === 16) label = '16 (60fps)';
       else if (value === 33) label = '33 (30fps)';
       else if (value === 100) label = '100 (10fps)';
       else label = `${value}ms`;
-      
+
       if (throttleValue) {
         throttleValue.textContent = label;
       }
       console.log('💡 sortThrottle:', value);
     });
-    
+
     // Update adaptive sorting
     adaptiveSlider.addEventListener('input', (e) => {
       const value = parseInt(e.target.value);
@@ -759,7 +732,7 @@ export class GSplatBasicExample {
       }
       console.log('💡 Adaptive sorting:', enabled);
     });
-    
+
     // Update LOD system
     lodSlider.addEventListener('input', (e) => {
       const value = parseInt(e.target.value);
@@ -770,7 +743,7 @@ export class GSplatBasicExample {
       }
       console.log('💡 LOD system:', enabled);
     });
-    
+
     // Update max pixel coverage culling
     maxPixelSlider.addEventListener('input', (e) => {
       const value = parseInt(e.target.value);
@@ -781,7 +754,7 @@ export class GSplatBasicExample {
       }
       console.log('💡 Max pixel coverage:', value === 0 ? 'disabled' : value);
     });
-    
+
     // Update cull distance threshold
     cullDistSlider.addEventListener('input', (e) => {
       const value = parseInt(e.target.value);
@@ -796,24 +769,24 @@ export class GSplatBasicExample {
       }
       console.log('💡 Cull distance:', value === 0 ? 'always' : value + 'm');
     });
-    
+
     // Performance monitoring (update every frame)
     let lastTime = performance.now();
     let frameCount = 0;
     let fpsSum = 0;
     let lastSortTime = 0;
     let sortCount = 0;
-    
+
     const updatePerformanceStats = () => {
       const now = performance.now();
       const deltaTime = now - lastTime;
       lastTime = now;
-      
+
       // Calculate FPS
       const fps = 1000 / deltaTime;
       frameCount++;
       fpsSum += fps;
-      
+
       // Update every 10 frames
       if (frameCount >= 10) {
         const avgFPS = fpsSum / frameCount;
@@ -822,12 +795,12 @@ export class GSplatBasicExample {
         frameCount = 0;
         fpsSum = 0;
       }
-      
+
       // Update splat count
       if (perfSplats) {
         perfSplats.textContent = `${this.renderer.count.toLocaleString()} / ${this.renderer['_fullCount'].toLocaleString()}`;
       }
-      
+
       // Update LOD level
       if (perfLOD) {
         const lodStats = this.renderer.getLODStats();
@@ -837,7 +810,7 @@ export class GSplatBasicExample {
           perfLOD.textContent = 'Disabled';
         }
       }
-      
+
       // Update sort frequency (estimate)
       if (perfSortFreq) {
         const currentSortTime = this.renderer['_lastSentTime'] || 0;
@@ -851,7 +824,7 @@ export class GSplatBasicExample {
           sortCount = 0;
         }
       }
-      
+
       // Update pixel culling stats
       if (perfMaxPix) {
         const pixelStats = this.renderer.getPixelCullingStats();
@@ -861,7 +834,7 @@ export class GSplatBasicExample {
           perfMaxPix.textContent = 'Disabled';
         }
       }
-      
+
       // Update cull distance stats
       if (perfCullDist) {
         const pixelStats = this.renderer.getPixelCullingStats();
@@ -871,12 +844,12 @@ export class GSplatBasicExample {
           perfCullDist.textContent = 'Always';
         }
       }
-      
+
       requestAnimationFrame(updatePerformanceStats);
     };
-    
+
     updatePerformanceStats();
-    
+
     console.log('✅ Control panel created');
     console.log('💡 Tips:');
     console.log('  - Press H to toggle panel visibility');
@@ -884,7 +857,7 @@ export class GSplatBasicExample {
     console.log('  - Use mouse wheel on input boxes for quick adjustments');
     console.log('  - Click to focus and type exact values');
     console.log('  - Use arrow keys ↑↓ to fine-tune values');
-    
+
     // Keyboard shortcut to toggle panel
     window.addEventListener('keydown', (e) => {
       if (e.key === 'h' || e.key === 'H') {
@@ -895,15 +868,11 @@ export class GSplatBasicExample {
   }
 }
 
-// 使用示例
-export const main = async () => {
+// 为了向后兼容，保留main函数
+export function main() {
   const example = new GSplatBasicExample();
-  await example.init();
-
-  // 基础使用
-  await example.loadGaussianSplat('./assets/ply/biker.ply');
-
-  // 或者使用映射（只渲染前 10000 个 splats）
-  // await example.loadWithMapping('./assets/ply/biker.ply', 10000);
+  example.init().then(() => {
+    example.loadGaussianSplat('./assets/ply/merged_gs.ply');
+  });
 }
 

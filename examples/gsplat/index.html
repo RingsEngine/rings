@@ -4,71 +4,364 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rings Engine 开发测试</title>
+    <title>Gaussian Splat 渐进式加载演示</title>
     <style>
         body {
             margin: 0;
-            padding: 20px;
-            font-family: Arial, sans-serif;
-            background: #1a1a1a;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0a;
             color: #fff;
+            overflow: hidden;
         }
 
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
+        canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none; /* 确保canvas不会拦截点击事件 */
         }
 
-        .test-section {
-            background: #2a2a2a;
-            border-radius: 8px;
+        .control-panel {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            color: #fff;
             padding: 20px;
-            margin-bottom: 20px;
+            border-radius: 12px;
+            width: 300px;
+            z-index: 100;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
         }
 
-        .test-button {
-            background: #007acc;
-            color: white;
+        .control-panel.hidden {
+            transform: translateX(-100%);
+            opacity: 0;
+        }
+
+        .control-panel h2 {
+            margin: 0 0 16px 0;
+            font-size: 18px;
+            font-weight: 600;
+            color: #4CAF50;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 8px;
+        }
+
+        .control-group {
+            margin-bottom: 16px;
+        }
+
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .control-label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #ddd;
+        }
+
+        .control-input {
+            width: 100%;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            color: #fff;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            box-sizing: border-box;
+        }
+
+        .control-input:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+        }
+
+        .control-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .control-button {
+            flex: 1;
+            padding: 10px 16px;
             border: none;
-            padding: 10px 20px;
-            border-radius: 4px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
             cursor: pointer;
-            margin: 5px;
+            transition: all 0.2s ease;
         }
 
-        .test-button:hover {
-            background: #005a9e;
+        .control-button.primary {
+            background: #4CAF50;
+            color: white;
         }
 
-        #log {
-            background: #111;
-            border: 1px solid #333;
-            border-radius: 4px;
-            padding: 10px;
-            max-height: 300px;
-            overflow-y: auto;
-            font-family: monospace;
+        .control-button.primary:hover {
+            background: #66BB6A;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+        }
+
+        .control-button.secondary {
+            background: #2196F3;
+            color: white;
+        }
+
+        .control-button.secondary:hover {
+            background: #42A5F5;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4);
+        }
+
+        .toggle-button {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            color: #4CAF50;
+            border: 2px solid #4CAF50;
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
             font-size: 12px;
+            font-weight: 600;
+            z-index: 99999; /* 提高层级确保可见 */
+            transition: all 0.3s ease;
+            user-select: none;
+            pointer-events: auto; /* 确保可以接收鼠标事件 */
+            /* 确保按钮始终在顶部且可点击 */
+            display: block;
+            width: auto;
+            height: auto;
         }
 
-        .success {
-            color: #4caf50;
+        .toggle-button:hover {
+            background: #4CAF50;
+            color: white;
         }
 
-        .error {
-            color: #f44336;
+        .chunk-size-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
         }
 
-        .info {
-            color: #2196f3;
+        .chunk-size-control label {
+            flex: 1;
+            font-size: 14px;
+            color: #ddd;
+        }
+
+        .chunk-size-control input {
+            width: 80px;
+            padding: 6px 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .hint {
+            font-size: 12px;
+            color: #888;
+            margin-top: 8px;
+            line-height: 1.4;
+        }
+
+        .stats-panel {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            color: #fff;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            z-index: 100;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            min-width: 200px;
+        }
+
+        .stats-panel h3 {
+            margin: 0 0 12px 0;
+            font-size: 14px;
+            font-weight: 600;
+            color: #4CAF50;
+            border-bottom: 1px solid rgba(76, 175, 80, 0.3);
+            padding-bottom: 6px;
+        }
+
+        .stats-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+
+        .stats-label {
+            color: #aaa;
+        }
+
+        .stats-value {
+            color: #4CAF50;
+            font-weight: 600;
         }
     </style>
 </head>
 
 <body>
+    <!-- 控制面板切换按钮 -->
+    <button id="toggle-panel" class="toggle-button">显示控制面板</button>
+    
+    <!-- 控制面板 -->
+    <div id="control-panel" class="control-panel hidden">
+        <h2>🎛️ Gaussian Splat 加载控制</h2>
+        
+        <div class="control-group">
+            <label class="control-label" for="model-path">模型文件路径:</label>
+            <input type="text" id="model-path" class="control-input" 
+                   value="./assets/ply/merged_gs.ply" 
+                   placeholder="输入 PLY 文件路径">
+        </div>
+        
+        <div class="chunk-size-control">
+            <label for="chunk-size">每批次点数:</label>
+            <input type="number" id="chunk-size" min="1000" max="10000000" step="100000" value="10000000">
+        </div>
+        
+        <div class="control-buttons">
+            <button id="load-progressive" class="control-button primary">渐进式加载</button>
+            <button id="load-normal" class="control-button secondary">普通加载</button>
+        </div>
+        
+        <div class="hint">
+            💡 提示：渐进式加载允许在文件下载过程中逐步显示模型，适合大型点云文件。
+            较小的批次大小可以更快看到初始效果，但可能会增加处理开销。
+        </div>
+    </div>
+    
+    <!-- 统计信息面板 -->
+    <div id="stats-panel" class="stats-panel">
+        <h3>📊 加载统计</h3>
+        <div class="stats-row">
+            <span class="stats-label">加载方式:</span>
+            <span id="load-method" class="stats-value">渐进式</span>
+        </div>
+        <div class="stats-row">
+            <span class="stats-label">状态:</span>
+            <span id="load-status" class="stats-value">未开始</span>
+        </div>
+        <div class="stats-row">
+            <span class="stats-label">点云数量:</span>
+            <span id="point-count" class="stats-value">0</span>
+        </div>
+    </div>
+
     <script type="module">
-        import { main } from './index.js';
-        main();
+        import { GSplatBasicExample } from './index.js';
+        
+        // 创建示例实例
+        const example = new GSplatBasicExample();
+        let isEngineInitialized = false;
+        
+        // 初始化引擎
+        async function initializeEngine() {
+            if (!isEngineInitialized) {
+                await example.init();
+                isEngineInitialized = true;
+                document.getElementById('load-status').textContent = '准备就绪';
+            }
+        }
+        
+        // 渐进式加载
+        async function loadProgressive() {
+            await initializeEngine();
+            
+            const modelPath = document.getElementById('model-path').value;
+            const chunkSize = parseInt(document.getElementById('chunk-size').value) || 10000;
+            
+            document.getElementById('load-method').textContent = '渐进式';
+            document.getElementById('load-status').textContent = '加载中...';
+            
+            try {
+                await example.loadGaussianSplatProgressive(modelPath, chunkSize, example);
+                document.getElementById('load-status').textContent = '加载完成';
+                
+                // 更新点云数量统计
+                if (example.renderer) {
+                    document.getElementById('point-count').textContent = example.renderer.count.toLocaleString();
+                }
+            } catch (error) {
+                console.error('加载失败:', error);
+                document.getElementById('load-status').textContent = '加载失败';
+            }
+        }
+        
+        // 普通加载
+        async function loadNormal() {
+            await initializeEngine();
+            
+            const modelPath = document.getElementById('model-path').value;
+            
+            document.getElementById('load-method').textContent = '普通';
+            document.getElementById('load-status').textContent = '加载中...';
+            
+            try {
+                await example.loadGaussianSplat(modelPath);
+                document.getElementById('load-status').textContent = '加载完成';
+                
+                // 更新点云数量统计
+                if (example.renderer) {
+                    document.getElementById('point-count').textContent = example.renderer.count.toLocaleString();
+                }
+            } catch (error) {
+                console.error('加载失败:', error);
+                document.getElementById('load-status').textContent = '加载失败';
+            }
+        }
+        
+        // 简单的切换函数，不依赖DOM查找
+        function togglePanel() {
+            const panel = document.getElementById('control-panel');
+            if (panel.classList.contains('hidden')) {
+                panel.classList.remove('hidden');
+                document.getElementById('toggle-panel').textContent = '隐藏控制面板';
+            } else {
+                panel.classList.add('hidden');
+                document.getElementById('toggle-panel').textContent = '显示控制面板';
+            }
+        }
+        
+        // 直接在按钮标签上添加点击事件
+        document.getElementById('toggle-panel').onclick = togglePanel;
+        document.getElementById('load-progressive').onclick = loadProgressive;
+        document.getElementById('load-normal').onclick = loadNormal;
+        
+        // 初始化
+        window.addEventListener('DOMContentLoaded', () => {
+            // 自动初始化引擎
+            initializeEngine().catch(err => {
+                console.error('引擎初始化失败:', err);
+                document.getElementById('load-status').textContent = '初始化失败';
+            });
+        });
     </script>
 </body>
 
