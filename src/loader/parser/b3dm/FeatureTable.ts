@@ -4,7 +4,10 @@ export class FeatureTable {
   private buffer: any;
   private binOffset: any;
   private binLength: any;
-  private header: any;
+  private _header: any;
+  get header() {
+    return this._header;
+  }
 
   constructor(buffer, start, headerLength, binLength) {
     this.buffer = buffer;
@@ -18,15 +21,15 @@ export class FeatureTable {
     } else {
       header = {};
     }
-    this.header = header;
+    this._header = header;
   }
 
   getKeys() {
-    return Object.keys(this.header);
+    return Object.keys(this._header);
   }
 
   getData(key, count?, defaultComponentType = null, defaultType = null) {
-    const header = this.header;
+    const header = this._header;
 
     if (!(key in header)) {
       return null;
@@ -130,7 +133,7 @@ export class FeatureTable {
 
   public destroy() {
     this.buffer = null;
-    this.header = null;
+    this._header = null;
     this.binOffset = null;
     this.binLength = null;
   }

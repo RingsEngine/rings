@@ -27,6 +27,9 @@ import { MeshRenderer } from '../../../components/renderer/MeshRenderer';
 import { Quaternion } from '../../../math/Quaternion';
 import { FileLoader } from '../../FileLoader';
 import { B3DMParser } from '../B3DMParser';
+import { I3DMParser } from '../I3DMParser';
+import { GLTFParser } from '../gltf/GLTFParser';
+import { PNTSParser } from '../pnts/PNTSParser';
 
 /**
  * Plugin interface
@@ -818,10 +821,9 @@ export class TilesRenderer {
 
     let scene: Object3D | null = null;
 
+    const loader = new FileLoader();
     switch (extension.toLowerCase()) {
-      case 'b3dm':
-        // Use Rings B3DM loader
-        const loader = new FileLoader();
+      case 'b3dm': {
         const parser = await loader.load(fullUrl, B3DMParser, {
           onProgress: (e: any) => {
             // Progress callback
@@ -832,35 +834,47 @@ export class TilesRenderer {
         });
         scene = parser.data;
         break;
+      }
 
-      case 'i3dm':
-        // Use Rings I3DM loader
-        scene = (await Engine3D.res.loadI3DM(
-          fullUrl,
-          {
-            onProgress: (e: any) => {},
-            onComplete: (e: any) => {},
+      case 'i3dm': {
+        const parser = await loader.load(fullUrl, I3DMParser, {
+          onProgress: (e: any) => {
+            // Progress callback
           },
-          )) as Object3D;
+          onComplete: (e: any) => {
+            // Complete callback
+          },
+        });
+        scene = parser.data;
         break;
+      }
 
       case 'glb':
-      case 'gltf':
-        // Use Rings GLTF loader
-        scene = (await Engine3D.res.loadGltf(fullUrl, {
-          onProgress: (e: any) => {},
-          onComplete: (e: any) => {},
-        })) as Object3D;
-
-        // No longer apply adjustmentTransform here because:
-        // 1. adjustmentTransform is already applied to group
-        // 2. All tiles are directly mounted under group, transform will be applied in setTileActive with world transform
+      case 'gltf': {
+        const parser = await loader.load(fullUrl, GLTFParser, {
+          onProgress: (e: any) => {
+            // Progress callback
+          },
+          onComplete: (e: any) => {
+            // Complete callback
+          },
+        });
+        scene = parser.data;
         break;
+      }
 
-      case 'pnts':
-        // TODO: Implement point cloud loading
-        console.warn('PNTS format not yet supported');
+      case 'pnts': {
+        const parser = await loader.load(fullUrl, PNTSParser, {
+          onProgress: (e: any) => {
+            // Progress callback
+          },
+          onComplete: (e: any) => {
+            // Complete callback
+          },
+        });
+        scene = parser.data;
         break;
+      }
 
       case 'json':
         // External tileset

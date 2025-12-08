@@ -26,10 +26,10 @@ export class PointCloudShader extends Shader {
     pass.setShaderEntry("VertMain", "FragMain");
     pass.topology = GPUPrimitiveTopology.triangle_list;
     
-    pass.depthWriteEnabled = false;
+    pass.depthWriteEnabled = true;
     pass.cullMode = GPUCullMode.none;
     
-    pass.shaderState.transparent = true;
+    pass.shaderState.transparent = false;
     pass.shaderState.blendMode = BlendMode.NORMAL;
     pass.shaderState.writeMasks = [0xF, 0xF];
     
