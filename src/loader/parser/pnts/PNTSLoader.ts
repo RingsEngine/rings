@@ -38,6 +38,8 @@ export class PNTSLoader extends PNTSLoaderBase {
     const pointCloudObj = new Object3D();
     const renderer = pointCloudObj.addComponent(PointCloudRenderer);
     renderer.initFromData(positions, colors, pointsLength);
+    renderer.setPointShape('circle');
+    renderer.setPointSize(4);
     
     const rtcCenter = featureTable.getData("RTC_CENTER", 1, "FLOAT", "VEC3");
     if (rtcCenter) {
