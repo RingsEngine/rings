@@ -297,6 +297,7 @@ export class TilesRenderer {
               basePath,
               null
             );
+            this.queueTileForDownload(rootTile);
             this._root = rootTile;
 
             const boundingVolume = new BoundingVolume(rootTile.boundingVolume);
@@ -376,10 +377,14 @@ export class TilesRenderer {
 
     queuedTiles.length = 0;
 
-    // 7. schedule LRU cache cleanup
+    // 7. update priority queues (process pending tasks)
+    loadQueue.update();
+    processNodeQueue.update();
+
+    // 8. schedule LRU cache cleanup
     lruCache.scheduleUnload();
 
-    // 8. check if loading is complete
+    // 9. check if loading is complete
     const runningTasks =
       loadQueue.running || processNodeQueue.running;
     if (runningTasks === false && this.isLoading === true) {
@@ -1024,6 +1029,20 @@ export class TilesRenderer {
     }
   }
 
+  private _checkIsLoadingTileWillBeActive(tile: Tile): boolean {
+    return (
+      tile.used &&
+      (
+        tile.loadingState === LOADING ||
+        tile.loadingState === PARSING ||
+        !this._activeTiles.has(tile) ||
+        !this._visibleTiles.has(tile)
+      ) && 
+      tile.loadingState !== UNLOADED &&
+      tile.loadingState !== FAILED &&
+      tile.hasRenderableContent
+    );
+  }
   /**
    * Get children tiles that are loading and will be active
    * Check if child is used in current frame (will be displayed) but not yet loaded
@@ -1034,7 +1053,7 @@ export class TilesRenderer {
     
     for (let i = 0, l = children.length; i < l; i++) {
       const child = children[i];
-      if (child.loadingState !== LOADED && child.loadingState !== FAILED) {
+      if (this._checkIsLoadingTileWillBeActive(child)) {
         loadingChildren.push(child);
       }
       
@@ -1048,11 +1067,31 @@ export class TilesRenderer {
   }
 
   /**
+   * Get parents tiles that are loading and will be active
+   * Check if parent is used in current frame (will be displayed) but not yet loaded
+   */
+  private _getLoadingParentsThatWillBeActive(tile: Tile): Tile[] {
+    const loadingParents: Tile[] = [];
+    const parent = tile.parent;
+    if (parent) {
+      if (this._checkIsLoadingTileWillBeActive(parent)) {
+        loadingParents.push(parent);
+      }
+    }
+    // if (parent?.parent) {
+    //   loadingParents.push(...this._getLoadingParentsThatWillBeActive(parent.parent));
+    // }
+    return loadingParents;
+  }
+
+  /**
    * Check and process delayed hide tiles when a child finishes loading
    */
   private _checkDelayedHideTiles(): void {
     for (const tile of this._delayedHideTiles) {
-      const stillLoading = this._getLoadingChildrenThatWillBeActive(tile);
+      const stillLoadingChildren = this._getLoadingChildrenThatWillBeActive(tile);
+      const stillLoadingParents = this._getLoadingParentsThatWillBeActive(tile);
+      const stillLoading = [...stillLoadingChildren, ...stillLoadingParents];
       if (stillLoading.length === 0) {
         this._delayedHideTiles.delete(tile);
         const scene = tile.cached.scene;

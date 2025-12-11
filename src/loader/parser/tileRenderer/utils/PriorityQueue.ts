@@ -17,7 +17,6 @@ export type TaskCallback = (item: Tile) => Promise<void> | void;
  */
 export class PriorityQueue {
   public maxJobs: number = 6; // Maximum concurrent tasks
-  public autoUpdate: boolean = true; // Auto update
   public priorityCallback: PriorityCallback | null = null;
 
   private _items: Tile[] = [];
@@ -31,21 +30,6 @@ export class PriorityQueue {
     }
   > = new Map();
   private _currJobs: number = 0;
-  private _scheduled: boolean = false;
-  private _schedulingCallback: (func: () => void) => void;
-
-  constructor() {
-    this._schedulingCallback = func => {
-      requestAnimationFrame(func);
-    };
-  }
-
-  /**
-   * Set scheduling callback (can be used to customize scheduling strategy)
-   */
-  set schedulingCallback(cb: (func: () => void) => void) {
-    this._schedulingCallback = cb;
-  }
 
   /**
    * Check if there are tasks running or queued
@@ -96,10 +80,6 @@ export class PriorityQueue {
     this._items.unshift(item);
     this._callbacks.set(item, data);
 
-    if (this.autoUpdate) {
-      this._scheduleJobRun();
-    }
-
     return promise;
   }
 
@@ -134,18 +114,11 @@ export class PriorityQueue {
   }
 
   /**
-   * Schedule task run
+   * Update queue - process pending tasks
+   * Should be called by TilesRenderer in its update() method
    */
-  private _scheduleJobRun(): void {
-    if (this._scheduled) {
-      return;
-    }
-
-    this._scheduled = true;
-    this._schedulingCallback(() => {
-      this._scheduled = false;
-      this._tryRunJobs();
-    });
+  update(): void {
+    this._tryRunJobs();
   }
 
   /**
@@ -159,10 +132,6 @@ export class PriorityQueue {
 
     const completedCallback = () => {
       this._currJobs--;
-
-      if (this.autoUpdate) {
-        this._scheduleJobRun();
-      }
     };
 
     while (
