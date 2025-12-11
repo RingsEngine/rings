@@ -209,6 +209,9 @@ export class TilesRenderer {
   // Active and visible tiles set
   protected _activeTiles: Set<Tile> = new Set();
 
+  // Tiles that should be hidden but are delayed due to children loading
+  protected _delayedHideTiles: Set<Tile> = new Set();
+
   // Rings-specific: Scene group
   public readonly group: Object3D;
 
@@ -355,6 +358,7 @@ export class TilesRenderer {
     this.updateCameraInfo();
 
     // 5. traverse tile tree and mark
+    this._checkDelayedHideTiles();
     markUsedTiles(root, this);
     markUsedSetLeaves(root, this);
     markVisibleTiles(root, this);
@@ -983,6 +987,9 @@ export class TilesRenderer {
   setTileActive(tile: Tile, active: boolean): void {
     if (active) {
       this._activeTiles.add(tile);
+      if (this._delayedHideTiles.has(tile)) {
+        this._delayedHideTiles.delete(tile);
+      }
     } else {
       this._activeTiles.delete(tile);
     }
@@ -1011,8 +1018,48 @@ export class TilesRenderer {
       // Set visibility (Rings uses transform.enable)
       scene.transform.enable = true;
     } else {
-      // Set invisible
-      scene.transform.enable = false;
+      if (!this._delayedHideTiles.has(tile)) {
+        this._delayedHideTiles.add(tile);
+      }
+    }
+  }
+
+  /**
+   * Get children tiles that are loading and will be active
+   * Check if child is used in current frame (will be displayed) but not yet loaded
+   */
+  private _getLoadingChildrenThatWillBeActive(tile: Tile): Tile[] {
+    const loadingChildren: Tile[] = [];
+    const children = tile.children;
+    
+    for (let i = 0, l = children.length; i < l; i++) {
+      const child = children[i];
+      if (child.loadingState !== LOADED && child.loadingState !== FAILED) {
+        loadingChildren.push(child);
+      }
+      
+      // Also check grandchildren recursively
+      if (child.children && child.children.length > 0) {
+        loadingChildren.push(...this._getLoadingChildrenThatWillBeActive(child));
+      }
+    }
+    
+    return loadingChildren;
+  }
+
+  /**
+   * Check and process delayed hide tiles when a child finishes loading
+   */
+  private _checkDelayedHideTiles(): void {
+    for (const tile of this._delayedHideTiles) {
+      const stillLoading = this._getLoadingChildrenThatWillBeActive(tile);
+      if (stillLoading.length === 0) {
+        this._delayedHideTiles.delete(tile);
+        const scene = tile.cached.scene;
+        if (scene) {
+          scene.transform.enable = false;
+        }
+      }
     }
   }
 
@@ -1022,6 +1069,9 @@ export class TilesRenderer {
   setTileVisible(tile: Tile, visible: boolean): void {
     if (visible) {
       this._visibleTiles.add(tile);
+      if (this._delayedHideTiles.has(tile)) {
+        this._delayedHideTiles.delete(tile);
+      }
     } else {
       this._visibleTiles.delete(tile);
     }
@@ -1031,8 +1081,14 @@ export class TilesRenderer {
       return;
     }
 
-    // Set visibility (Rings uses transform.enable)
-    scene.transform.enable = visible;
+    if (visible) {
+      // Set visible
+      scene.transform.enable = true;
+    } else {
+      if (!this._delayedHideTiles.has(tile)) {
+        this._delayedHideTiles.add(tile);
+      }
+    }
   }
 
   /**
