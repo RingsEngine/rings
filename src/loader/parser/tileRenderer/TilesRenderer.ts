@@ -969,8 +969,11 @@ export class TilesRenderer {
 
       // If tile is already active, immediately add to scene group
       // This way scene objects can be displayed immediately after loading, without waiting for next toggleTiles call
-      if (tile.active) {
+      // if (tile.active) 
+      {
         this.setTileActive(tile, true);
+        tile.active = true;
+        this.stats.active++;
       }
     } else {
       tile.loadingState = FAILED;
@@ -1029,76 +1032,19 @@ export class TilesRenderer {
     }
   }
 
-  private _checkIsLoadingTileWillBeActive(tile: Tile): boolean {
-    return (
-      tile.used &&
-      (
-        tile.loadingState === LOADING ||
-        tile.loadingState === PARSING ||
-        !this._activeTiles.has(tile) ||
-        !this._visibleTiles.has(tile)
-      ) && 
-      tile.loadingState !== UNLOADED &&
-      tile.loadingState !== FAILED &&
-      tile.hasRenderableContent
-    );
-  }
-  /**
-   * Get children tiles that are loading and will be active
-   * Check if child is used in current frame (will be displayed) but not yet loaded
-   */
-  private _getLoadingChildrenThatWillBeActive(tile: Tile): Tile[] {
-    const loadingChildren: Tile[] = [];
-    const children = tile.children;
-    
-    for (let i = 0, l = children.length; i < l; i++) {
-      const child = children[i];
-      if (this._checkIsLoadingTileWillBeActive(child)) {
-        loadingChildren.push(child);
-      }
-      
-      // Also check grandchildren recursively
-      if (child.children && child.children.length > 0) {
-        loadingChildren.push(...this._getLoadingChildrenThatWillBeActive(child));
-      }
-    }
-    
-    return loadingChildren;
-  }
-
-  /**
-   * Get parents tiles that are loading and will be active
-   * Check if parent is used in current frame (will be displayed) but not yet loaded
-   */
-  private _getLoadingParentsThatWillBeActive(tile: Tile): Tile[] {
-    const loadingParents: Tile[] = [];
-    const parent = tile.parent;
-    if (parent) {
-      if (this._checkIsLoadingTileWillBeActive(parent)) {
-        loadingParents.push(parent);
-      }
-    }
-    // if (parent?.parent) {
-    //   loadingParents.push(...this._getLoadingParentsThatWillBeActive(parent.parent));
-    // }
-    return loadingParents;
-  }
-
   /**
    * Check and process delayed hide tiles when a child finishes loading
    */
   private _checkDelayedHideTiles(): void {
+    if (this.stats.downloading !== 0) {
+      return;
+    }
     for (const tile of this._delayedHideTiles) {
-      const stillLoadingChildren = this._getLoadingChildrenThatWillBeActive(tile);
-      const stillLoadingParents = this._getLoadingParentsThatWillBeActive(tile);
-      const stillLoading = [...stillLoadingChildren, ...stillLoadingParents];
-      if (stillLoading.length === 0) {
-        this._delayedHideTiles.delete(tile);
-        const scene = tile.cached.scene;
-        if (scene) {
-          scene.transform.enable = false;
-        }
-      }
+      this._delayedHideTiles.delete(tile);
+      const scene = tile.cached.scene;
+      if (scene) {
+        scene.transform.enable = false;
+      }      
     }
   }
 
