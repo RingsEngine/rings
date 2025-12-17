@@ -48,6 +48,7 @@ type Face = {
 
 export class OBJParser extends ParserBase {
   static format: ParserFormat = ParserFormat.TEXT;
+  static cloudImageProcessParam: string = '';
   private textData: string = "";
 
   private source_vertices: number[][];
@@ -246,7 +247,7 @@ export class OBJParser extends ParserBase {
           const texUrl = StringUtil.normalizePath(
             this.baseUrl + mat.textures[i]
           );
-          promiseList.push(Engine3D.res.loadTexture(texUrl).catch(
+          promiseList.push(Engine3D.res.loadTexture(texUrl + OBJParser.cloudImageProcessParam).catch(
             (error) => {
               console.error(`Failed to load texture: ${texUrl}`, error);
               return null;

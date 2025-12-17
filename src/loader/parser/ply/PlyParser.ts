@@ -15,6 +15,7 @@ import { PlyMode } from "./PlyTypes";
 
 export class PlyParser extends ParserBase {
     static format: ParserFormat = ParserFormat.BIN;
+    static cloudImageProcessParam: string = '';
     public async parseBuffer(buffer: ArrayBuffer): Promise<void> {
         const header = parsePlyHeader(buffer);
         switch (header.mode) {
@@ -93,7 +94,7 @@ export class PlyParser extends ParserBase {
                         const texturePath = StringUtil.normalizePath(
                             this.baseUrl + plyData.textureFiles[texnum]
                         );
-                        promiseList.push(Engine3D.res.loadTexture(texturePath).then((texture) => {
+                        promiseList.push(Engine3D.res.loadTexture(texturePath + PlyParser.cloudImageProcessParam).then((texture) => {
                             material.baseMap = texture;
                             materials.set(texnum, material);
                         }));
