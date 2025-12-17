@@ -603,7 +603,7 @@ export class OBJParser extends ParserBase {
         const texturePath = StringUtil.normalizePath(
           this.baseUrl + matData.map_Kd
         );
-        const texture = Engine3D.res.getTexture(texturePath);
+        const texture = Engine3D.res.getTexture(texturePath + OBJParser.cloudImageProcessParam);
         if (texture) {
           mat.baseMap = texture;
         }
