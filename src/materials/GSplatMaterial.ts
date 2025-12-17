@@ -70,6 +70,11 @@ export class GSplatMaterial extends Material {
     const pass = this.shader.getDefaultColorShader();
     pass.setUniform("pixelCull", this._pixelCullArray);
   }
+
+  public setTexParams(texParams: Float32Array) {
+    const pass = this.shader.getDefaultColorShader();
+    pass.setUniformArray("tex_params", texParams);
+  }
 }
 
 
