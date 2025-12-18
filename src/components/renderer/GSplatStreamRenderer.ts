@@ -14,6 +14,8 @@ import { Vector2 } from "../../math/Vector2";
 import { toHalfFloat } from "../../util/Convert";
 import { Matrix4 } from "../../math/Matrix4";
 import { RegisterComponent } from "../../util/SerializeDecoration";
+import { BoundingBox } from "../../core/bound/BoundingBox";
+import { Vector3 } from "../../math/Vector3";
 
 /**
  * Single splat data structure for streaming
@@ -37,6 +39,7 @@ export class GSplatStreamRenderer extends RenderNode {
   // Splat count and texture dimensions
   public totalCount: number = 0;
   public size: Vector2 = new Vector2();
+  public worldBoundBox: BoundingBox = new BoundingBox();
 
   // GPU textures for splat data
   public splatColor: Uint8ArrayTexture;
@@ -390,6 +393,7 @@ export class GSplatStreamRenderer extends RenderNode {
     const m = worldMatrix.rawData;
 
     // Transform each valid splat center to world space
+    this.worldBoundBox.makeEmpty();
     for (let i = 0; i < count; i++) {
       if (!this._splatSetFlags[i]) continue;
 
@@ -402,6 +406,8 @@ export class GSplatStreamRenderer extends RenderNode {
       this._worldPositions[idx + 0] = m[0] * x + m[4] * y + m[8] * z + m[12];
       this._worldPositions[idx + 1] = m[1] * x + m[5] * y + m[9] * z + m[13];
       this._worldPositions[idx + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
+
+      this.worldBoundBox.expandByPoint(new Vector3(this._worldPositions[idx + 0], this._worldPositions[idx + 1], this._worldPositions[idx + 2]));
     }
 
     this._centersSent = false;
@@ -431,6 +437,7 @@ export class GSplatStreamRenderer extends RenderNode {
       this._worldPositions[idx + 0] = m[0] * x + m[4] * y + m[8] * z + m[12];
       this._worldPositions[idx + 1] = m[1] * x + m[5] * y + m[9] * z + m[13];
       this._worldPositions[idx + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
+      this.worldBoundBox.expandByPoint(new Vector3(this._worldPositions[idx + 0], this._worldPositions[idx + 1], this._worldPositions[idx + 2]));
     }
 
     this._centersSent = false;

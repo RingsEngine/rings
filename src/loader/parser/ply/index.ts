@@ -7,4 +7,5 @@
 export * from './PlyTypes';
 export * from './PlyUtils';
 export * from './PlyLoader';
+export * from './PlyStreamParser';
 
