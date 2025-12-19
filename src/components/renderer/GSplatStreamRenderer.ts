@@ -363,6 +363,7 @@ export class GSplatStreamRenderer extends RenderNode {
   /**
    * Flush pending updates to GPU
    * Updates GPU textures with all pending changes
+   * Uses partial updates when possible for better performance
    */
   public flushUpdates() {
     if (this._pendingUpdates.size === 0) return;
@@ -370,11 +371,35 @@ export class GSplatStreamRenderer extends RenderNode {
     const w = this.size.x | 0;
     const h = this.size.y | 0;
 
-    // For now, update entire textures (can be optimized to partial updates later)
-    // This is acceptable for streaming as updates are batched
-    this.splatColor.updateTexture(w, h, this._colorData);
-    this.transformA.updateTexture(w, h, this._transformAData);
-    this.transformB.updateTexture(w, h, this._transformBData, false);
+    // Calculate the range of rows that need updating
+    const pendingIndices = Array.from(this._pendingUpdates);
+    if (pendingIndices.length === 0) return;
+
+    // Find min/max row indices
+    let minRow = h;
+    let maxRow = 0;
+    for (const index of pendingIndices) {
+      const row = Math.floor(index / w);
+      if (row < minRow) minRow = row;
+      if (row > maxRow) maxRow = row;
+    }
+
+    const rowCount = maxRow - minRow + 1;
+    const updateRatio = rowCount / h;
+
+    // Use partial update if updating less than 50% of rows, otherwise full update
+    // This avoids overhead of partial updates when most of the texture needs updating
+    if (updateRatio < 0.5 && rowCount < h) {
+      // Partial update: only update the affected rows
+      this.splatColor.updateTexture(w, h, this._colorData, minRow, rowCount);
+      this.transformA.updateTexture(w, h, this._transformAData, minRow, rowCount);
+      this.transformB.updateTexture(w, h, this._transformBData, false, minRow, rowCount);
+    } else {
+      // Full update: update entire textures
+      this.splatColor.updateTexture(w, h, this._colorData);
+      this.transformA.updateTexture(w, h, this._transformAData);
+      this.transformB.updateTexture(w, h, this._transformBData, false);
+    }
 
     // Update world positions
     this.updatePendingWorldPositions();

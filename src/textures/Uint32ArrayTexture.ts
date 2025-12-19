@@ -44,10 +44,32 @@ export class Uint32ArrayTexture extends Texture {
     return this;
   }
 
-  public updateTexture(width: number, height: number, data: Uint32Array) {
+  public updateTexture(width: number, height: number, data: Uint32Array, startRow?: number, rowCount?: number) {
     let device = webGPUContext.device;
     const bytesPerRow = width * 4 * 4;
     
+    // Partial update: only update specified rows
+    if (startRow !== undefined && rowCount !== undefined && rowCount < height) {
+      const updateHeight = rowCount;
+      const updateOffset = startRow * width * 4; // Offset in elements
+      const updateData = data.subarray(updateOffset, updateOffset + updateHeight * width * 4);
+      
+      device.queue.writeTexture(
+        { 
+          texture: this.getGPUTexture(),
+          origin: [0, startRow, 0], // Start at row startRow
+        },
+        updateData.buffer,
+        { 
+          bytesPerRow: bytesPerRow,
+          offset: updateData.byteOffset,
+        },
+        { width: width, height: updateHeight, depthOrArrayLayers: 1 }
+      );
+      return;
+    }
+
+    // Full update: update entire texture
     device.queue.writeTexture(
       { texture: this.getGPUTexture() },
       data.buffer,
