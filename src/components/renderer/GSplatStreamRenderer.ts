@@ -39,7 +39,39 @@ export class GSplatStreamRenderer extends RenderNode {
   // Splat count and texture dimensions
   public totalCount: number = 0;
   public size: Vector2 = new Vector2();
-  public worldBoundBox: BoundingBox = new BoundingBox();
+  public localBoundBox: BoundingBox = new BoundingBox();
+  // public worldBoundBox: BoundingBox = new BoundingBox();
+  public get worldBoundBox(): BoundingBox {
+    const boundBox = new BoundingBox();
+    boundBox.makeEmpty();
+    
+    const worldMatrix = this.object3D.transform.worldMatrix;
+    const m = worldMatrix.rawData;
+    const localMin = this.localBoundBox.min;
+    const localMax = this.localBoundBox.max;
+    
+    // Transform all 8 corners of the bounding box
+    // Generate all 8 corners: (min/max.x, min/max.y, min/max.z)
+    const corners = [
+      [localMin.x, localMin.y, localMin.z], // 0: min, min, min
+      [localMax.x, localMin.y, localMin.z], // 1: max, min, min
+      [localMin.x, localMax.y, localMin.z], // 2: min, max, min
+      [localMax.x, localMax.y, localMin.z], // 3: max, max, min
+      [localMin.x, localMin.y, localMax.z], // 4: min, min, max
+      [localMax.x, localMin.y, localMax.z], // 5: max, min, max
+      [localMin.x, localMax.y, localMax.z], // 6: min, max, max
+      [localMax.x, localMax.y, localMax.z], // 7: max, max, max
+    ];
+    
+    for (const [x, y, z] of corners) {
+      const wx = m[0] * x + m[4] * y + m[8] * z + m[12];
+      const wy = m[1] * x + m[5] * y + m[9] * z + m[13];
+      const wz = m[2] * x + m[6] * y + m[10] * z + m[14];
+      boundBox.expandByPoint(new Vector3(wx, wy, wz));
+    }
+
+    return boundBox;
+  }
 
   // GPU textures for splat data
   public splatColor: Uint8ArrayTexture;
@@ -57,7 +89,7 @@ export class GSplatStreamRenderer extends RenderNode {
   private _transformBData: number[]; // RGBA16F: count * 4
   private _orderData: Uint32Array; // R32U: size.x * size.y
   private _positions: Float32Array; // xyz per splat (local space)
-  private _worldPositions: Float32Array; // xyz per splat (world space, cached)
+  // private _worldPositions: Float32Array; // xyz per splat (world space, cached)
 
   // Tracking which splats have been set
   private _splatSetFlags: boolean[]; // Track which indices have data
@@ -135,8 +167,9 @@ export class GSplatStreamRenderer extends RenderNode {
     // Position buffers
     this._positions = new Float32Array(totalCount * 3);
     this._positions.fill(0);
-    this._worldPositions = new Float32Array(totalCount * 3);
-    this._worldPositions.fill(0);
+    // this._worldPositions = new Float32Array(totalCount * 3);
+    // this._worldPositions.fill(0);
+    this.localBoundBox.makeEmpty();
 
     // Tracking flags
     this._splatSetFlags = new Array(totalCount).fill(false);
@@ -201,6 +234,7 @@ export class GSplatStreamRenderer extends RenderNode {
     this._positions[index * 3 + 0] = data.position[0];
     this._positions[index * 3 + 1] = data.position[1];
     this._positions[index * 3 + 2] = data.position[2];
+    this.localBoundBox.expandByPoint(new Vector3(data.position[0], data.position[1], data.position[2]));
 
     // Update color (from SH or default)
     const SH_C0 = 0.28209479177387814;
@@ -227,7 +261,7 @@ export class GSplatStreamRenderer extends RenderNode {
       this._validCount++;
       this.texParams[2] = this._validCount;
       // Mark that centers need to be resent to worker
-      this._centersSent = false;
+      // this._centersSent = false;
     }
 
     this._pendingUpdates.add(index);
@@ -386,29 +420,29 @@ export class GSplatStreamRenderer extends RenderNode {
   private updateWorldPositions() {
     if (!this._positions || this._validCount === 0) return;
 
-    const worldMatrix = this.object3D.transform.worldMatrix;
-    const localPos = this._positions;
-    const count = this._validCount;
+    // const worldMatrix = this.object3D.transform.worldMatrix;
+    // const localPos = this._positions;
+    // const count = this._validCount;
 
-    const m = worldMatrix.rawData;
+    // const m = worldMatrix.rawData;
 
     // Transform each valid splat center to world space
-    this.worldBoundBox.makeEmpty();
-    for (let i = 0; i < count; i++) {
-      if (!this._splatSetFlags[i]) continue;
+    // this.worldBoundBox.makeEmpty();
+    // for (let i = 0; i < count; i++) {
+    //   if (!this._splatSetFlags[i]) continue;
 
-      const idx = i * 3;
-      const x = localPos[idx + 0];
-      const y = localPos[idx + 1];
-      const z = localPos[idx + 2];
+    //   const idx = i * 3;
+    //   const x = localPos[idx + 0];
+    //   const y = localPos[idx + 1];
+    //   const z = localPos[idx + 2];
 
-      // worldPos = modelMatrix * localPos
-      this._worldPositions[idx + 0] = m[0] * x + m[4] * y + m[8] * z + m[12];
-      this._worldPositions[idx + 1] = m[1] * x + m[5] * y + m[9] * z + m[13];
-      this._worldPositions[idx + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
+    //   // worldPos = modelMatrix * localPos
+    //   this._worldPositions[idx + 0] = m[0] * x + m[4] * y + m[8] * z + m[12];
+    //   this._worldPositions[idx + 1] = m[1] * x + m[5] * y + m[9] * z + m[13];
+    //   this._worldPositions[idx + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
 
-      this.worldBoundBox.expandByPoint(new Vector3(this._worldPositions[idx + 0], this._worldPositions[idx + 1], this._worldPositions[idx + 2]));
-    }
+    //   this.worldBoundBox.expandByPoint(new Vector3(this._worldPositions[idx + 0], this._worldPositions[idx + 1], this._worldPositions[idx + 2]));
+    // }
 
     this._centersSent = false;
   }
@@ -416,29 +450,29 @@ export class GSplatStreamRenderer extends RenderNode {
   private updatePendingWorldPositions() {
     if (!this._positions || this._validCount === 0) return;
 
-    const worldMatrix = this.object3D.transform.worldMatrix;
-    const localPos = this._positions;
-    const count = this._validCount;
+    // const worldMatrix = this.object3D.transform.worldMatrix;
+    // const localPos = this._positions;
+    // const count = this._validCount;
 
-    const m = worldMatrix.rawData;
+    // const m = worldMatrix.rawData;
 
-    // Transform each valid splat center to world space
-    const pendingUpdates = Array.from(this._pendingUpdates.values());
-    for (let i = 0; i < pendingUpdates.length; i++) {
-      const ii = pendingUpdates[i];
-      if (!this._splatSetFlags[ii]) continue;
+    // // Transform each valid splat center to world space
+    // const pendingUpdates = Array.from(this._pendingUpdates.values());
+    // for (let i = 0; i < pendingUpdates.length; i++) {
+    //   const ii = pendingUpdates[i];
+    //   if (!this._splatSetFlags[ii]) continue;
 
-      const idx = ii * 3;
-      const x = localPos[idx + 0];
-      const y = localPos[idx + 1];
-      const z = localPos[idx + 2];
+    //   const idx = ii * 3;
+    //   const x = localPos[idx + 0];
+    //   const y = localPos[idx + 1];
+    //   const z = localPos[idx + 2];
 
-      // worldPos = modelMatrix * localPos
-      this._worldPositions[idx + 0] = m[0] * x + m[4] * y + m[8] * z + m[12];
-      this._worldPositions[idx + 1] = m[1] * x + m[5] * y + m[9] * z + m[13];
-      this._worldPositions[idx + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
-      this.worldBoundBox.expandByPoint(new Vector3(this._worldPositions[idx + 0], this._worldPositions[idx + 1], this._worldPositions[idx + 2]));
-    }
+    //   // worldPos = modelMatrix * localPos
+    //   this._worldPositions[idx + 0] = m[0] * x + m[4] * y + m[8] * z + m[12];
+    //   this._worldPositions[idx + 1] = m[1] * x + m[5] * y + m[9] * z + m[13];
+    //   this._worldPositions[idx + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
+    //   this.worldBoundBox.expandByPoint(new Vector3(this._worldPositions[idx + 0], this._worldPositions[idx + 1], this._worldPositions[idx + 2]));
+    // }
 
     this._centersSent = false;
   }
@@ -452,7 +486,7 @@ export class GSplatStreamRenderer extends RenderNode {
 
     // Check if transform has changed
     const transformChanged = this.object3D.transform.localChange;
-    if (transformChanged || !this._worldPositions || this._worldPositions.length === 0) {
+    if (transformChanged) {
       this.updateWorldPositions();
     }
 
@@ -540,14 +574,20 @@ export class GSplatStreamRenderer extends RenderNode {
 
       // Send initial centers (only valid splats)
       const centers = new Float32Array(this._validCount * 3);
-      const worldPos = this._worldPositions || this._positions;
+      // const worldPos = this._worldPositions || this._positions;
       let centerIdx = 0;
+      const worldMatrix = this.object3D.transform.worldMatrix;
+      const localPos = this._positions;
+      const m = worldMatrix.rawData;
       for (let i = 0; i < this._validCount; i++) {
         if (this._splatSetFlags[i]) {
           const srcIdx = i * 3;
-          centers[centerIdx * 3 + 0] = worldPos[srcIdx + 0];
-          centers[centerIdx * 3 + 1] = worldPos[srcIdx + 1];
-          centers[centerIdx * 3 + 2] = worldPos[srcIdx + 2];
+          const x = localPos[srcIdx + 0];
+          const y = localPos[srcIdx + 1];
+          const z = localPos[srcIdx + 2];
+          centers[centerIdx * 3 + 0] = m[0] * x + m[4] * y + m[8] * z + m[12];
+          centers[centerIdx * 3 + 1] = m[1] * x + m[5] * y + m[9] * z + m[13];
+          centers[centerIdx * 3 + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
           centerIdx++;
         }
       }
@@ -568,14 +608,19 @@ export class GSplatStreamRenderer extends RenderNode {
     // Update centers if transform changed or new splats added
     if (!this._centersSent && this._sortWorker) {
       const centers = new Float32Array(this._validCount * 3);
-      const worldPos = this._worldPositions || this._positions;
       let centerIdx = 0;
+      const worldMatrix = this.object3D.transform.worldMatrix;
+      const localPos = this._positions;
+      const m = worldMatrix.rawData;
       for (let i = 0; i < this._validCount; i++) {
         if (this._splatSetFlags[i]) {
           const srcIdx = i * 3;
-          centers[centerIdx * 3 + 0] = worldPos[srcIdx + 0];
-          centers[centerIdx * 3 + 1] = worldPos[srcIdx + 1];
-          centers[centerIdx * 3 + 2] = worldPos[srcIdx + 2];
+          const x = localPos[srcIdx + 0];
+          const y = localPos[srcIdx + 1];
+          const z = localPos[srcIdx + 2];
+          centers[centerIdx * 3 + 0] = m[0] * x + m[4] * y + m[8] * z + m[12];
+          centers[centerIdx * 3 + 1] = m[1] * x + m[5] * y + m[9] * z + m[13];
+          centers[centerIdx * 3 + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
           centerIdx++;
         }
       }
@@ -961,7 +1006,7 @@ export class GSplatStreamRenderer extends RenderNode {
     }
 
     this._positions = null;
-    this._worldPositions = null;
+    // this._worldPositions = null;
     this._orderData = null;
     this._colorData = null;
     this._transformAData = null;
