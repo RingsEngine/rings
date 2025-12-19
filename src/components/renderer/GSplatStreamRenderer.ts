@@ -78,6 +78,7 @@ export class GSplatStreamRenderer extends RenderNode {
   public transformA: Uint32ArrayTexture;
   public transformB: Float16ArrayTexture;
   public texParams: Float32Array; // [numSplats, texWidth, validCount, visBoost]
+  private _texParamDirty: boolean = true;
   public splatOrder: R32UintTexture;
 
   // Material and geometry
@@ -259,7 +260,6 @@ export class GSplatStreamRenderer extends RenderNode {
     if (!wasSet) {
       this._splatSetFlags[index] = true;
       this._validCount++;
-      this.texParams[2] = this._validCount;
       // Mark that centers need to be resent to worker
       // this._centersSent = false;
     }
@@ -431,13 +431,13 @@ export class GSplatStreamRenderer extends RenderNode {
    * Update splat sorting before rendering
    * Uses the same logic as GSplatRenderer for reliable sorting
    */
-  public onBeforeUpdate(view?: View3D) {
-    if (this._validCount > 0 && view?.camera) {
-      if (view.camera.viewMatrix) {
-        this.scheduleOrder(view.camera.viewMatrix);
-      }
-    }
-  }
+  // public onBeforeUpdate(view?: View3D) {
+  //   if (this._validCount > 0 && view?.camera) {
+  //     if (view.camera.viewMatrix) {
+  //       this.scheduleOrder(view.camera.viewMatrix);
+  //     }
+  //   }
+  // }
 
   /**
    * Update world space positions when transform changes
@@ -588,8 +588,7 @@ export class GSplatStreamRenderer extends RenderNode {
 
         // Update valid instance count (camera back culling)
         const valid = Math.max(0, Math.min(this._validCount, ev.data.count | 0));
-        this.texParams[2] = valid;
-        this.texParams[0] = valid;
+        this.setCount(valid);
         this._updateTexParams();
 
         // Only render instances needed for visible splats (exclude splats behind camera)
@@ -845,14 +844,19 @@ export class GSplatStreamRenderer extends RenderNode {
    */
   public setVisBoost(v: number) {
     this.texParams[3] = Math.max(0.0, v);
+    this._texParamDirty = true;
   }
   
   public setCount(c: number) {
     this.texParams[0] = Math.max(0, c);
+    this._texParamDirty = true;
   }
   
   private _updateTexParams() {
-    this.gsplatMaterial.setTexParams(this.texParams);
+    if (this._texParamDirty) {
+      this.gsplatMaterial.setTexParams(this.texParams);
+      this._texParamDirty = false;
+    }
   }
 
   /**
@@ -924,6 +928,11 @@ export class GSplatStreamRenderer extends RenderNode {
     renderPassState: RendererPassState,
     clusterLightingBuffer?: ClusterLightingBuffer
   ) {
+    if (this._validCount > 0 && view?.camera) {
+      if (view.camera.viewMatrix) {
+        this.scheduleOrder(view.camera.viewMatrix);
+      }
+    }
     // Flush any pending updates before rendering
     if (this._pendingUpdates.size > 0 && this._frameCount >= 60) {
       this.flushUpdates();
@@ -933,6 +942,8 @@ export class GSplatStreamRenderer extends RenderNode {
     } 
     this._frameCount++;
 
+    this._updateTexParams();
+    
     const worldMatrix = this.object3D.transform.worldMatrix;
     this.gsplatMaterial.setTransformMatrix(worldMatrix);
 
