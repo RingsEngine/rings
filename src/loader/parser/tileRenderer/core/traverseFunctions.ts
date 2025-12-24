@@ -350,12 +350,12 @@ export function toggleTiles(tile: Tile, renderer: TilesRenderer): void {
       const wasActive = (tile as any).__wasSetActive;
 
       if (wasActive !== setActive) {
-        renderer.setTileActive(tile, setActive);
+        renderer.setTileDelayedActive(tile, setActive);
         (tile as any).__wasSetActive = setActive;
       }
 
       if (wasVisible !== setVisible) {
-        renderer.setTileVisible(tile, setVisible);
+        renderer.setTileDelayedVisible(tile, setVisible);
         (tile as any).__wasSetVisible = setVisible;
       }
     }

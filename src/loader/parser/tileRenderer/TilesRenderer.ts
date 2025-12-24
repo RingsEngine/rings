@@ -211,6 +211,8 @@ export class TilesRenderer {
 
   // Tiles that should be hidden but are delayed due to children loading
   protected _delayedHideTiles: Set<Tile> = new Set();
+  protected _delayedVisibleTiles: Set<Tile> = new Set();
+  protected _delayedActiveTiles: Set<Tile> = new Set();
 
   // Rings-specific: Scene group
   public readonly group: Object3D;
@@ -360,6 +362,8 @@ export class TilesRenderer {
 
     // 5. traverse tile tree and mark
     this._checkDelayedHideTiles();
+    this._checkDelayedActiveTiles();
+    this._checkDelayedVisibleTiles();
     markUsedTiles(root, this);
     markUsedSetLeaves(root, this);
     markVisibleTiles(root, this);
@@ -939,7 +943,6 @@ export class TilesRenderer {
 
     if (scene) {
       tile.cached.scene = scene;
-      tile.loadingState = LOADED;
 
       // No longer apply transform here because all tiles are directly mounted under group
       // Transform will be applied in setTileActive with accumulated world transform
@@ -969,12 +972,27 @@ export class TilesRenderer {
 
       // If tile is already active, immediately add to scene group
       // This way scene objects can be displayed immediately after loading, without waiting for next toggleTiles call
+      
       // if (tile.active) 
       {
-        this.setTileActive(tile, true);
+        this.setTileImmediateActive(tile);
         tile.active = true;
+        (tile as any).__wasSetActive = true;
         this.stats.active++;
       }
+      // if (tile.visible) 
+      {
+        this.setTileImmediateVisible(tile);
+        tile.visible = true;
+        (tile as any).__wasSetVisible = true;
+        this.stats.visible++;
+      }
+      tile.loadingState = LOADED;
+      tile.usedLastFrame = true;
+      // markUsedTiles(tile, this);
+      // markUsedSetLeaves(tile, this);
+      markVisibleTiles(tile, this);
+      toggleTiles(tile, this);
     } else {
       tile.loadingState = FAILED;
       this.stats.failed++;
@@ -992,42 +1010,80 @@ export class TilesRenderer {
   /**
    * Set tile active state
    */
-  setTileActive(tile: Tile, active: boolean): void {
+  setTileDelayedActive(tile: Tile, active: boolean): void {
     if (active) {
       this._activeTiles.add(tile);
       if (this._delayedHideTiles.has(tile)) {
         this._delayedHideTiles.delete(tile);
       }
+      if (!this._delayedActiveTiles.has(tile)) {
+        this._delayedActiveTiles.add(tile);
+      }
     } else {
       this._activeTiles.delete(tile);
-    }
-
-    const scene = tile.cached.scene;
-    if (!scene) {
-      return;
-    }
-
-    if (active) {
-      // All tiles' scenes are directly added under group, no parent-child relationship
-      // This allows independent control of each tile's visibility, avoiding parent tile hiding affecting child tiles
-      if (!this.group.entityChildren.includes(scene)) {
-        // If scene is already added elsewhere (e.g., wrong parent scene), remove first
-        if (scene.parent) {
-          scene.parent.object3D.removeChild(scene);
-        }
-        this.group.addChild(scene);
-      }
-      
-      // Apply accumulated world transform (because there's no parent-child relationship, need to apply full transform)
-      if (tile.cached.worldTransform) {
-        this._applyWorldTransform(scene.transform, tile.cached.worldTransform);
-      }
-      
-      // Set visibility (Rings uses transform.enable)
-      scene.transform.enable = true;
-    } else {
       if (!this._delayedHideTiles.has(tile)) {
         this._delayedHideTiles.add(tile);
+      }
+      if (this._delayedActiveTiles.has(tile)) {
+        this._delayedActiveTiles.delete(tile);
+      }
+    }
+
+    // const scene = tile.cached.scene;
+    // if (!scene && !tile.hasRenderableContent) {
+    //   return;
+    // }
+
+    // if (active) {
+    //   if (scene) {
+    //     // All tiles' scenes are directly added under group, no parent-child relationship
+    //     // This allows independent control of each tile's visibility, avoiding parent tile hiding affecting child tiles
+    //     if (!this.group.entityChildren.includes(scene)) {
+    //       // If scene is already added elsewhere (e.g., wrong parent scene), remove first
+    //       if (scene.parent) {
+    //         scene.parent.object3D.removeChild(scene);
+    //       }
+    //       this.group.addChild(scene);
+    //     }
+        
+    //     // Apply accumulated world transform (because there's no parent-child relationship, need to apply full transform)
+    //     if (tile.cached.worldTransform) {
+    //       this._applyWorldTransform(scene.transform, tile.cached.worldTransform);
+    //     }
+        
+    //     // Set visibility (Rings uses transform.enable)
+    //     // scene.transform.enable = true;
+    //   }
+    // } else {
+    //   if (!this._delayedHideTiles.has(tile)) {
+    //     this._delayedHideTiles.add(tile);
+    //   }
+    // }
+  }
+
+  setTileImmediateActive(tile: Tile): void {
+    if (tile.hasRenderableContent) {
+      const scene = tile.cached.scene;
+      if (scene) {
+        if (!this.group.entityChildren.includes(scene)) {
+          if (scene.parent) {
+            scene.parent.object3D.removeChild(scene);
+          }
+          this.group.addChild(scene);
+        }
+        
+        if (tile.cached.worldTransform) {
+          this._applyWorldTransform(scene.transform, tile.cached.worldTransform);
+        }
+      }
+    }
+  }
+
+  setTileImmediateVisible(tile: Tile): void {
+    if (tile.hasRenderableContent) {
+      const scene = tile.cached.scene;
+      if (scene) {
+        scene.transform.enable = true;
       }
     }
   }
@@ -1040,40 +1096,88 @@ export class TilesRenderer {
       return;
     }
     for (const tile of this._delayedHideTiles) {
-      this._delayedHideTiles.delete(tile);
       const scene = tile.cached.scene;
       if (scene) {
         scene.transform.enable = false;
+        this._delayedHideTiles.delete(tile);
       }      
+    }
+  }
+
+  private _checkDelayedActiveTiles(): void {
+    for (const tile of this._delayedActiveTiles) {
+      if (tile.hasRenderableContent) {
+        const scene = tile.cached.scene;
+        if (scene) {
+          if (!this.group.entityChildren.includes(scene)) {
+            if (scene.parent) {
+              scene.parent.object3D.removeChild(scene);
+            }
+            this.group.addChild(scene);
+          }
+          
+          if (tile.cached.worldTransform) {
+            this._applyWorldTransform(scene.transform, tile.cached.worldTransform);
+          }
+          this._delayedActiveTiles.delete(tile);
+        }
+      } else {
+        this._delayedActiveTiles.delete(tile);
+      }
+    }
+  }
+
+  private _checkDelayedVisibleTiles(): void {
+    for (const tile of this._delayedVisibleTiles) {
+      if (tile.hasRenderableContent) {
+        const scene = tile.cached.scene;
+        if (scene) {
+          scene.transform.enable = true;
+          this._delayedVisibleTiles.delete(tile);
+        }
+      } else {
+        this._delayedVisibleTiles.delete(tile);
+      }
     }
   }
 
   /**
    * Set tile visibility
    */
-  setTileVisible(tile: Tile, visible: boolean): void {
+  setTileDelayedVisible(tile: Tile, visible: boolean): void {
     if (visible) {
       this._visibleTiles.add(tile);
       if (this._delayedHideTiles.has(tile)) {
         this._delayedHideTiles.delete(tile);
       }
+      if (!this._delayedVisibleTiles.has(tile)) {
+        this._delayedVisibleTiles.add(tile);
+      }
     } else {
       this._visibleTiles.delete(tile);
-    }
-
-    const scene = tile.cached.scene;
-    if (!scene) {
-      return;
-    }
-
-    if (visible) {
-      // Set visible
-      scene.transform.enable = true;
-    } else {
       if (!this._delayedHideTiles.has(tile)) {
         this._delayedHideTiles.add(tile);
       }
+      if (this._delayedVisibleTiles.has(tile)) {
+        this._delayedVisibleTiles.delete(tile);
+      }
     }
+
+    // const scene = tile.cached.scene;
+    // if (!scene && !tile.hasRenderableContent) {
+    //   return;
+    // }
+
+    // if (visible) {
+    //   // Set visible
+    //   if (scene) {
+    //     scene.transform.enable = true;
+    //   }
+    // } else {
+    //   if (!this._delayedHideTiles.has(tile)) {
+    //     this._delayedHideTiles.add(tile);
+    //   }
+    // }
   }
 
   /**

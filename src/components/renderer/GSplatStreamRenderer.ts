@@ -928,7 +928,7 @@ export class GSplatStreamRenderer extends RenderNode {
     renderPassState: RendererPassState,
     clusterLightingBuffer?: ClusterLightingBuffer
   ) {
-    if (this._validCount > 0 && view?.camera) {
+    if (this._validCount > 0 && view?.camera && this._frameCount >= 60) {
       if (view.camera.viewMatrix) {
         this.scheduleOrder(view.camera.viewMatrix);
       }
