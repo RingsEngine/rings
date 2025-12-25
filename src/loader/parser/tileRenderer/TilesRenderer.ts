@@ -53,6 +53,7 @@ export interface TilesRendererStats {
   used: number;
   active: number;
   visible: number;
+  sceneCount: number;
   inCacheSinceLoad: number;
 }
 
@@ -188,6 +189,7 @@ export class TilesRenderer {
     used: 0,
     active: 0,
     visible: 0,
+    sceneCount: 0,
     inCacheSinceLoad: 0,
   };
 
@@ -987,6 +989,7 @@ export class TilesRenderer {
         (tile as any).__wasSetVisible = true;
         this.stats.visible++;
       }
+      this.stats.sceneCount++;
       tile.loadingState = LOADED;
       tile.usedLastFrame = true;
       // markUsedTiles(tile, this);
