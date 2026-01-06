@@ -19,6 +19,9 @@ export class GPUContext {
   public static matrixCount: number = 0;
   public static lastRenderPassState: RendererPassState;
   public static LastCommand: GPUCommandEncoder | null;
+  
+  private static multiTextureViewCache: WeakMap<GPUTexture, GPUTextureView> = new WeakMap();
+  private static swapchainTextureCache: { texture: GPUTexture | null; view: GPUTextureView | null } = { texture: null, view: null };
 
   public static bindPipeline(
     encoder: GPURenderPassEncoder | GPURenderBundleEncoder,
@@ -140,23 +143,41 @@ export class GPUContext {
           renderPassState.multisample > 0 &&
           renderPassState.renderTargets.length == 1
         ) {
-          att.view = renderPassState.multiTexture.createView();
+          let multiView = this.multiTextureViewCache.get(renderPassState.multiTexture);
+          if (!multiView) {
+            multiView = renderPassState.multiTexture.createView();
+            this.multiTextureViewCache.set(renderPassState.multiTexture, multiView);
+          }
+          att.view = multiView;
           att.resolveTarget = renderTarget.getGPUView();
         } else {
-          att.view = renderTarget.getGPUTexture().createView();
+          att.view = renderTarget.getGPUView();
         }
       }
       return command.beginRenderPass(renderPassState.renderPassDescriptor);
     } else {
       let att0 = renderPassState.renderPassDescriptor.colorAttachments[0];
       if (att0) {
+        const swapchainTexture = webGPUContext.context.getCurrentTexture();
         if (renderPassState.multisample > 0) {
-          att0.view = renderPassState.multiTexture.createView();
-          att0.resolveTarget = webGPUContext.context
-            .getCurrentTexture()
-            .createView();
+          let multiView = this.multiTextureViewCache.get(renderPassState.multiTexture);
+          if (!multiView) {
+            multiView = renderPassState.multiTexture.createView();
+            this.multiTextureViewCache.set(renderPassState.multiTexture, multiView);
+          }
+          att0.view = multiView;
+          
+          if (this.swapchainTextureCache.texture !== swapchainTexture) {
+            this.swapchainTextureCache.texture = swapchainTexture;
+            this.swapchainTextureCache.view = swapchainTexture.createView();
+          }
+          att0.resolveTarget = this.swapchainTextureCache.view;
         } else {
-          att0.view = webGPUContext.context.getCurrentTexture().createView();
+          if (this.swapchainTextureCache.texture !== swapchainTexture) {
+            this.swapchainTextureCache.texture = swapchainTexture;
+            this.swapchainTextureCache.view = swapchainTexture.createView();
+          }
+          att0.view = this.swapchainTextureCache.view;
         }
       }
       return command.beginRenderPass(renderPassState.renderPassDescriptor);
