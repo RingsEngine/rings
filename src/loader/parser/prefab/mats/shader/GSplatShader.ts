@@ -1,4 +1,4 @@
-import { GPUCullMode, GPUPrimitiveTopology } from "../../../../../gfx/graphics/webGpu/WebGPUConst";
+import { GPUCompareFunction, GPUCullMode, GPUPrimitiveTopology } from "../../../../../gfx/graphics/webGpu/WebGPUConst";
 import { RenderShaderPass } from "../../../../../gfx/graphics/webGpu/shader/RenderShaderPass";
 import { Shader } from "../../../../../gfx/graphics/webGpu/shader/Shader";
 import { PassType } from "../../../../../gfx/renderJob/passRenderer/state/PassType";
@@ -25,8 +25,10 @@ export class GSplatShader extends Shader {
     pass.cullMode = GPUCullMode.none;
     pass.shaderState.transparent = true;
     pass.shaderState.blendMode = BlendMode.NORMAL;
-    pass.shaderState.writeMasks = [0xF, 0xF];
+    // Only write to first color attachment (color), skip gBuffer attachment for performance
+    pass.shaderState.writeMasks = [0xF, 0x0];
     pass.shaderState.castReflection = false;
+    pass.shaderState.depthCompare = GPUCompareFunction.less;
 
     this.addRenderPass(pass);
     this.setDefault();

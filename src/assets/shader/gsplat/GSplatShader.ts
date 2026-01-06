@@ -108,11 +108,23 @@ export const GSplat_VS: string = /* wgsl */ `
         let radius = length(vec2f((diagonal1 - diagonal2) * 0.5, offDiagonal));
         let lambda1 = mid + radius;
         let lambda2 = max(mid - radius, MIN_LAMBDA);
+
+        let vmin = min(MAX_SPLAT_SIZE, min(viewport.x, viewport.y));
+        let l1 = 2.0 * min(sqrt(2.0 * lambda1), vmin);
+        let l2 = 2.0 * min(sqrt(2.0 * lambda2), vmin);
+
+        // if (l1 < 2.0 && l2 < 2.0) {
+        //     return discardSplat();
+        // }
+
+        let centerProj = projMat * vec4f(splat_cam, 1.0);
+        let c = centerProj.ww * vec2f(1.0 / viewport.x, 1.0 / viewport.y);
+
         let diagonalVector = normalize(vec2f(offDiagonal, lambda1 - diagonal1));
         
         // Calculate axis vectors with size clamping
-        let v1 = min(sqrt(2.0 * lambda1), MAX_SPLAT_SIZE) * diagonalVector;
-        let v2 = min(sqrt(2.0 * lambda2), MAX_SPLAT_SIZE) * vec2f(diagonalVector.y, -diagonalVector.x);
+        let v1 = l1 * diagonalVector;
+        let v2 = l2 * vec2f(diagonalVector.y, -diagonalVector.x);
         
         // WebGPU Y-axis flip: WebGPU NDC Y goes from top(-1) to bottom(1), opposite of WebGL
         return vec4f(v1.x, -v1.y, v2.x, -v2.y);
@@ -178,11 +190,13 @@ export const GSplat_VS: string = /* wgsl */ `
         let v1v2 = calcV1V2(splat_cam.xyz, splatData.covA, splatData.covB, W, viewport, matrix_projection);
         
         // Calculate scale based on alpha (optimized formula)
-        let scale = min(1.0, sqrt(LOG_255 + log(color.a)) * 0.5);
+        let t = pow(splat_cam.z + 0.5, 5);
+        let scale = min(1.0, sqrt(-log(1.0 / (255.0 * color.a))) / 2.0);
         
         // Apply visBoost (size multiplier)
         let visBoost = materialUniform.tex_params.w;
-        let v1v2_scaled = v1v2 * (scale * visBoost);
+        let expt = exp(-1.0 / t);
+        let v1v2_scaled = v1v2 * (scale * visBoost * expt);
         
         // Pixel coverage culling (vectorized squared length calculation)
         let v1v2_sq = v1v2_scaled * v1v2_scaled;
@@ -216,7 +230,7 @@ export const GSplat_VS: string = /* wgsl */ `
         
         var o: VSOut;
         o.member = splat_proj + vec4f(offset, 0.0, 0.0);
-        o.vTexCoord = vertex_pos * (scale * 0.5);
+        o.vTexCoord = vertex_pos * (scale);
         o.vColor = color;
         
         return o;
@@ -228,16 +242,30 @@ export const GSplat_FS: string = /* wgsl */ `
     
     // Constants
     const ALPHA_THRESHOLD: f32 = 0.00392156863; // 1.0 / 255.0
-    const GAUSSIAN_SCALE: f32 = 4.0;
+    // const GAUSSIAN_SCALE: f32 = 4.0;
+    const EXP4      = exp(-4.0);
+    const INV_EXP4  = 1.0 / (1.0 - EXP4);
+
+    fn normExp(x: f32) -> f32 {
+        return (exp(x * -4.0) - EXP4) * INV_EXP4;
+    }
 
     // === evalSplat() - optimized gaussian evaluation ===
     fn evalSplat(texCoord: vec2f, color: vec4f) -> vec4f {
         let A = dot(texCoord, texCoord);
+
+        if (A > 1.0) {
+            discard;
+            // return vec4f(1.0, 0.0, 0.0, 0.5);
+        }
         
         // Branch-less optimization using select
-        let gaussian = exp(-A * GAUSSIAN_SCALE) * color.a;
-        let alpha = select(gaussian, 0.0, A > 1.0 || gaussian < ALPHA_THRESHOLD);
-        
+        var alpha = normExp(A) * color.a;
+
+        if (alpha < ALPHA_THRESHOLD) {
+            discard;
+            // alpha = 0.5;
+        }
         return vec4f(color.rgb, alpha);
     }
 

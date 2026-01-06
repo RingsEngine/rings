@@ -20,10 +20,10 @@ export class GSplatGeometry extends GeometryBase {
     const meshPositions = new Float32Array(12 * batchSize);
     for (let i = 0; i < batchSize; ++i) {
       meshPositions.set([
-        -2, -2, i,
-         2, -2, i,
-         2,  2, i,
-        -2,  2, i
+        -1, -1, i,
+         1, -1, i,
+         1,  1, i,
+        -1,  1, i
       ], i * 12);
     }
     
