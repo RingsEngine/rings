@@ -36,6 +36,7 @@ export type SplatData = {
  */
 @RegisterComponent(GSplatStreamRenderer, "GSplatStreamRenderer")
 export class GSplatStreamRenderer extends RenderNode {
+  static flushFrameLimit = 60;
   // Splat count and texture dimensions
   public totalCount: number = 0;
   public size: Vector2 = new Vector2();
@@ -934,10 +935,10 @@ export class GSplatStreamRenderer extends RenderNode {
       }
     }
     // Flush any pending updates before rendering
-    if (this._pendingUpdates.size > 0 && this._frameCount >= 60) {
+    if (this._pendingUpdates.size > 0 && this._frameCount >= GSplatStreamRenderer.flushFrameLimit) {
       this.flushUpdates();
     }
-    if (this._frameCount >= 60 && this._pendingUpdates.size === 0) {
+    if (this._frameCount >= GSplatStreamRenderer.flushFrameLimit && this._pendingUpdates.size === 0) {
         this._frameCount = 0;
     } 
     this._frameCount++;
