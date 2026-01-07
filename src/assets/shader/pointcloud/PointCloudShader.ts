@@ -123,7 +123,6 @@ export const PointCloud_FS: string = /* wgsl */ `
         }
         
         o.color = vColor;
-        o.gBuffer = vec4f(0.0);
         return o;
     }
 `;

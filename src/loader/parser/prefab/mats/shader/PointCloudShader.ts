@@ -31,7 +31,7 @@ export class PointCloudShader extends Shader {
     
     pass.shaderState.transparent = false;
     pass.shaderState.blendMode = BlendMode.NORMAL;
-    pass.shaderState.writeMasks = [0xF, 0xF];
+    pass.shaderState.writeMasks = [0xF, 0x0];
     
     pass.shaderState.castReflection = false;
     
