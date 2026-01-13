@@ -43,13 +43,15 @@ export const GSplat_VS: string = /* wgsl */ `
     }
     
     // === calcSplatUV() - returns optional UV ===
-    fn calcSplatUV(orderId: u32, textureWidth: u32, numSplats: u32) -> vec2<i32> {
+    fn getSplatId(orderId: u32, textureWidth: u32, numSplats: u32) -> u32 {
         let orderUV = vec2<i32>(
             i32(orderId % textureWidth),
             i32(orderId / textureWidth)
         );
         
-        let splatId = textureLoad(splatOrder, orderUV, 0).r;
+        return u32(textureLoad(splatOrder, orderUV, 0).r);
+    }
+    fn calcSplatUV(splatId: u32, textureWidth: u32, numSplats: u32) -> vec2<i32> {
         return vec2<i32>(
             i32(splatId % textureWidth),
             i32(splatId / textureWidth)
@@ -148,9 +150,11 @@ export const GSplat_VS: string = /* wgsl */ `
         if (orderId >= numSplats) {
             return discardSplat();
         }
+
+        let splatId = getSplatId(orderId, textureWidth, numSplats);
         
         // Calculate splat UV and load all data in one go
-        let splatUV = calcSplatUV(orderId, textureWidth, numSplats);
+        let splatUV = calcSplatUV(splatId, textureWidth, numSplats);
         let splatData = getSplatData(splatUV);
         
         // Load color early for alpha test
