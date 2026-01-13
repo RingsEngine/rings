@@ -244,6 +244,8 @@ export class TilesRenderer {
     queueProcessTime: 0,
   };
 
+  public transCdnUrlFunc: (oriUrl: string) => string = null;
+
   constructor(url: string | null = null) {
     this.rootURL = url;
 
@@ -832,7 +834,7 @@ export class TilesRenderer {
       return parts.length > 1 ? parts[parts.length - 1] : '';
     };
     const extension = getUrlExtension(uri);
-    const fullUrl = url;
+    const fullUrl = this.transCdnUrlFunc ? this.transCdnUrlFunc(url) : url;
 
     let scene: Object3D | null = null;
 
