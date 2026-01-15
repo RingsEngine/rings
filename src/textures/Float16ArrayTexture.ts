@@ -57,29 +57,27 @@ function batchConvertToHalfFloat(src: number[], dst: Uint16Array, offset: number
  */
 export class Float16ArrayTexture extends Texture {
   public uint16Array: Uint16Array;
-  public floatArray: number[];
   private _dataBuffer: GPUBuffer;
   /**
-   * 使用数字数组填充纹理，格式为[红0, 绿0, 蓝0, 透明度0, 红1, 绿1, 蓝1, 透明度1...]
+   * 使用 Uint16Array 填充纹理（Float16 格式），格式为[红0, 绿0, 蓝0, 透明度0, 红1, 绿1, 蓝1, 透明度1...]
    * @param width 纹理宽度
    * @param height 纹理高度
-   * @param numbers 每个像素的颜色值数组
+   * @param data Float16 数据数组（Uint16Array），每个元素是一个 Float16 值
    * @param useMipmap 是否生成Mipmap
    * @returns 返回纹理实例
    */
   public create(
     width: number,
     height: number,
-    numbers: number[] = null,
+    data: Uint16Array | null = null,
     mipmap: boolean = true
   ): this {
-    if (numbers == null) {
-      numbers = [];
-      for (let i = 0, c = width * height * 4; i < c; i++) {
-        numbers[i] = 0;
-      }
+    if (data == null) {
+      const size = width * height * 4;
+      data = new Uint16Array(size);
+      data.fill(0);
     }
-    this.updateTexture(width, height, numbers, mipmap);
+    this.updateTexture(width, height, data, mipmap);
     return this;
   }
 
@@ -87,7 +85,7 @@ export class Float16ArrayTexture extends Texture {
    * 更新纹理内容
    * @param width 纹理宽度
    * @param height 纹理高度
-   * @param numbers 像素数据数组
+   * @param data Float16 数据数组（Uint16Array），每个元素是一个 Float16 值
    * @param mipmap 是否生成Mipmap
    * @param startRow 起始行（部分更新）
    * @param rowCount 更新的行数（部分更新）
@@ -95,7 +93,7 @@ export class Float16ArrayTexture extends Texture {
   public updateTexture(
     width: number,
     height: number,
-    numbers: number[],
+    data: Uint16Array,
     mipmap: boolean = true,
     startRow?: number,
     rowCount?: number
@@ -107,7 +105,8 @@ export class Float16ArrayTexture extends Texture {
       this.gpuTexture = null;
     }
 
-    this.floatArray = numbers;
+    // Store reference to the data
+    this.uint16Array = data;
     let device = webGPUContext.device;
     const bytesPerRow = width * 4 * 2;
     this.format = GPUTextureFormat.rgba16float;
@@ -121,20 +120,8 @@ export class Float16ArrayTexture extends Texture {
       const updateOffset = startRow * width * 4; // Offset in elements
       const updateLength = updateHeight * width * 4;
       
-      // Only convert the data we need to update
-      if (!this.uint16Array || this.uint16Array.length < updateOffset + updateLength) {
-        // Ensure uint16Array is large enough for the full texture
-        if (!this.uint16Array || this.uint16Array.length < numbers.length) {
-          this.uint16Array = new Uint16Array(numbers.length);
-        }
-      }
-      
-      // Convert only the updated portion (optimized batch conversion)
-      const uint16Array = this.uint16Array;
-      batchConvertToHalfFloat(numbers, uint16Array, updateOffset, updateLength);
-      
       // Create subarray for the update region
-      const updateData = uint16Array.subarray(updateOffset, updateOffset + updateLength);
+      const updateData = data.subarray(updateOffset, updateOffset + updateLength);
       
       // Reuse buffer if size is sufficient, otherwise recreate
       const neededSize = updateData.byteLength;
@@ -173,14 +160,8 @@ export class Float16ArrayTexture extends Texture {
       return;
     }
 
-    // Full update: convert entire array
-    if (!this.uint16Array || this.uint16Array.length != numbers.length) {
-      this.uint16Array = new Uint16Array(numbers.length);
-    }
-    const uint16Array = this.uint16Array;
-    
-    // Convert all numbers to half float (optimized batch conversion)
-    batchConvertToHalfFloat(numbers, uint16Array, 0, numbers.length);
+    // Full update: use data directly
+    const uint16Array = data;
 
     // Reuse buffer if size is sufficient, otherwise recreate
     const neededSize = uint16Array.byteLength;

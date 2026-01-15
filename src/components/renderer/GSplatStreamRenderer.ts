@@ -88,7 +88,7 @@ export class GSplatStreamRenderer extends RenderNode {
   // CPU-side data buffers (pre-allocated)
   private _colorData: Uint8Array; // RGBA8: count * 4
   private _transformAData: Uint32Array; // RGBA32U: count * 4
-  private _transformBData: number[]; // RGBA16F: count * 4
+  private _transformBData: Uint16Array; // RGBA16F: count * 4 (Float16 format)
   private _orderData: Uint32Array; // R32U: size.x * size.y
   private _positions: Float32Array; // xyz per splat (local space)
   // private _worldPositions: Float32Array; // xyz per splat (world space, cached)
@@ -157,8 +157,9 @@ export class GSplatStreamRenderer extends RenderNode {
     this._transformAData = new Uint32Array(total * 4);
     this._transformAData.fill(0);
 
-    // TransformB buffer: RGBA16F
-    this._transformBData = new Array<number>(total * 4).fill(0);
+    // TransformB buffer: RGBA16F (Float16 format)
+    this._transformBData = new Uint16Array(total * 4);
+    this._transformBData.fill(0);
 
     // Order buffer: R32U
     this._orderData = new Uint32Array(total);
@@ -348,12 +349,12 @@ export class GSplatStreamRenderer extends RenderNode {
     const cBy = r01 * r02 + r11 * r12 + r21 * r22;
     const cBz = r02 * r02 + r12 * r12 + r22 * r22;
 
-    // Write transformB (covA.xyz, covB.z)
+    // Write transformB (covA.xyz, covB.z) as Float16
     const bidx = idx;
-    this._transformBData[bidx + 0] = cAx;
-    this._transformBData[bidx + 1] = cAy;
-    this._transformBData[bidx + 2] = cAz;
-    this._transformBData[bidx + 3] = cBz;
+    this._transformBData[bidx + 0] = toHalfFloat(cAx) & 0xffff;
+    this._transformBData[bidx + 1] = toHalfFloat(cAy) & 0xffff;
+    this._transformBData[bidx + 2] = toHalfFloat(cAz) & 0xffff;
+    this._transformBData[bidx + 3] = toHalfFloat(cBz) & 0xffff;
 
     // Pack transformA.w as half2(cB.x, cB.y)
     const hx = toHalfFloat(cBx) & 0xffff;

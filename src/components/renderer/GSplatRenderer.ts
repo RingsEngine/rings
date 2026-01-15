@@ -404,8 +404,9 @@ export class GSplatRenderer extends RenderNode {
 
     // transformA: uint32 RGBA (xyz as floatBits, w packs half2 of covB.xy)
     const tA = new Uint32Array(w * h * 4);
-    // transformB: half rgba16f (covA.xyz, covB.z)
-    const tB = new Array<number>(w * h * 4).fill(0);
+    // transformB: half rgba16f (covA.xyz, covB.z) - Float16 format
+    const tB = new Uint16Array(w * h * 4);
+    tB.fill(0);
 
     // Pack floatBits safely
     const fb = new ArrayBuffer(4);
@@ -488,12 +489,12 @@ export class GSplatRenderer extends RenderNode {
       const cBy = r01 * r02 + r11 * r12 + r21 * r22;
       const cBz = r02 * r02 + r12 * r12 + r22 * r22;
 
-      // Write transformB (covA.xyz, covB.z)
+      // Write transformB (covA.xyz, covB.z) as Float16
       const bidx = idx;
-      tB[bidx + 0] = cAx;
-      tB[bidx + 1] = cAy;
-      tB[bidx + 2] = cAz;
-      tB[bidx + 3] = cBz;
+      tB[bidx + 0] = toHalfFloat(cAx) & 0xffff;
+      tB[bidx + 1] = toHalfFloat(cAy) & 0xffff;
+      tB[bidx + 2] = toHalfFloat(cAz) & 0xffff;
+      tB[bidx + 3] = toHalfFloat(cBz) & 0xffff;
 
       // Pack transformA.w as half2(cB.x, cB.y)
       const hx = toHalfFloat(cBx) & 0xffff;
