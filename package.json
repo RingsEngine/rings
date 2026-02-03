@@ -1,6 +1,6 @@
 {
   "name": "@rings-webgpu/core",
-  "version": "1.0.48",
+  "version": "1.0.49",
   "description": "Rings webgpu Engine",
   "main": "index.js",
   "exports": {
