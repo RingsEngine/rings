@@ -30,7 +30,8 @@ export class PlyStreamParser {
 
   // Async processing state
   private _parseTimeoutId: ReturnType<typeof setTimeout> | ReturnType<typeof requestIdleCallback> | null = null;
-  private _verticesPerChunk: number = 10000000; // Number of vertices to process per chunk
+  static sVerticesPerChunk: number = 10000000; // Number of vertices to process per chunk
+  static sMaxProcessingTime: number = 5; // Maximum processing time per chunk (ms) to avoid blocking
   private _useIdleCallback: boolean = typeof requestIdleCallback !== 'undefined';
 
   constructor(
@@ -310,7 +311,7 @@ export class PlyStreamParser {
     const propIndex = (n: string) => this._properties.findIndex((p) => p.name === n);
 
     const startTime = performance.now();
-    const maxProcessingTime = 5; // Maximum processing time per chunk (ms) to avoid blocking
+    
     let processedInThisChunk = 0;
 
     while (this._processedVertices < vertexCount && !this._cancelled) {
@@ -416,9 +417,9 @@ export class PlyStreamParser {
       }
 
       // Check processing time, pause if exceeded to yield main thread
-      if (processedInThisChunk >= this._verticesPerChunk) {
+      if (processedInThisChunk >= PlyStreamParser.sVerticesPerChunk) {
         const elapsed = performance.now() - startTime;
-        if (elapsed > maxProcessingTime) {
+        if (elapsed > PlyStreamParser.sMaxProcessingTime) {
           // Continue processing asynchronously
           this._scheduleNextChunk();
           return;
