@@ -28,6 +28,11 @@ export class PlyStreamParser {
   private _batchSize: number = 1000;
   private _cancelled: boolean = false;
 
+  // Async processing state
+  private _parseTimeoutId: ReturnType<typeof setTimeout> | ReturnType<typeof requestIdleCallback> | null = null;
+  private _verticesPerChunk: number = 10000000; // Number of vertices to process per chunk
+  private _useIdleCallback: boolean = typeof requestIdleCallback !== 'undefined';
+
   constructor(
     onHeaderParsed: (header: PlyHeader) => void,
     onSplatParsed: (splatData: SplatData, index: number) => void,
@@ -57,6 +62,15 @@ export class PlyStreamParser {
    */
   public cancel(): void {
     this._cancelled = true;
+    // Clear pending async tasks
+    if (this._parseTimeoutId !== null) {
+      if (this._useIdleCallback) {
+        cancelIdleCallback(this._parseTimeoutId as any);
+      } else {
+        clearTimeout(this._parseTimeoutId as number);
+      }
+      this._parseTimeoutId = null;
+    }
   }
 
   /**
@@ -266,9 +280,27 @@ export class PlyStreamParser {
 
   /**
    * Parse vertices from current data buffer
+   * Entry point - checks if async processing is already scheduled
    */
   private _parseVertices(): void {
     if (!this._header || !this._dataBuffer) return;
+    
+    // If async processing is already scheduled, don't start another
+    if (this._parseTimeoutId !== null) {
+      return;
+    }
+
+    this._parseVerticesChunk();
+  }
+
+  /**
+   * Parse a chunk of vertices with time and count limits
+   */
+  private _parseVerticesChunk(): void {
+    if (!this._header || !this._dataBuffer || this._cancelled) {
+      this._parseTimeoutId = null;
+      return;
+    }
 
     // Create DataView from current buffer (buffer may have been reallocated)
     const payload = new DataView(this._dataBuffer.buffer, this._dataBuffer.byteOffset, this._dataBuffer.byteLength);
@@ -277,19 +309,19 @@ export class PlyStreamParser {
     const has = (n: string) => this._properties.find((p) => p.name === n) != null;
     const propIndex = (n: string) => this._properties.findIndex((p) => p.name === n);
 
-    // Parse vertices in batches
+    const startTime = performance.now();
+    const maxProcessingTime = 5; // Maximum processing time per chunk (ms) to avoid blocking
+    let processedInThisChunk = 0;
+
     while (this._processedVertices < vertexCount && !this._cancelled) {
       const v = this._processedVertices;
       const vOffset = v * this._vertexStride;
 
       // Check if we have enough data for this vertex
       if (vOffset + this._vertexStride > this._dataOffset) {
-        break; // Not enough data yet
-      }
-
-      // Check if cancelled
-      if (this._cancelled) {
-        break;
+        // Not enough data yet, wait for more
+        this._parseTimeoutId = null;
+        return;
       }
 
       // Validate required properties
@@ -375,15 +407,59 @@ export class PlyStreamParser {
       }
 
       this._processedVertices++;
+      processedInThisChunk++;
 
-      // Batch processing: yield control every N vertices
+      // Check if batch size reached, pause and yield control
       if (this._processedVertices % this._batchSize === 0) {
-        // Use setTimeout to yield control and prevent blocking
-        setTimeout(() => {
-          this._parseVertices();
-        }, 0);
+        this._scheduleNextChunk();
         return;
       }
+
+      // Check processing time, pause if exceeded to yield main thread
+      if (processedInThisChunk >= this._verticesPerChunk) {
+        const elapsed = performance.now() - startTime;
+        if (elapsed > maxProcessingTime) {
+          // Continue processing asynchronously
+          this._scheduleNextChunk();
+          return;
+        }
+        processedInThisChunk = 0;
+      }
+    }
+
+    // All vertices processed
+    this._parseTimeoutId = null;
+  }
+
+  /**
+   * Schedule next chunk of vertex processing
+   */
+  private _scheduleNextChunk(): void {
+    if (this._cancelled) {
+      this._parseTimeoutId = null;
+      return;
+    }
+
+    if (this._useIdleCallback) {
+      // Use requestIdleCallback to continue processing when browser is idle
+      this._parseTimeoutId = requestIdleCallback((deadline: IdleDeadline) => {
+        this._parseTimeoutId = null;
+        if (!this._cancelled && deadline.timeRemaining() > 0) {
+          this._parseVerticesChunk();
+        } else if (!this._cancelled) {
+          // If not enough time, use setTimeout to delay processing
+          this._parseTimeoutId = setTimeout(() => {
+            this._parseTimeoutId = null;
+            this._parseVerticesChunk();
+          }, 0);
+        }
+      }, { timeout: 100 }) as any;
+    } else {
+      // Use setTimeout to yield main thread
+      this._parseTimeoutId = setTimeout(() => {
+        this._parseTimeoutId = null;
+        this._parseVerticesChunk();
+      }, 0);
     }
   }
 
