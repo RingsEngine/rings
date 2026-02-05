@@ -18,7 +18,7 @@ export class StreamingGaussianSplatParser extends ParserBase {
   private _streamParser: PlyStreamParser | null = null;
   private _streamingRenderer: GSplatStreamRenderer | null = null;
   private _rendererObject: Object3D | null = null;
-  private _chunksPerBatch: number = 1000; // Number of splats to process per batch
+  private _chunksPerBatch: number = 10000; // Number of splats to process per batch
   private _headerParsed: boolean = false;
   private _onHeaderParsed: (() => void) | null = null;
   private _cancelled: boolean = false;
