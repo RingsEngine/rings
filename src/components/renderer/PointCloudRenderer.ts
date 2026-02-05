@@ -39,10 +39,6 @@ export class PointCloudRenderer extends RenderNode {
   }
   private _colors: Uint8Array;
   private _orderData: Uint32Array;
-  private _fullCount: number = 0;
-  get fullCount(): number {
-    return this._fullCount;
-  }
   
   private _batchSize: number = 128;
   public instanceCount: number = 0;
@@ -86,7 +82,6 @@ export class PointCloudRenderer extends RenderNode {
     }
     
     this.count = count;
-    this._fullCount = count;
     this.size = this.evalTextureSize(count);
     
     this._positions = positions;

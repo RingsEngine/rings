@@ -38,7 +38,7 @@ export class BoundUtil {
 
     for (const pointCloudRenderer of pointCloudRenderers) {
       const positions = pointCloudRenderer.positions;
-      const count = pointCloudRenderer.fullCount;
+      const count = pointCloudRenderer.count;
 
       if (!positions || count === 0) {
         console.warn('genPointCloudBounds: No position data available');
