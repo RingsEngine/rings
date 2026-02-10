@@ -260,16 +260,8 @@ export class PointCloudStreamRenderer extends RenderNode {
     }
 
     if (updateRatio < 0.5 && rowCount < h) {
-      const rowStartIdx = minRow * w;
-      const rowEndIdx = (maxRow + 1) * w;
-      const partialRowCount = maxRow - minRow + 1;
-      const partialPositionData = this._positionData.subarray(
-        rowStartIdx * 4,
-        rowEndIdx * 4
-      );
-
       this.pointColor.updateTexture(w, h, this._colorData, minRow, rowCount);
-      this.pointPosition.updateTexture(w, h, partialPositionData, false, minRow, rowCount);
+      this.pointPosition.updateTexture(w, h, this._positionData, false, minRow, rowCount);
     } else {
       this.pointColor.updateTexture(w, h, this._colorData);
       this.pointPosition.updateTexture(w, h, this._positionData, false);
