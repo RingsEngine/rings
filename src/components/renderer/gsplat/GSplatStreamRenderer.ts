@@ -37,6 +37,7 @@ export type SplatData = {
 @RegisterComponent(GSplatStreamRenderer, "GSplatStreamRenderer")
 export class GSplatStreamRenderer extends RenderNode {
   static flushFrameLimit = 60;
+  static useWasmSortWorker = true;
   // Splat count and texture dimensions
   public totalCount: number = 0;
   public size: Vector2 = new Vector2();
@@ -560,7 +561,11 @@ export class GSplatStreamRenderer extends RenderNode {
     this._lastSentTime = now;
 
     if (!this._sortWorker) {
-      this._sortWorker = this.createWasmSortWorker();
+      if (GSplatStreamRenderer.useWasmSortWorker) {
+        this._sortWorker = this.createWasmSortWorker();
+      } else {
+        this._sortWorker = this.createSortWorker();
+      }
       this._sortWorker.onmessage = (ev: MessageEvent) => {
         const newOrder = ev.data.order;
         const oldOrder = this._orderData.buffer;
