@@ -2,7 +2,7 @@ import { ParserBase } from "../ParserBase";
 import { ParserFormat } from "../ParserFormat";
 import { GaussianSplatAsset } from "./GaussianSplatAsset";
 import { PlyStreamParser } from "../ply/PlyStreamParser";
-import { GSplatStreamRenderer, SplatData } from "../../../components/renderer/GSplatStreamRenderer";
+import { GSplatStreamRenderer, SplatData } from "../../../components/renderer/gsplat/GSplatStreamRenderer";
 import { Object3D } from "../../../core/entities/Object3D";
 import { PlyHeader } from "../ply/PlyTypes";
 

@@ -2,7 +2,7 @@ import { Vector3 } from "../math/Vector3";
 import { BoundingBox } from "../core/bound/BoundingBox";
 import { Object3D } from "../core/entities/Object3D";
 import { MeshRenderer } from "../components/renderer/MeshRenderer";
-import { GSplatRenderer } from "../components/renderer/GSplatRenderer";
+import { GSplatRenderer } from "../components/renderer/gsplat/GSplatRenderer";
 import { Matrix4 } from "../math/Matrix4";
 import { PointCloudRenderer } from "../components/renderer/PointCloudRenderer";
 

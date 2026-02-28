@@ -1,4 +1,4 @@
-import { GSplatRenderer } from "../../../components/renderer/GSplatRenderer";
+import { GSplatRenderer } from "../../../components/renderer/gsplat/GSplatRenderer";
 import { MeshRenderer } from "../../../components/renderer/MeshRenderer";
 import { PointCloudRenderer } from "../../../components/renderer/PointCloudRenderer";
 import { Object3D } from "../../../core/entities/Object3D";

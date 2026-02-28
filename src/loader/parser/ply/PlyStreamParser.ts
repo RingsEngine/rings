@@ -1,6 +1,6 @@
 import { PlyHeader, PlyProperty, PlyMode, splatProperties, splatColorProperties } from './PlyTypes';
 import { byteSizeOfType, readByType } from './PlyUtils';
-import { SplatData } from '../../../components/renderer/GSplatStreamRenderer';
+import { SplatData } from '../../../components/renderer/gsplat/GSplatStreamRenderer';
 
 /**
  * Streaming PLY parser for Gaussian Splatting

@@ -1,0 +1,20 @@
+{
+  "name": "@rings/wasm-splat-sort",
+  "version": "0.1.0",
+  "author": "Rings",
+  "description": "WASM-based sorting for Gaussian Splatting",
+  "type": "module",
+  "main": "sort.js",
+  "types": "sort.d.ts",
+  "files": [
+    "sort.js",
+    "sort.wasm",
+    "sort.d.ts",
+    "WasmSplatSort.ts"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rings/rings.git"
+  }
+}

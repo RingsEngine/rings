@@ -1,21 +1,21 @@
-import { RenderNode } from "./RenderNode";
-import { GSplatMaterial } from "../../materials/GSplatMaterial";
-import { GSplatGeometry } from "../../shape/GSplatGeometry";
-import { View3D } from "../../core/View3D";
-import { RendererPassState } from "../../gfx/renderJob/passRenderer/state/RendererPassState";
-import { ClusterLightingBuffer } from "../../gfx/renderJob/passRenderer/cluster/ClusterLightingBuffer";
-import { PassType } from "../../gfx/renderJob/passRenderer/state/PassType";
-import { GPUContext } from "../../gfx/renderJob/GPUContext";
-import { Uint8ArrayTexture } from "../../textures/Uint8ArrayTexture";
-import { Uint32ArrayTexture } from "../../textures/Uint32ArrayTexture";
-import { R32UintTexture } from "../../textures/R32UintTexture";
-import { Float16ArrayTexture } from "../../textures/Float16ArrayTexture";
-import { Vector2 } from "../../math/Vector2";
-import { toHalfFloat } from "../../util/Convert";
-import { Matrix4 } from "../../math/Matrix4";
-import { RegisterComponent } from "../../util/SerializeDecoration";
-import { BoundingBox } from "../../core/bound/BoundingBox";
-import { Vector3 } from "../../math/Vector3";
+import { RenderNode } from "../RenderNode";
+import { GSplatMaterial } from "../../../materials/GSplatMaterial";
+import { GSplatGeometry } from "../../../shape/GSplatGeometry";
+import { View3D } from "../../../core/View3D";
+import { RendererPassState } from "../../../gfx/renderJob/passRenderer/state/RendererPassState";
+import { ClusterLightingBuffer } from "../../../gfx/renderJob/passRenderer/cluster/ClusterLightingBuffer";
+import { PassType } from "../../../gfx/renderJob/passRenderer/state/PassType";
+import { GPUContext } from "../../../gfx/renderJob/GPUContext";
+import { Uint8ArrayTexture } from "../../../textures/Uint8ArrayTexture";
+import { Uint32ArrayTexture } from "../../../textures/Uint32ArrayTexture";
+import { R32UintTexture } from "../../../textures/R32UintTexture";
+import { Float16ArrayTexture } from "../../../textures/Float16ArrayTexture";
+import { Vector2 } from "../../../math/Vector2";
+import { toHalfFloat } from "../../../util/Convert";
+import { Matrix4 } from "../../../math/Matrix4";
+import { RegisterComponent } from "../../../util/SerializeDecoration";
+import { BoundingBox } from "../../../core/bound/BoundingBox";
+import { Vector3 } from "../../../math/Vector3";
 
 /**
  * Single splat data structure for streaming
@@ -560,7 +560,7 @@ export class GSplatStreamRenderer extends RenderNode {
     this._lastSentTime = now;
 
     if (!this._sortWorker) {
-      this._sortWorker = this.createSortWorker();
+      this._sortWorker = this.createWasmSortWorker();
       this._sortWorker.onmessage = (ev: MessageEvent) => {
         const newOrder = ev.data.order;
         const oldOrder = this._orderData.buffer;
@@ -839,6 +839,18 @@ export class GSplatStreamRenderer extends RenderNode {
     const blob = new Blob([code], { type: 'application/javascript' });
     const url = URL.createObjectURL(blob);
     return new Worker(url);
+  }
+
+  /**
+   * Create a WASM-based Web Worker for sorting splats
+   */
+  private createWasmSortWorker(): Worker {
+    // Use a separate Worker file for proper module support
+    // Vite will handle the bundling and path resolution
+    return new Worker(
+      new URL('./WasmSplatSortWorker.ts', import.meta.url),
+      { type: 'module' }
+    );
   }
 
   /**
