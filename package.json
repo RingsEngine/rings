@@ -20,6 +20,9 @@
     "type": "git",
     "url": "git+https://github.com/RingsEngine/rings.git"
   },
+  "publishConfig": {
+    "registry": "https://www.npmjs.com/package/@rings-webgpu/core"
+  },
   "types": "./dist/types/index.d.ts",
   "scripts": {
     "dev": "vite",
