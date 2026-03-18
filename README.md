@@ -221,14 +221,14 @@ src/
 
 ### 安装
 ```bash
-npm install rings-engine
+npm i @rings-webgpu/core
 # 或使用pnpm
-pnpm add rings-engine
+pnpm add @rings-webgpu/core
 ```
 
 ### 基础使用
 ```typescript
-import { Engine3D, Scene3D, Object3D, Camera3D, LitMaterial } from 'rings-engine';
+import { Engine3D, Scene3D, Object3D, Camera3D, LitMaterial } from '@rings-webgpu/core';
 
 // 初始化引擎
 await Engine3D.init();
