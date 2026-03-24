@@ -1,4 +1,4 @@
-import { Vector3, Quaternion, DEGREES_TO_RADIANS } from "@rings/core";
+import { Vector3, Quaternion, DEGREES_TO_RADIANS } from "@rings-webgpu/core";
 import { Ammo } from "../Physics";
 
 /**

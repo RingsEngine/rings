@@ -1,4 +1,4 @@
-import { ComponentBase, Vector3 } from "@rings/core";
+import { ComponentBase, Vector3 } from "@rings-webgpu/core";
 import { Ammo, Physics } from "../Physics";
 import { TempPhyMath } from "../utils/TempPhyMath";
 import { CollisionEventHandler } from "./RigidbodyExpansion";

@@ -1,0 +1,108 @@
+/**
+ * Rings 文档：标题层级与正文排版
+ * 在 vue.css 之后加载，用于覆盖默认字号
+ */
+
+:root {
+  --rings-doc-text: #2c3e50;
+  --rings-doc-muted: #5c6b7a;
+  --rings-doc-border: #e8ecf1;
+  --rings-doc-h1: #1a1a2e;
+  --rings-doc-h2: #16213e;
+  --rings-doc-h3: #243447;
+}
+
+/* 正文区域基础 */
+.markdown-section {
+  color: var(--rings-doc-text);
+  font-size: 16px;
+  line-height: 1.7;
+  letter-spacing: 0.01em;
+}
+
+.markdown-section > *:first-child {
+  margin-top: 0;
+}
+
+/* H1：页面主标题 — 最大、底部分隔 */
+.markdown-section h1 {
+  font-size: 2.125rem; /* ~34px */
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--rings-doc-h1);
+  margin: 0 0 1.25rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 2px solid var(--rings-doc-border);
+  letter-spacing: -0.03em;
+}
+
+/* H2：大章节 — 明显小于 H1，上间距拉开区块 */
+.markdown-section h2 {
+  font-size: 1.5rem; /* 24px */
+  font-weight: 650;
+  line-height: 1.35;
+  color: var(--rings-doc-h2);
+  margin: 2.5rem 0 0.85rem;
+  padding-top: 0.35rem;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid var(--rings-doc-border);
+  letter-spacing: -0.02em;
+}
+
+.markdown-section h2:first-of-type {
+  margin-top: 1.5rem;
+}
+
+/* H3：小节 */
+.markdown-section h3 {
+  font-size: 1.2rem; /* ~19px */
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--rings-doc-h3);
+  margin: 1.85rem 0 0.65rem;
+  letter-spacing: -0.01em;
+}
+
+/* H4：更细的子节（若文档中使用 ####） */
+.markdown-section h4 {
+  font-size: 1.05rem; /* ~17px */
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--rings-doc-h3);
+  margin: 1.35rem 0 0.5rem;
+  opacity: 0.95;
+}
+
+/* 侧边栏与顶部标题（Docsify） */
+.sidebar > h1,
+.app-name {
+  font-size: 1.35rem !important;
+  font-weight: 700 !important;
+}
+
+.sidebar-nav > ul > li > a {
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.sidebar-nav ul ul a {
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: var(--rings-doc-muted);
+}
+
+/* 代码块与列表：避免被标题衬得过小 */
+.markdown-section pre {
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+.markdown-section ul,
+.markdown-section ol {
+  margin: 0.5rem 0 1rem;
+}
+
+.markdown-section blockquote {
+  font-size: 0.95rem;
+  color: var(--rings-doc-muted);
+}

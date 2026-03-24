@@ -1,468 +1,152 @@
 # 渲染管线详解
 
-Rings Engine 基于WebGPU构建现代化渲染管线，支持前向渲染、阴影映射、后处理等高级特性。
+本篇说明 **每一帧画面是怎么画出来的**：先做哪些准备，再画场景，最后叠后处理和界面。实现上以 **前向渲染** 为主，代码入口在 **`ForwardRenderJob` / `RendererJob`**（`src/gfx/renderJob/jobs/`）。
 
-## 🎨 渲染架构概览
+**延伸阅读**：[核心概念](./core) · [后处理](./post-processing) · [性能与调优](./performance)
 
-### 渲染管线流程
+---
+
+## 一句话理解
+
+可以把一帧想成一条 **流水线**：先算「哪些灯影响哪些像素」，再画 **阴影贴图**，然后 **画 3D 场景**（含天空、透明物体等），接着做 **全屏后处理**（如泛光、抗锯齿），再画 **2D UI**，最后 **输出到屏幕**。
+
+---
+
+## 一帧里的大致步骤
+
+下面按 **时间顺序** 排列。带「可选」的项由 **`Engine3D.setting`** 里的开关控制，关掉就不会执行。
+
+1. **准备灯光和反射数据**  
+   把当前场景里的光源、反射探针等信息更新到 GPU 可用的缓冲里。
+
+2. **（可选）遮挡查询**  
+   开启 **`occlusionQuery`** 时，用 GPU 查询判断部分物体是否被挡住，减少无效绘制。
+
+3. **分簇光照（Cluster）**  
+   把屏幕划成许多小格子，用计算着色器算出 **每个格子里可能有哪些光源**。主绘制时按格子查表，就能在 **前向渲染** 里支持较多动态光，而不用整套传统延迟渲染。
+
+4. **（可选）画阴影贴图**  
+   先为 **平行光**（含级联阴影 CSM）、再为 **点光** 等生成深度贴图，供后面主通道采样。
+
+5. **（可选）深度预通道**  
+   开启 **`zPrePass`** 时，先快速写一遍深度，减轻后面主通道的 overdraw。
+
+6. **（可选）DDGI 全局光照**  
+   开启 **`gi.enable`** 时，更新并采样辐射度探针等，给场景补间接光。
+
+7. **主绘制**  
+   包括 **环境反射**、**颜色主通道** 等：在这里画不透明物体、天空、透明物体等（具体分组在引擎内部完成）。
+
+8. **后处理**  
+   对整屏图像做 Bloom、TAA、FXAA 等（由 **`PostProcessingComponent`** 或 **`RendererJob.addPost`** 等挂载的效果类决定）。
+
+9. **GUI**  
+   在 3D 之上绘制界面。
+
+10. **呈现到屏幕**  
+    把最终颜色交给 WebGPU 的交换链显示。
 
 ```mermaid
-graph TD
-    A[场景准备] --> B[可见性剔除]
-    B --> C[渲染队列构建]
-    C --> D[预深度渲染]
-    D --> E[主渲染通道]
-    E --> F[天空盒渲染]
-    F --> G[透明物体渲染]
-    G --> H[后处理效果]
-    H --> I[最终输出]
+graph LR
+    A[灯光数据] --> B[分簇]
+    B --> C[阴影]
+    C --> D[主绘制]
+    D --> E[后处理]
+    E --> F[GUI]
+    F --> G[上屏]
 ```
 
-### 渲染阶段详解
+> **给想读源码的同学**：阴影、分簇、深度预通道等会在 **`RendererJob.renderFrame`** 里按固定顺序调用；和「主 Pass 列表」的遍历是两套逻辑，不必死记类名，知道 **先后顺序** 即可。
 
-| 阶段 | 描述 | 优化技术 |
-|------|------|----------|
-| **预深度** | 生成深度缓冲 | Early-Z剔除 |
-| **主渲染** | 不透明物体渲染 | 材质排序 |
-| **天空盒** | 环境背景渲染 | 立方体贴图 |
-| **透明渲染** | 透明物体渲染 | 深度排序 |
-| **后处理** | 全屏效果处理 | 多重采样 |
+---
 
-## 🔍 可见性剔除系统
+## 分簇光照是什么？
 
-### 视锥体剔除
+场景里灯多了，如果每个像素都去算「所有灯」，会很慢。引擎把屏幕分成很多 **簇（Cluster）**，预先算好 **每个簇可能受哪些灯影响**，画像素时只查自己所在簇的灯列表。  
+这是 **前向渲染 + 查表** 的做法，和「先画到 GBuffer 再全屏算光」的经典延迟渲染不是同一种结构。
 
-基于相机视锥体的几何剔除：
+---
+
+## 谁会画在屏幕上？谁会被跳过？
+
+| 问题 | 说明 |
+|------|------|
+| **哪些物体参与绘制？** | 引擎根据 **相机** 和 **场景** 收集带渲染组件的物体（如 `MeshRenderer`），在内部做视锥相关处理。没有对外暴露类似教程里的 `frustum.intersectsBox` 这种一步 API。 |
+| **遮挡** | 使用 **`Engine3D.setting.occlusionQuery`** 时走 **`OcclusionSystem`**；没有 `scene.getOccluders()` 这类通用接口。 |
+| **LOD** | 通用「按距离自动换网格 LOD」要自己在业务里做，或看具体 Loader/示例（如大地形、Tiles）。 |
+
+---
+
+## 「渲染层」RenderLayer 是什么？
+
+这里的 **`RenderLayer`** 是 **位标志**（静态批、动态批、隐藏等），用来打标签或批处理，**不是**「Background=1000、Transparent=3000」那种渲染队列编号。  
+不透明和透明谁先谁后，由 **颜色主通道内部** 的分组和绘制顺序决定。
+
+---
+
+## 灯光与阴影怎么用？
+
+- **平行光** 的类名是 **`DirectLight`**（不是 DirectionalLight）。  
+- **点光** `PointLight`、**聚光灯** `SpotLight`。  
+- 颜色、强度、是否投影等：`lightColor`、`intensity`、**`castShadow`** 等（继承自 **`LightBase`**）。
+
+**阴影清晰度、偏移** 等多数在 **`Engine3D.setting.shadow`** 里统一调（例如 `shadowSize`、`pointShadowSize`、`shadowBias`），而不是每个灯光上单独一个 `shadowResolution`。  
+平行光的 **级联阴影（CSM）** 用 **`Camera3D.enableCSM`** 配合上述全局阴影设置。
 
 ```typescript
-// 相机视锥体定义
-const frustum = camera.frustum;
+import { Object3D, DirectLight, PointLight, SpotLight, Color } from '@rings-webgpu/core';
 
-// 包围盒测试
-const bounds = renderer.bounds;
-if (frustum.intersectsBox(bounds)) {
-    // 对象可见，加入渲染队列
-    renderQueue.add(renderer);
-}
+// 平行光
+const sunObj = new Object3D();
+const dir = sunObj.addComponent(DirectLight);
+dir.lightColor = new Color(1, 1, 1, 1);
+dir.intensity = 1.2;
+dir.castShadow = true;
+
+// 点光：range 为影响距离，at / quadratic 控制衰减曲线
+const pointObj = new Object3D();
+const point = pointObj.addComponent(PointLight);
+point.range = 10;
+point.at = 0.1;
+point.quadratic = 0.01;
+point.castShadow = true;
+
+// 聚光灯：outerAngle 等为角度（度），详见 SpotLight 注释
+const spotObj = new Object3D();
+const spot = spotObj.addComponent(SpotLight);
+spot.outerAngle = 45;
+spot.range = 15;
+spot.castShadow = true;
 ```
 
-### 遮挡剔除
+---
 
-使用层级Z-Buffer进行遮挡测试：
+## 阴影看起来有锯齿或漏光？
 
-```typescript
-// CPU端遮挡剔除
-const occluders = scene.getOccluders();
-for (const renderer of renderers) {
-    if (!occlusionCulling.isVisible(renderer)) {
-        continue; // 被遮挡，跳过渲染
-    }
-    renderQueue.add(renderer);
-}
-```
+优先调 **`Engine3D.setting.shadow`** 里的分辨率、`shadowBias`，以及材质里与 shadow 相关的 uniform（如 `shadowBias`）。具体采样方式在内置 WGSL 里实现，一般不需要自己换一套「PCSS/VSM」命名 API。
 
-### 距离剔除
+---
 
-基于距离的LOD系统：
+## 后处理从哪接？
 
-```typescript
-const distance = Vector3.distance(cameraPos, objectPos);
-const lodLevel = lodSystem.getLODLevel(distance, mesh);
+后处理由 **`PostRenderer`** 统一调度，单个效果是 **`PostBase`** 的子类（例如 Bloom、TAA、FXAA）。  
+可在 **`PostProcessingComponent`** 里 **`addPost`**，或使用 **`RendererJob.addPost`**。详细列表与用法见 [后处理效果](./post-processing)。
 
-if (lodLevel === -1) {
-    // 距离太远，完全剔除
-    continue;
-}
+---
 
-// 使用对应LOD网格
-renderer.geometry = lodMeshes[lodLevel];
-```
+## 调试渲染
 
-## 🎯 渲染队列管理
+- 打开 **`Engine3D.setting.render.debug`** 可走引擎内置的渲染调试路径（具体显示内容随版本可能变化）。  
+- 核心包 **没有** `Engine3D.debug.showWireframe` 这类字段；FPS 面板请用 **`@rings/stats`**，见 [快速入门](./quick-start) 与 [性能与调优](./performance)。
 
-### 队列分类
+---
 
-```typescript
-enum RenderQueue {
-    Background = 1000,
-    Geometry = 2000,
-    AlphaTest = 2450,
-    Transparent = 3000,
-    Overlay = 4000
-}
-```
+## 🔗 相关文档
 
-### 排序策略
+- [核心概念](./core) — 引擎、场景、视图、组件  
+- [后处理效果](./post-processing) — 各 Post 效果说明  
+- [性能与调优](./performance) — 实例化、合批、缓存等  
+- [组件系统](./components)  
+- [Shader 开发](./shaders)
 
-1. **不透明物体**：从前到后排序（Early-Z优化）
-2. **透明物体**：从后到前排序（混合正确性）
-3. **材质排序**：减少状态切换开销
-
-### 渲染队列构建
-
-```typescript
-class RenderQueue {
-    private opaqueQueue: RenderBatch[] = [];
-    private transparentQueue: RenderBatch[] = [];
-    
-    addRenderer(renderer: MeshRenderer) {
-        const material = renderer.material;
-        const isTransparent = material.transparent;
-        
-        if (isTransparent) {
-            this.transparentQueue.push(new RenderBatch(renderer));
-        } else {
-            this.opaqueQueue.push(new RenderBatch(renderer));
-        }
-    }
-    
-    sort() {
-        // 不透明物体：从前到后
-        this.opaqueQueue.sort((a, b) => {
-            return b.depth - a.depth; // 深度降序
-        });
-        
-        // 透明物体：从后到前
-        this.transparentQueue.sort((a, b) => {
-            return a.depth - b.depth; // 深度升序
-        });
-    }
-}
-```
-
-## 💡 光照系统
-
-### 多光源支持
-
-#### 方向光 (DirectionalLight)
-模拟太阳光，支持级联阴影映射(CSM)：
-
-```typescript
-// 方向光设置
-const directionalLight = light.addComponent(DirectionalLight);
-directionalLight.intensity = 1.0;
-directionalLight.lightColor = new Color(1, 1, 1);
-directionalLight.castShadow = true;
-
-// CSM配置
-const csm = directionalLight.cascadeShadowMap;
-csm.numCascades = 4;
-csm.cascadeSplits = [0.1, 0.25, 0.5, 1.0];
-```
-
-#### 点光源 (PointLight)
-全向光源，支持立方体阴影映射：
-
-```typescript
-const pointLight = light.addComponent(PointLight);
-pointLight.range = 10.0;
-pointLight.at = 0.1;
-pointLight.quadratic = 0.01;
-pointLight.castShadow = true;
-
-// 阴影映射配置
-pointLight.shadowResolution = 1024;
-pointLight.shadowBias = 0.005;
-```
-
-#### 聚光灯 (SpotLight)
-锥形光束，支持投影纹理：
-
-```typescript
-const spotLight = light.addComponent(SpotLight);
-spotLight.innerAngle = 20;
-spotLight.outerAngle = 30;
-spotLight.range = 15.0;
-spotLight.castShadow = true;
-
-// 投影纹理
-spotLight.projectionTexture = goboTexture;
-```
-
-### 光照剔除
-
-使用基于瓦片的延迟光照：
-
-```typescript
-// 光照剔除着色器
-@compute @workgroup_size(8, 8, 1)
-fn tileLightCulling(
-    @builtin(global_invocation_id) id: vec3<u32>
-) {
-    let tileIndex = id.x + id.y * tilesX;
-    
-    // 收集影响该瓦片的光源
-    for (var i = 0u; i < numLights; i++) {
-        if (lightInTile(i, tileIndex)) {
-            lightIndices[tileIndex].push(i);
-        }
-    }
-}
-```
-
-## 🌅 阴影渲染
-
-### 阴影映射技术
-
-#### 级联阴影映射 (CSM)
-
-```typescript
-class CascadeShadowMap {
-    private cascades: ShadowMap[] = [];
-    
-    update(camera: Camera3D, light: DirectionalLight) {
-        for (let i = 0; i < this.numCascades; i++) {
-            const split = this.cascadeSplits[i];
-            const frustum = camera.getSplitFrustum(split);
-            
-            // 计算光源投影矩阵
-            const lightMatrix = this.calculateLightMatrix(frustum, light.direction);
-            
-            // 渲染阴影贴图
-            this.renderShadowMap(i, lightMatrix);
-        }
-    }
-}
-```
-
-#### 软阴影技术
-
-- **PCF (Percentage-Closer Filtering)**
-- **PCSS (Percentage-Closer Soft Shadows)**
-- **VSM (Variance Shadow Maps)**
-- **ESM (Exponential Shadow Maps)**
-
-### 阴影质量优化
-
-```typescript
-// 阴影偏差设置
-const shadowBias = 0.001;
-const shadowNormalBias = 0.005;
-
-// 阴影分辨率
-const shadowResolution = 2048; // 或 4096 用于高质量
-
-// 阴影过滤
-const shadowFilterSize = 2.0; // PCF滤波大小
-```
-
-## 🎭 后处理系统
-
-### 后处理管线
-
-```typescript
-class PostProcessingStack {
-    private effects: PostProcessEffect[] = [];
-    
-    addEffect(effect: PostProcessEffect) {
-        this.effects.push(effect);
-    }
-    
-    render(source: Texture, destination: Texture) {
-        let current = source;
-        let temp = this.getTemporaryTexture();
-        
-        for (const effect of this.effects) {
-            effect.render(current, temp);
-            [current, temp] = [temp, current]; // 交换
-        }
-        
-        // 最终输出
-        this.blit(current, destination);
-    }
-}
-```
-
-### 常用后处理效果
-
-#### 抗锯齿 (FXAA/TAA)
-
-```glsl
-// FXAA实现
-vec4 fxaa(sampler2D tex, vec2 uv, vec2 texelSize) {
-    vec3 rgbNW = texture(tex, uv + texelSize * vec2(-1, -1)).xyz;
-    vec3 rgbNE = texture(tex, uv + texelSize * vec2(1, -1)).xyz;
-    vec3 rgbSW = texture(tex, uv + texelSize * vec2(-1, 1)).xyz;
-    vec3 rgbSE = texture(tex, uv + texelSize * vec2(1, 1)).xyz;
-    
-    vec3 luma = vec3(0.299, 0.587, 0.114);
-    float lumaNW = dot(rgbNW, luma);
-    float lumaNE = dot(rgbNE, luma);
-    float lumaSW = dot(rgbSW, luma);
-    float lumaSE = dot(rgbSE, luma);
-    
-    // FXAA算法...
-    return vec4(result, 1.0);
-}
-```
-
-#### Bloom效果
-
-```typescript
-class BloomEffect extends PostProcessEffect {
-    private blurMaterial: Material;
-    private combineMaterial: Material;
-    
-    render(source: Texture, destination: Texture) {
-        // 1. 提取亮部
-        this.extractHighlights(source, this.brightTexture);
-        
-        // 2. 多次模糊
-        this.gaussianBlur(this.brightTexture, this.blurTexture1);
-        this.gaussianBlur(this.blurTexture1, this.blurTexture2);
-        
-        // 3. 合成最终图像
-        this.combineMaterial.setTexture('u_source', source);
-        this.combineMaterial.setTexture('u_bloom', this.blurTexture2);
-        this.blit(this.combineMaterial, destination);
-    }
-}
-```
-
-#### 色调映射 (Tone Mapping)
-
-```glsl
-// ACES色调映射
-vec3 aces(vec3 x) {
-    const float a = 2.51;
-    const float b = 0.03;
-    const float c = 2.43;
-    const float d = 0.59;
-    const float e = 0.14;
-    
-    return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
-}
-```
-
-## 🎮 性能优化
-
-### GPU优化技术
-
-#### 实例化渲染
-
-```typescript
-// GPU Instancing
-class InstancedRenderer {
-    private instanceBuffer: GPUBuffer;
-    private instanceCount: number;
-    
-    render(renderPass: GPURenderPassEncoder) {
-        renderPass.setVertexBuffer(1, this.instanceBuffer);
-        renderPass.drawIndexed(
-            this.indexCount,
-            this.instanceCount, // 实例数量
-            0, 0, 0
-        );
-    }
-}
-```
-
-#### 材质合并
-
-```typescript
-// 动态合批
-class DynamicBatching {
-    private batchGroups: Map<string, RenderBatch[]> = new Map();
-    
-    addRenderer(renderer: MeshRenderer) {
-        const key = this.getBatchKey(renderer);
-        if (!this.batchGroups.has(key)) {
-            this.batchGroups.set(key, []);
-        }
-        this.batchGroups.get(key)!.push(renderer);
-    }
-    
-    buildBatches() {
-        for (const [key, renderers] of this.batchGroups) {
-            if (renderers.length > 1) {
-                // 合并网格
-                this.mergeMeshes(renderers);
-            }
-        }
-    }
-}
-```
-
-### 内存管理
-
-#### 资源池化
-
-```typescript
-class ResourcePool<T> {
-    private pool: T[] = [];
-    private createFn: () => T;
-    
-    constructor(createFn: () => T) {
-        this.createFn = createFn;
-    }
-    
-    get(): T {
-        return this.pool.pop() || this.createFn();
-    }
-    
-    release(resource: T) {
-        this.pool.push(resource);
-    }
-}
-```
-
-#### 纹理流送
-
-```typescript
-class TextureStreaming {
-    private textureCache: Map<string, Texture> = new Map();
-    
-    async loadTexture(path: string, priority: number): Promise<Texture> {
-        // 检查缓存
-        if (this.textureCache.has(path)) {
-            return this.textureCache.get(path)!;
-        }
-        
-        // 加载低分辨率版本
-        const lowRes = await this.loadLowRes(path);
-        
-        // 异步加载高分辨率
-        this.loadHighResAsync(path, priority);
-        
-        return lowRes;
-    }
-}
-```
-
-## 📊 调试工具
-
-### 渲染调试
-
-```typescript
-// 启用调试模式
-Engine3D.debug.enableDebugMode();
-
-// 显示线框
-Engine3D.debug.showWireframe = true;
-
-// 显示法线
-Engine3D.debug.showNormals = true;
-
-// 显示包围盒
-Engine3D.debug.showBounds = true;
-
-// 性能统计
-Engine3D.debug.showStats = true;
-```
-
-### 性能分析
-
-| 指标 | 理想值 | 优化建议 |
-|------|--------|----------|
-| **Draw Calls** | < 1000 | 使用实例化/合批 |
-| **Triangles** | < 1M | LOD系统 |
-| **GPU时间** | < 16ms | 减少overdraw |
-| **内存使用** | < 2GB | 纹理压缩 |
-
-## 🔗 相关资源
-
-- [核心概念 →](/core)
-- [组件系统 →](/components)
-- [着色器开发 →](/shaders)
-- [后处理效果 →](/post-processing)
-- [API参考 →](/classes/RenderJob.md)
+**源码速查**：`RendererJob.ts`、`ForwardRenderJob.ts`、`ColorPassRenderer.ts`、`ClusterLightingRender.ts`、`PostRenderer.ts`

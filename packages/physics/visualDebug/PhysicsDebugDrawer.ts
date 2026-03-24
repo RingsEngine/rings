@@ -1,4 +1,4 @@
-import { Object3D, Vector3, Color, GetCountInstanceID } from "@rings/core";
+import { Object3D, Vector3, Color, GetCountInstanceID } from "@rings-webgpu/core";
 import { Ammo } from "../Physics";
 import { TempPhyMath } from "../utils/TempPhyMath";
 import { DebugDrawMode, DebugDrawerOptions } from "./DebugDrawModeEnum";

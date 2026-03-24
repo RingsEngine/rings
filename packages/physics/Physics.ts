@@ -1,5 +1,5 @@
-import Ammo from "@rings/ammo";
-import { Vector3, Time, BoundingBox, Object3D, Quaternion } from "@rings/core";
+import Ammo from "@rings-webgpu/ammo";
+import { Vector3, Time, BoundingBox, Object3D, Quaternion } from "@rings-webgpu/core";
 import { ContactProcessedUtil } from "./utils/ContactProcessedUtil";
 import { RigidBodyUtil } from "./utils/RigidBodyUtil";
 import { TempPhyMath } from "./utils/TempPhyMath";

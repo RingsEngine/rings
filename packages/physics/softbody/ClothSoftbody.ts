@@ -3,7 +3,7 @@ import {
   PlaneGeometry,
   VertexAttributeName,
   Quaternion,
-} from "@rings/core";
+} from "@rings-webgpu/core";
 import { SoftbodyBase } from "./SoftbodyBase";
 import { Ammo, Physics } from "../Physics";
 import { TempPhyMath } from "../utils/TempPhyMath";

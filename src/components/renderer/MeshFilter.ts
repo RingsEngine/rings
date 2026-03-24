@@ -1,4 +1,4 @@
-import { GeometryBase, Object3D } from "../..";
+import { Object3D } from "../..";
 import { Engine3D } from "../../Engine3D";
 import { RegisterComponent } from "../../util/SerializeDecoration";
 import { MeshRenderer } from "./MeshRenderer";
@@ -9,17 +9,12 @@ export class MeshFilter extends MeshRenderer {
     super();
   }
 
-  public get geometry(): GeometryBase {
-    return null;
-  }
-  public set geometry(value: GeometryBase) {}
-
   public cloneTo(obj: Object3D): void {}
 
   public set meshURL(value: string) {
-    let geometry = Engine3D.res.getGeometry(value);
+    const geometry = Engine3D.res.getGeometry(value);
     if (geometry) {
-      this.geometry = geometry;
+      super.geometry = geometry;
     } else {
       console.error("no geometry set", value);
     }

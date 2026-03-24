@@ -27,6 +27,7 @@ export class ForwardRenderJob extends RendererJob {
 
       colorPassRenderer.setRenderStates(rtFrame);
 
+      // DDGI 仅在此处创建：若首帧 enable 为 false，之后运行时改为 true 不会自动补建（见 RendererJob）
       if (Engine3D.setting.gi.enable) {
         let lightEntries = GlobalBindGroup.getLightEntries(this.view.scene);
         this.ddgiProbeRenderer = new DDGIProbeRenderer(

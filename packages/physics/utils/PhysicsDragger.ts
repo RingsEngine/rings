@@ -1,4 +1,4 @@
-import { Engine3D, View3D, PointerEvent3D, Vector3 } from "@rings/core";
+import { Engine3D, View3D, PointerEvent3D, Vector3 } from "@rings-webgpu/core";
 import { Ammo, Physics } from "../Physics";
 import { TempPhyMath } from "./TempPhyMath";
 import { CollisionFlags } from "../rigidbody/RigidbodyEnum";

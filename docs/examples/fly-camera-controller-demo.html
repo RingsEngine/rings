@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings — FlyCameraController 演示（可运行示例）</title>
+  <style>
+    html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
+    body { position: relative; font-family: system-ui, "Segoe UI", sans-serif; }
+    #canvas { display: block; width: 100%; height: 100%; }
+    .hud {
+      position: absolute; left: 8px; top: 8px; right: 220px; pointer-events: none;
+      font-size: 11px; line-height: 1.45; color: #e6edf3; text-shadow: 0 1px 3px #000;
+      font-family: ui-monospace, monospace;
+    }
+    .controls {
+      position: absolute; top: 0; right: 0; bottom: 0; width: 200px; padding: 10px;
+      overflow: auto; background: rgba(15, 20, 25, 0.92); color: #e6edf3;
+      font-size: 0.78rem; border-left: 1px solid #2d3a4d;
+    }
+    .controls h3 { margin: 0 0 8px; font-size: 0.8rem; color: #8b9cb3; font-weight: 600; }
+    .row { margin-bottom: 10px; }
+    .row label { display: block; margin-bottom: 3px; color: #8b9cb3; }
+    .row input[type="range"] { width: 100%; }
+    .row .val { float: right; color: #58a6ff; }
+    @media (max-width: 520px) {
+      .hud { right: 8px; }
+      .controls { width: 100%; height: auto; max-height: 45%; top: auto; left: 0; border-left: none; border-top: 1px solid #2d3a4d; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" style="width: 100%; height: 100%;"></canvas>
+  <div class="hud" id="hud"></div>
+  <aside class="controls">
+    <h3>FlyCameraController</h3>
+    <div class="row">
+      <label>moveSpeed <span class="val" id="speed-val">5</span></label>
+      <input type="range" id="speed" min="1" max="20" value="5" step="0.5" />
+    </div>
+    <div class="row">
+      <label>shiftMoveScale <span class="val" id="shift-val">20</span></label>
+      <input type="range" id="shift" min="5" max="40" value="20" step="1" />
+    </div>
+    <p style="margin:8px 0 0;color:#8b9cb3;line-height:1.45">
+      先<strong>点击画布</strong>，再拖拽转向。WASD 平移，Q/E 升降，<strong>Shift</strong> 加速，<strong>F</strong> 重置朝向。
+    </p>
+  </aside>
+
+  <script type="module">
+    import {
+      Engine3D,
+      Scene3D,
+      Object3D,
+      Camera3D,
+      View3D,
+      Vector3,
+      LitMaterial,
+      BoxGeometry,
+      SphereGeometry,
+      PlaneGeometry,
+      MeshRenderer,
+      AtmosphericComponent,
+      DirectLight,
+      FlyCameraController,
+      Color,
+    } from 'https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js';
+
+    function fmt(v) {
+      return `${v.x.toFixed(2)}, ${v.y.toFixed(2)}, ${v.z.toFixed(2)}`;
+    }
+
+    async function main() {
+      const canvas = document.getElementById('canvas');
+      const hud = document.getElementById('hud');
+      if (!canvas) throw new Error('缺少 #canvas');
+
+      try {
+        await Engine3D.init({ canvasConfig: { canvas } });
+      } catch (e) {
+        document.body.innerHTML =
+          '<p style="padding:1rem;font-family:sans-serif">WebGPU 初始化失败，请使用 Chrome/Edge 最新版并在 localhost 或 HTTPS 下打开。</p>';
+        console.error(e);
+        return;
+      }
+
+      const scene = new Scene3D();
+      const sky = scene.addComponent(AtmosphericComponent);
+      sky.sunY = 0.6;
+      sky.sunZ = 0.8;
+
+      const cameraObj = new Object3D();
+      const camera = cameraObj.addComponent(Camera3D);
+      camera.perspective(60, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 1000);
+
+      const fly = cameraObj.addComponent(FlyCameraController);
+      fly.setCamera(new Vector3(0, 5, 12), new Vector3(0, 0, 0));
+      fly.moveSpeed = 5;
+      fly.config.shiftMoveScale = 20;
+      scene.addChild(cameraObj);
+
+      const lightObj = new Object3D();
+      const light = lightObj.addComponent(DirectLight);
+      light.lightColor = new Color(1, 1, 1, 1);
+      light.intensity = 1.2;
+      light.castShadow = true;
+      scene.addChild(lightObj);
+
+      const ground = new Object3D();
+      const groundR = ground.addComponent(MeshRenderer);
+      groundR.geometry = new PlaneGeometry(10, 10);
+      groundR.material = new LitMaterial();
+      groundR.material.baseColor = new Color(0.3, 0.3, 0.3, 1);
+      groundR.receiveShadow = true;
+      scene.addChild(ground);
+
+      const box = new Object3D();
+      const boxR = box.addComponent(MeshRenderer);
+      boxR.geometry = new BoxGeometry(1, 1, 1);
+      boxR.material = new LitMaterial();
+      boxR.material.baseColor = new Color(0.8, 0.2, 0.2, 1);
+      boxR.castShadow = true;
+      box.y = 0.5;
+      scene.addChild(box);
+
+      const sphere = new Object3D();
+      const sphereR = sphere.addComponent(MeshRenderer);
+      sphereR.geometry = new SphereGeometry(0.5, 32, 32);
+      sphereR.material = new LitMaterial();
+      sphereR.material.baseColor = new Color(0.2, 0.8, 0.2, 1);
+      sphereR.castShadow = true;
+      sphere.x = 2;
+      sphere.y = 0.5;
+      scene.addChild(sphere);
+
+      const view = new View3D();
+      view.scene = scene;
+      view.camera = camera;
+      Engine3D.startRenderView(view);
+
+      const speedEl = document.getElementById('speed');
+      const speedVal = document.getElementById('speed-val');
+      const shiftEl = document.getElementById('shift');
+      const shiftVal = document.getElementById('shift-val');
+
+      function bindSliders() {
+        fly.moveSpeed = Number(speedEl.value);
+        fly.config.shiftMoveScale = Number(shiftEl.value);
+        speedVal.textContent = String(fly.moveSpeed);
+        shiftVal.textContent = String(fly.config.shiftMoveScale);
+      }
+      speedEl.addEventListener('input', bindSliders);
+      shiftEl.addEventListener('input', bindSliders);
+      bindSliders();
+
+      window.addEventListener('resize', () => {
+        camera.perspective(
+          60,
+          canvas.clientWidth / Math.max(canvas.clientHeight, 1),
+          0.1,
+          1000
+        );
+      });
+
+      function tick() {
+        const lp = cameraObj.transform.localPosition;
+        hud.innerHTML =
+          `<div><b>相机位置</b> localPosition ${fmt(lp)}</div>` +
+          `<div><b>setCamera</b> targetPos ${fmt(fly.targetPos)} · lookAtPos ${fmt(fly.lookAtPos)}（移动中不随帧更新）</div>` +
+          `<div><b>moveSpeed</b> ${fly.moveSpeed.toFixed(1)} · <b>shiftMoveScale</b> ${fly.config.shiftMoveScale}</div>`;
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+
+    main();
+  </script>
+</body>
+</html>

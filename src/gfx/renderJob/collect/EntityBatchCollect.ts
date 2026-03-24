@@ -10,6 +10,9 @@ export class EntityBatchCollect {
   }
 
   public collect_add(node: RenderNode) {
+    if (!node.geometry) {
+      return;
+    }
     let g_key = "";
     let s_key = "";
     g_key += node.geometry.instanceID;

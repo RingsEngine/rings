@@ -1,5 +1,5 @@
 {
-  "name": "@rings/ammo",
+  "name": "@rings-webgpu/ammo",
   "version": "0.2.1",
   "author": "Rings",
   "description": "Rings WebGPU Engine",
@@ -12,6 +12,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rings/rings.git"
+    "url": "git+https://github.com/RingsEngine/rings.git",
+    "directory": "packages/ammo"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

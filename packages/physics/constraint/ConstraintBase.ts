@@ -1,4 +1,4 @@
-import { ComponentBase, Vector3, Quaternion } from "@rings/core";
+import { ComponentBase, Vector3, Quaternion } from "@rings-webgpu/core";
 import { Ammo, Physics } from "../Physics";
 import { Rigidbody } from "../rigidbody/Rigidbody";
 

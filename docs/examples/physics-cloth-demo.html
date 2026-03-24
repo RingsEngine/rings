@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings — 物理：ClothSoftbody 布料</title>
+  <script type="importmap">
+    {
+      "imports": {
+        "@rings-webgpu/core": "https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js",
+        "@rings-webgpu/physics": "../../packages/physics/dist/physics.es.js"
+      }
+    }
+  </script>
+  <style>
+    html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
+    #canvas { display: block; width: 100%; height: 100%; }
+    .hud {
+      position: absolute; left: 8px; top: 8px; right: 8px; pointer-events: none;
+      font-size: 11px; color: #e6edf3; text-shadow: 0 1px 3px #000;
+      font-family: ui-monospace, monospace;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div class="hud">
+    <code>Physics.init({ useSoftBody: true })</code> + <code>ClothSoftbody</code>，<code>PlaneGeometry</code> 分段，<code>fixNodeIndices</code> 固定上沿两角。
+  </div>
+  <script type="module">
+    import {
+      Engine3D, Scene3D, Object3D, Camera3D, View3D, Color, Vector3,
+      LitMaterial, PlaneGeometry, BoxGeometry, MeshRenderer,
+      AtmosphericComponent, DirectLight, HoverCameraController,
+      ColliderComponent,
+    } from "@rings-webgpu/core";
+    import { Physics, Rigidbody, ClothSoftbody } from "@rings-webgpu/physics";
+
+    async function main() {
+      const canvas = document.getElementById("canvas");
+      if (!canvas) return;
+
+      try {
+        await Engine3D.init({
+          canvasConfig: { canvas },
+          beforeRender: () => { if (Physics.isInited) Physics.update(); },
+        });
+      } catch (e) {
+        document.body.innerHTML = "<p style=\"padding:1rem\">WebGPU 初始化失败。</p>";
+        console.error(e);
+        return;
+      }
+
+      await Physics.init({ useSoftBody: true });
+
+      const scene = new Scene3D();
+      scene.addComponent(AtmosphericComponent);
+
+      const camObj = new Object3D();
+      const camera = camObj.addComponent(Camera3D);
+      camera.perspective(52, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 300);
+      camObj.addComponent(HoverCameraController).setCamera(18, -42, 12);
+      scene.addChild(camObj);
+
+      const lightObj = new Object3D();
+      lightObj.addComponent(DirectLight).intensity = 1.2;
+      scene.addChild(lightObj);
+
+      const ground = new Object3D();
+      const gMr = ground.addComponent(MeshRenderer);
+      gMr.geometry = new BoxGeometry(20, 0.25, 20);
+      gMr.material = new LitMaterial();
+      gMr.material.baseColor = new Color(0.22, 0.24, 0.28, 1);
+      const gCol = ground.addComponent(ColliderComponent);
+      gCol.shape.setFromCenterAndSize(new Vector3(0, 0, 0), new Vector3(20, 0.25, 20));
+      const gRb = ground.addComponent(Rigidbody);
+      gRb.mass = 0;
+      scene.addChild(ground);
+
+      const clothObj = new Object3D();
+      clothObj.y = 5.5;
+      clothObj.z = 0;
+      const clothMr = clothObj.addComponent(MeshRenderer);
+      clothMr.geometry = new PlaneGeometry(4, 3, 12, 10);
+      clothMr.material = new LitMaterial();
+      clothMr.material.baseColor = new Color(0.55, 0.35, 0.75, 1);
+      const cloth = clothObj.addComponent(ClothSoftbody);
+      cloth.fixNodeIndices = ["leftTop", "rightTop"];
+      cloth.mass = 2;
+
+      scene.addChild(clothObj);
+
+      const view = new View3D();
+      view.scene = scene;
+      view.camera = camera;
+      Engine3D.startRenderView(view);
+    }
+
+    main().catch(console.error);
+  </script>
+  <p style="position:absolute;bottom:6px;left:8px;font-size:10px;color:#8b9cb3;margin:0">
+    需 <code>npm run build:physics</code> + 仓库根目录 HTTP 访问；软体与刚体地面碰撞依赖 Ammo 软体世界。
+  </p>
+</body>
+</html>

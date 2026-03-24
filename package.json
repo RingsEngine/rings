@@ -20,9 +20,6 @@
     "type": "git",
     "url": "git+https://github.com/RingsEngine/rings.git"
   },
-  "publishConfig": {
-    "registry": "https://www.npmjs.com/package/@rings-webgpu/core"
-  },
   "types": "./dist/types/index.d.ts",
   "scripts": {
     "dev": "vite",
@@ -30,12 +27,15 @@
     "build:test": "tsc --p tsconfig.build.json && vite build && npm run build:packages",
     "build:packages": "npm run build:physics && npm run build:media && npm run build:stats",
     "build:physics": "cd packages/physics && npm run build",
+    "publish:ammo": "npm publish packages/ammo --access public",
+    "publish:physics": "npm run build:physics && npm publish packages/physics --access public",
     "build:media": "cd packages/media-extention && npm run build",
     "build:stats": "cd packages/stats && npm run build",
     "build:types": "tsc --emitDeclarationOnly -p tsconfig.build.json && node scripts/build-types.js",
     "minify": "node scripts/minify.js",
     "docs": "typedoc --skipErrorChecking",
-    "publish": "npm publish --access public"
+    "publish": "npm publish --access public",
+    "publish:packages": "npm run publish:ammo && npm run publish:physics"
   },
   "files": [
     "dist"

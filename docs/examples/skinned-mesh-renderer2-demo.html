@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings — SkinnedMeshRenderer2 / GLTF</title>
+  <style>
+    html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
+    body { position: relative; font-family: system-ui, "Segoe UI", sans-serif; }
+    #canvas { display: block; width: 100%; height: 100%; }
+    .hud {
+      position: absolute; left: 8px; top: 8px; right: 260px; pointer-events: none;
+      font-size: 11px; line-height: 1.45; color: #e6edf3; text-shadow: 0 1px 3px #000;
+      font-family: ui-monospace, monospace;
+    }
+    .controls {
+      position: absolute; top: 0; right: 0; bottom: 0; width: 240px; padding: 10px;
+      overflow: auto; background: rgba(15, 20, 25, 0.92); color: #e6edf3;
+      font-size: 0.72rem; border-left: 1px solid #2d3a4d;
+    }
+    .controls h3 { margin: 0 0 8px; font-size: 0.75rem; color: #8b9cb3; font-weight: 600; }
+    .controls p { margin: 0; color: #8b9cb3; line-height: 1.45; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" style="width: 100%; height: 100%;"></canvas>
+  <div class="hud" id="hud"></div>
+  <aside class="controls">
+    <h3>SkinnedMeshRenderer2</h3>
+    <p>
+      仓库内 <strong>RiggedSimple.glb</strong>（Khronos 示例）：GLTF 为带骨骼的 mesh 挂 <code>SkinnedMeshRenderer2</code>，并与 <code>AnimatorComponent</code> 同树。
+      拖拽旋转视角（Hover）。
+    </p>
+  </aside>
+  <script type="module">
+    import {
+      Engine3D,
+      Scene3D,
+      Object3D,
+      Camera3D,
+      View3D,
+      Color,
+      LitMaterial,
+      PlaneGeometry,
+      MeshRenderer,
+      SkinnedMeshRenderer2,
+      AnimatorComponent,
+      AtmosphericComponent,
+      DirectLight,
+      HoverCameraController,
+    } from 'https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js';
+
+    // 与当前 HTML 同目录的 glb，避免 CDN/CORS；亦可用绝对 CDN URL
+    const GLB = new URL('./RiggedSimple.glb', import.meta.url).href;
+
+    async function main() {
+      const canvas = document.getElementById('canvas');
+      const hud = document.getElementById('hud');
+      if (!canvas) return;
+      try {
+        await Engine3D.init({ canvasConfig: { canvas } });
+      } catch (e) {
+        document.body.innerHTML =
+          '<p style="padding:1rem;font-family:sans-serif">WebGPU 初始化失败，请使用 Chrome/Edge 并在 localhost 或 HTTPS 下打开。</p>';
+        console.error(e);
+        return;
+      }
+
+      const scene = new Scene3D();
+      scene.addComponent(AtmosphericComponent);
+
+      const camObj = new Object3D();
+      const camera = camObj.addComponent(Camera3D);
+      camera.perspective(50, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.05, 500);
+      const hover = camObj.addComponent(HoverCameraController);
+      hover.setCamera(3.2, -4.5, 1.85);
+      scene.addChild(camObj);
+
+      const sun = new Object3D();
+      const dl = sun.addComponent(DirectLight);
+      dl.lightColor = new Color(1, 0.98, 0.95, 1);
+      dl.intensity = 1.15;
+      dl.castShadow = true;
+      sun.transform.rotationX = -55;
+      sun.transform.rotationY = 35;
+      scene.addChild(sun);
+
+      const ground = new Object3D();
+      const gr = ground.addComponent(MeshRenderer);
+      gr.geometry = new PlaneGeometry(24, 24);
+      gr.material = new LitMaterial();
+      gr.material.baseColor = new Color(0.18, 0.2, 0.24, 1);
+      gr.receiveShadow = true;
+      ground.transform.rotationX = -90;
+      ground.y = -0.01;
+      scene.addChild(ground);
+
+      let skinned2 = 0;
+      let animators = 0;
+      try {
+        const root = await Engine3D.res.loadGltf(GLB);
+        scene.addChild(root);
+        root.traverse((child) => {
+          if (child.getComponent(SkinnedMeshRenderer2)) {
+            skinned2++;
+            const sm = child.getComponent(SkinnedMeshRenderer2);
+            sm.castShadow = true;
+            sm.receiveShadow = true;
+          }
+          if (child.getComponent(AnimatorComponent)) animators++;
+        });
+        let played = false;
+        root.traverse((child) => {
+          const ac = child.getComponent(AnimatorComponent);
+          if (!played && ac && ac.clips && ac.clips.length) {
+            ac.playAnim(ac.clips[0].clipName, 0, 1);
+            played = true;
+          }
+        });
+      } catch (err) {
+        console.error(err);
+        hud.textContent = 'GLTF 加载失败（网络/CORS）。请联网或在本地文档服务下重试。';
+      }
+
+      const view = new View3D();
+      view.scene = scene;
+      view.camera = camera;
+      Engine3D.startRenderView(view);
+
+      window.addEventListener('resize', () => {
+        camera.perspective(50, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.05, 500);
+      });
+
+      function tick() {
+        hud.textContent = `SkinnedMeshRenderer2=${skinned2} · AnimatorComponent=${animators} · ${GLB.split('/').pop()}`;
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+    main();
+  </script>
+</body>
+</html>

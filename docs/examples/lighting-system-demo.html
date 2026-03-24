@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings — 光照系统演示（DirectLight / PointLight / SpotLight）</title>
+  <style>
+    html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
+    body { position: relative; font-family: system-ui, "Segoe UI", sans-serif; }
+    #canvas { display: block; width: 100%; height: 100%; }
+    .hud {
+      position: absolute; left: 8px; top: 8px; right: 240px; pointer-events: none;
+      font-size: 11px; line-height: 1.45; color: #e6edf3; text-shadow: 0 1px 3px #000;
+      font-family: ui-monospace, monospace;
+    }
+    .controls {
+      position: absolute; top: 0; right: 0; bottom: 0; width: 220px; padding: 10px;
+      overflow: auto; background: rgba(15, 20, 25, 0.92); color: #e6edf3;
+      font-size: 0.72rem; border-left: 1px solid #2d3a4d;
+    }
+    .controls h3 { margin: 12px 0 6px; font-size: 0.75rem; color: #8b9cb3; font-weight: 600; }
+    .controls h3:first-child { margin-top: 0; }
+    .row { margin-bottom: 8px; }
+    .row label { display: block; margin-bottom: 2px; color: #8b9cb3; }
+    .row input[type="range"] { width: 100%; }
+    .row .val { float: right; color: #58a6ff; }
+    @media (max-width: 560px) {
+      .hud { right: 8px; }
+      .controls { width: 100%; height: auto; max-height: 42%; top: auto; left: 0; border-left: none; border-top: 1px solid #2d3a4d; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" style="width: 100%; height: 100%;"></canvas>
+  <div class="hud" id="hud"></div>
+  <aside class="controls">
+    <h3>DirectLight（平行光）</h3>
+    <div class="row">
+      <label>intensity <span class="val" id="d-int-v">1.2</span></label>
+      <input type="range" id="d-int" min="0" max="30" value="12" step="1" />
+    </div>
+    <div class="row">
+      <label>indirect（quadratic）<span class="val" id="d-ind-v">0.35</span></label>
+      <input type="range" id="d-ind" min="5" max="80" value="35" step="1" />
+    </div>
+    <h3>PointLight（点光）</h3>
+    <div class="row">
+      <label>intensity <span class="val" id="p-int-v">2</span></label>
+      <input type="range" id="p-int" min="0" max="20" value="20" step="1" />
+    </div>
+    <div class="row">
+      <label>range <span class="val" id="p-range-v">12</span></label>
+      <input type="range" id="p-range" min="4" max="30" value="12" step="1" />
+    </div>
+    <h3>SpotLight（聚光）</h3>
+    <div class="row">
+      <label>intensity <span class="val" id="s-int-v">2.5</span></label>
+      <input type="range" id="s-int" min="0" max="25" value="25" step="1" />
+    </div>
+    <div class="row">
+      <label>outerAngle（度）<span class="val" id="s-ang-v">40</span></label>
+      <input type="range" id="s-ang" min="15" max="90" value="40" step="1" />
+    </div>
+    <p style="margin:10px 0 0;color:#8b9cb3;line-height:1.45">场景含大气 + Hover 相机。橙点光在右侧，蓝紫聚光从斜上方照向原点。</p>
+  </aside>
+
+  <script type="module">
+    import {
+      Engine3D,
+      Scene3D,
+      Object3D,
+      Camera3D,
+      View3D,
+      Vector3,
+      LitMaterial,
+      BoxGeometry,
+      SphereGeometry,
+      PlaneGeometry,
+      MeshRenderer,
+      AtmosphericComponent,
+      DirectLight,
+      PointLight,
+      SpotLight,
+      HoverCameraController,
+      Color,
+    } from 'https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js';
+
+    async function main() {
+      const canvas = document.getElementById('canvas');
+      const hud = document.getElementById('hud');
+      if (!canvas) throw new Error('缺少 #canvas');
+
+      try {
+        await Engine3D.init({ canvasConfig: { canvas } });
+      } catch (e) {
+        document.body.innerHTML =
+          '<p style="padding:1rem;font-family:sans-serif">WebGPU 初始化失败，请使用 Chrome/Edge 最新版并在 localhost 或 HTTPS 下打开。</p>';
+        console.error(e);
+        return;
+      }
+
+      const scene = new Scene3D();
+      const sky = scene.addComponent(AtmosphericComponent);
+      sky.sunY = 0.55;
+      sky.sunZ = 0.75;
+
+      const cameraObj = new Object3D();
+      const camera = cameraObj.addComponent(Camera3D);
+      camera.perspective(60, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 1000);
+      const hover = cameraObj.addComponent(HoverCameraController);
+      hover.setCamera(40, -28, 14);
+      scene.addChild(cameraObj);
+
+      const dirObj = new Object3D();
+      const dirLight = dirObj.addComponent(DirectLight);
+      dirLight.lightColor = new Color(1, 0.98, 0.95, 1);
+      dirLight.intensity = 1.2;
+      dirLight.castShadow = true;
+      dirLight.indirect = 0.35;
+      dirObj.transform.rotationX = -50;
+      dirObj.transform.rotationY = 35;
+      scene.addChild(dirObj);
+
+      const pointObj = new Object3D();
+      const pointLight = pointObj.addComponent(PointLight);
+      pointLight.lightColor = new Color(1, 0.45, 0.15, 1);
+      pointLight.intensity = 2;
+      pointLight.range = 12;
+      pointLight.at = 0.15;
+      pointLight.quadratic = 0.4;
+      pointLight.castShadow = false;
+      pointObj.transform.localPosition = new Vector3(4, 2.5, 2);
+      scene.addChild(pointObj);
+
+      const spotObj = new Object3D();
+      const spotLight = spotObj.addComponent(SpotLight);
+      spotLight.lightColor = new Color(0.55, 0.6, 1, 1);
+      spotLight.intensity = 2.5;
+      spotLight.range = 22;
+      spotLight.outerAngle = 40;
+      spotLight.innerAngle = 75;
+      spotLight.at = 0.12;
+      spotLight.castShadow = true;
+      const spotPos = new Vector3(-5, 8, 6);
+      const spotTarget = new Vector3(0, 0.3, 0);
+      spotObj.transform.localPosition = spotPos;
+      spotObj.transform.lookAt(spotPos, spotTarget);
+      scene.addChild(spotObj);
+
+      const ground = new Object3D();
+      const groundR = ground.addComponent(MeshRenderer);
+      groundR.geometry = new PlaneGeometry(14, 14);
+      groundR.material = new LitMaterial();
+      groundR.material.baseColor = new Color(0.22, 0.24, 0.28, 1);
+      groundR.receiveShadow = true;
+      scene.addChild(ground);
+
+      const box = new Object3D();
+      const boxR = box.addComponent(MeshRenderer);
+      boxR.geometry = new BoxGeometry(1, 1, 1);
+      boxR.material = new LitMaterial();
+      boxR.material.baseColor = new Color(0.75, 0.72, 0.68, 1);
+      boxR.castShadow = true;
+      box.y = 0.5;
+      scene.addChild(box);
+
+      const sphere = new Object3D();
+      const sphereR = sphere.addComponent(MeshRenderer);
+      sphereR.geometry = new SphereGeometry(0.45, 32, 32);
+      sphereR.material = new LitMaterial();
+      sphereR.material.baseColor = new Color(0.55, 0.7, 0.45, 1);
+      sphereR.castShadow = true;
+      sphere.x = 2.2;
+      sphere.y = 0.45;
+      scene.addChild(sphere);
+
+      const view = new View3D();
+      view.scene = scene;
+      view.camera = camera;
+      Engine3D.startRenderView(view);
+
+      const dInt = document.getElementById('d-int');
+      const dIntV = document.getElementById('d-int-v');
+      const dInd = document.getElementById('d-ind');
+      const dIndV = document.getElementById('d-ind-v');
+      const pInt = document.getElementById('p-int');
+      const pIntV = document.getElementById('p-int-v');
+      const pRange = document.getElementById('p-range');
+      const pRangeV = document.getElementById('p-range-v');
+      const sInt = document.getElementById('s-int');
+      const sIntV = document.getElementById('s-int-v');
+      const sAng = document.getElementById('s-ang');
+      const sAngV = document.getElementById('s-ang-v');
+
+      function bind() {
+        dirLight.intensity = Number(dInt.value) / 10;
+        dirLight.indirect = Number(dInd.value) / 100;
+        pointLight.intensity = Number(pInt.value) / 10;
+        pointLight.range = Number(pRange.value);
+        spotLight.intensity = Number(sInt.value) / 10;
+        spotLight.outerAngle = Number(sAng.value);
+        dIntV.textContent = dirLight.intensity.toFixed(1);
+        dIndV.textContent = dirLight.indirect.toFixed(2);
+        pIntV.textContent = pointLight.intensity.toFixed(1);
+        pRangeV.textContent = String(pointLight.range);
+        sIntV.textContent = spotLight.intensity.toFixed(1);
+        sAngV.textContent = String(spotLight.outerAngle);
+      }
+      [dInt, dInd, pInt, pRange, sInt, sAng].forEach((el) =>
+        el.addEventListener('input', bind)
+      );
+      bind();
+
+      window.addEventListener('resize', () => {
+        camera.perspective(
+          60,
+          canvas.clientWidth / Math.max(canvas.clientHeight, 1),
+          0.1,
+          1000
+        );
+      });
+
+      function tick() {
+        hud.innerHTML =
+          `<div><b>Direct</b> I=${dirLight.intensity.toFixed(1)} indirect=${dirLight.indirect.toFixed(2)}</div>` +
+          `<div><b>Point</b> I=${pointLight.intensity.toFixed(1)} range=${pointLight.range}</div>` +
+          `<div><b>Spot</b> I=${spotLight.intensity.toFixed(1)} outer°=${spotLight.outerAngle.toFixed(0)} inner%=${spotLight.innerAngle.toFixed(0)}</div>`;
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+
+    main();
+  </script>
+</body>
+</html>

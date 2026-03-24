@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings — DirectLight（平行光）演示</title>
+  <style>
+    html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
+    body { position: relative; font-family: system-ui, "Segoe UI", sans-serif; }
+    #canvas { display: block; width: 100%; height: 100%; }
+    .hud {
+      position: absolute; left: 8px; top: 8px; right: 220px; pointer-events: none;
+      font-size: 11px; line-height: 1.45; color: #e6edf3; text-shadow: 0 1px 3px #000;
+      font-family: ui-monospace, monospace;
+    }
+    .controls {
+      position: absolute; top: 0; right: 0; bottom: 0; width: 200px; padding: 10px;
+      overflow: auto; background: rgba(15, 20, 25, 0.92); color: #e6edf3;
+      font-size: 0.72rem; border-left: 1px solid #2d3a4d;
+    }
+    .controls h3 { margin: 0 0 8px; font-size: 0.75rem; color: #8b9cb3; font-weight: 600; }
+    .row { margin-bottom: 8px; }
+    .row label { display: block; margin-bottom: 2px; color: #8b9cb3; }
+    .row input[type="range"] { width: 100%; }
+    .row .val { float: right; color: #58a6ff; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" style="width: 100%; height: 100%;"></canvas>
+  <div class="hud" id="hud"></div>
+  <aside class="controls">
+    <h3>DirectLight</h3>
+    <div class="row">
+      <label>intensity <span class="val" id="int-v">1.2</span></label>
+      <input type="range" id="int" min="0" max="30" value="12" step="1" />
+    </div>
+    <div class="row">
+      <label>indirect <span class="val" id="ind-v">0.35</span></label>
+      <input type="range" id="ind" min="5" max="80" value="35" step="1" />
+    </div>
+    <p style="margin:10px 0 0;color:#8b9cb3;line-height:1.45">仅平行光 + 阴影。拖拽旋转（Hover）。</p>
+  </aside>
+  <script type="module">
+    import {
+      Engine3D,
+      Scene3D,
+      Object3D,
+      Camera3D,
+      View3D,
+      LitMaterial,
+      BoxGeometry,
+      PlaneGeometry,
+      MeshRenderer,
+      AtmosphericComponent,
+      DirectLight,
+      HoverCameraController,
+      Color,
+    } from 'https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js';
+
+    async function main() {
+      const canvas = document.getElementById('canvas');
+      const hud = document.getElementById('hud');
+      if (!canvas) return;
+      try {
+        await Engine3D.init({ canvasConfig: { canvas } });
+      } catch (e) {
+        document.body.innerHTML =
+          '<p style="padding:1rem;font-family:sans-serif">WebGPU 初始化失败，请使用 Chrome/Edge 并在 localhost 或 HTTPS 下打开。</p>';
+        console.error(e);
+        return;
+      }
+
+      const scene = new Scene3D();
+      scene.addComponent(AtmosphericComponent);
+
+      const cameraObj = new Object3D();
+      const camera = cameraObj.addComponent(Camera3D);
+      camera.perspective(60, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 1000);
+      const hover = cameraObj.addComponent(HoverCameraController);
+      hover.setCamera(38, -30, 12);
+      scene.addChild(cameraObj);
+
+      const dirObj = new Object3D();
+      const dirLight = dirObj.addComponent(DirectLight);
+      dirLight.lightColor = new Color(1, 0.97, 0.92, 1);
+      dirLight.intensity = 1.2;
+      dirLight.castShadow = true;
+      dirLight.indirect = 0.35;
+      dirObj.transform.rotationX = -52;
+      dirObj.transform.rotationY = 32;
+      scene.addChild(dirObj);
+
+      const ground = new Object3D();
+      const gr = ground.addComponent(MeshRenderer);
+      gr.geometry = new PlaneGeometry(14, 14);
+      gr.material = new LitMaterial();
+      gr.material.baseColor = new Color(0.22, 0.24, 0.28, 1);
+      gr.receiveShadow = true;
+      scene.addChild(ground);
+
+      const box = new Object3D();
+      const br = box.addComponent(MeshRenderer);
+      br.geometry = new BoxGeometry(1, 1, 1);
+      br.material = new LitMaterial();
+      br.material.baseColor = new Color(0.72, 0.68, 0.62, 1);
+      br.castShadow = true;
+      box.y = 0.5;
+      scene.addChild(box);
+
+      const view = new View3D();
+      view.scene = scene;
+      view.camera = camera;
+      Engine3D.startRenderView(view);
+
+      const intEl = document.getElementById('int');
+      const intV = document.getElementById('int-v');
+      const indEl = document.getElementById('ind');
+      const indV = document.getElementById('ind-v');
+
+      function bind() {
+        dirLight.intensity = Number(intEl.value) / 10;
+        dirLight.indirect = Number(indEl.value) / 100;
+        intV.textContent = dirLight.intensity.toFixed(1);
+        indV.textContent = dirLight.indirect.toFixed(2);
+      }
+      intEl.addEventListener('input', bind);
+      indEl.addEventListener('input', bind);
+      bind();
+
+      window.addEventListener('resize', () => {
+        camera.perspective(
+          60,
+          canvas.clientWidth / Math.max(canvas.clientHeight, 1),
+          0.1,
+          1000
+        );
+      });
+
+      function tick() {
+        hud.textContent = `DirectLight · intensity=${dirLight.intensity.toFixed(2)} indirect=${dirLight.indirect.toFixed(2)} · castShadow=${dirLight.castShadow}`;
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+    main();
+  </script>
+</body>
+</html>

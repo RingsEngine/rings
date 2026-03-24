@@ -1,16 +1,27 @@
 {
-  "name": "@rings/physics",
-  "version": "0.3.4",
+  "name": "@rings-webgpu/physics",
+  "version": "0.0.1",
   "author": "rings",
   "description": "rings Physics Plugin, Powerd by Ammo.js",
   "main": "./dist/physics.umd.js",
   "module": "./dist/physics.es.js",
   "module:dev": "./index.ts",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/physics.es.js",
+      "require": "./dist/physics.umd.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
     "dist"
   ],
   "scripts": {
+    "prepublishOnly": "npm run build",
     "build": "vite build && npm run build:types && npm run build:clean",
     "build:types": "tsc --emitDeclarationOnly -p tsconfig.json",
     "build:clean": "node ../../scripts/build-clean.js physics",
@@ -20,12 +31,13 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rings/rings.git"
+    "url": "git+https://github.com/RingsEngine/rings.git",
+    "directory": "packages/physics"
   },
   "dependencies": {
-    "@rings/ammo": ">=0.2.1"
+    "@rings-webgpu/ammo": ">=0.2.1"
   },
   "peerDependencies": {
-    "@rings/core": ">=0.8.0"
+    "@rings-webgpu/core": ">=1.0.0"
   }
 }

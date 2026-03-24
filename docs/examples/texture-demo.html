@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings — 纹理演示（BitmapTexture2D / 采样）</title>
+  <style>
+    html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
+    body { position: relative; font-family: system-ui, "Segoe UI", sans-serif; }
+    #canvas { display: block; width: 100%; height: 100%; }
+    .hud {
+      position: absolute; left: 8px; top: 8px; right: 260px; pointer-events: none;
+      font-size: 11px; line-height: 1.45; color: #e6edf3; text-shadow: 0 1px 3px #000;
+      font-family: ui-monospace, monospace;
+    }
+    .controls {
+      position: absolute; top: 0; right: 0; bottom: 0; width: 240px; padding: 10px;
+      overflow: auto; background: rgba(15, 20, 25, 0.92); color: #e6edf3;
+      font-size: 0.72rem; border-left: 1px solid #2d3a4d;
+    }
+    .controls h3 { margin: 12px 0 6px; font-size: 0.75rem; color: #8b9cb3; font-weight: 600; }
+    .controls h3:first-child { margin-top: 0; }
+    .row { margin-bottom: 8px; }
+    .row label { display: block; margin-bottom: 4px; color: #8b9cb3; }
+    .row select { width: 100%; padding: 4px; background: #1e293b; color: #e6edf3; border: 1px solid #334155; border-radius: 4px; }
+    .row input[type="range"] { width: 100%; }
+    .row .val { float: right; color: #58a6ff; }
+    .row input[type="checkbox"] { margin-right: 6px; }
+    @media (max-width: 560px) {
+      .hud { right: 8px; }
+      .controls { width: 100%; height: auto; max-height: 45%; top: auto; left: 0; border-left: none; border-top: 1px solid #2d3a4d; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" style="width: 100%; height: 100%;"></canvas>
+  <div class="hud" id="hud"></div>
+  <aside class="controls">
+    <h3>寻址 addressMode</h3>
+    <div class="row">
+      <label for="addr-u">U</label>
+      <select id="addr-u">
+        <option value="repeat" selected>repeat</option>
+        <option value="clamp-to-edge">clamp-to-edge</option>
+        <option value="mirror-repeat">mirror-repeat</option>
+      </select>
+    </div>
+    <div class="row">
+      <label for="addr-v">V</label>
+      <select id="addr-v">
+        <option value="repeat" selected>repeat</option>
+        <option value="clamp-to-edge">clamp-to-edge</option>
+        <option value="mirror-repeat">mirror-repeat</option>
+      </select>
+    </div>
+    <h3>过滤 min / mag</h3>
+    <div class="row">
+      <label for="filt">filter</label>
+      <select id="filt">
+        <option value="linear" selected>linear</option>
+        <option value="nearest">nearest</option>
+      </select>
+    </div>
+    <h3>Mipmap</h3>
+    <div class="row">
+      <label><input type="checkbox" id="mip" checked /> useMipmap</label>
+    </div>
+    <div class="row">
+      <label>mipmapFilter <span class="val" id="mipf-v">linear</span></label>
+      <select id="mipf">
+        <option value="linear" selected>linear</option>
+        <option value="nearest">nearest</option>
+      </select>
+    </div>
+    <h3>各向异性</h3>
+    <div class="row">
+      <label>maxAnisotropy <span class="val" id="ani-v">8</span></label>
+      <input type="range" id="ani" min="1" max="16" value="8" step="1" />
+    </div>
+    <h3>UV 平铺（baseMapOffsetSize.zw）</h3>
+    <div class="row">
+      <label>tiling <span class="val" id="til-v">4</span></label>
+      <input type="range" id="til" min="1" max="12" value="4" step="1" />
+    </div>
+    <p style="margin:10px 0 0;color:#8b9cb3;line-height:1.45">程序化 Canvas → <code>BitmapTexture2D</code> → <code>LitMaterial.baseMap</code>；<code>PlaneGeometry(..., Vector3.Z_AXIS)</code> 法线朝 +Z，相机从 +Z 侧正视平面。无外部贴图 URL。</p>
+  </aside>
+
+  <script type="module">
+    import {
+      Engine3D,
+      Scene3D,
+      Object3D,
+      Camera3D,
+      View3D,
+      Vector3,
+      Vector4,
+      LitMaterial,
+      PlaneGeometry,
+      MeshRenderer,
+      AtmosphericComponent,
+      DirectLight,
+      HoverCameraController,
+      Color,
+      BitmapTexture2D,
+    } from 'https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js';
+
+    function makeCheckerCanvas() {
+      const c = document.createElement('canvas');
+      c.width = 256;
+      c.height = 256;
+      const ctx = c.getContext('2d');
+      const n = 8;
+      const s = 256 / n;
+      for (let y = 0; y < n; y++) {
+        for (let x = 0; x < n; x++) {
+          ctx.fillStyle = (x + y) % 2 ? '#3d5a80' : '#98c1d9';
+          ctx.fillRect(x * s, y * s, s, s);
+        }
+      }
+      ctx.fillStyle = '#ee6c4d';
+      ctx.fillRect(0, 0, 20, 20);
+      ctx.fillStyle = '#293241';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText('UV', 4, 15);
+      return c;
+    }
+
+    async function main() {
+      const canvas = document.getElementById('canvas');
+      const hud = document.getElementById('hud');
+      if (!canvas) throw new Error('缺少 #canvas');
+
+      try {
+        await Engine3D.init({ canvasConfig: { canvas } });
+      } catch (e) {
+        document.body.innerHTML =
+          '<p style="padding:1rem;font-family:sans-serif">WebGPU 初始化失败，请使用 Chrome/Edge 最新版并在 localhost 或 HTTPS 下打开。</p>';
+        console.error(e);
+        return;
+      }
+
+      const scene = new Scene3D();
+      const sky = scene.addComponent(AtmosphericComponent);
+      sky.sunY = 0.55;
+      sky.sunZ = 0.65;
+
+      const cameraObj = new Object3D();
+      const camera = cameraObj.addComponent(Camera3D);
+      camera.perspective(55, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 200);
+      const hover = cameraObj.addComponent(HoverCameraController);
+      // roll≈0、pitch 略负：相机在平面法线 +Z 一侧，正视 XY 竖面
+      hover.setCamera(0, -12, 13);
+      scene.addChild(cameraObj);
+
+      const dirObj = new Object3D();
+      const dirLight = dirObj.addComponent(DirectLight);
+      dirLight.lightColor = new Color(1, 0.98, 0.95, 1);
+      dirLight.intensity = 1.4;
+      dirLight.castShadow = true;
+      dirLight.indirect = 0.28;
+      dirObj.transform.rotationX = -48;
+      dirObj.transform.rotationY = 32;
+      scene.addChild(dirObj);
+
+      const tex = new BitmapTexture2D(true);
+      tex.name = 'demo-checker';
+      // 与 load() 路径一致；在通过 source 赋 Canvas 时须指定 format（旧版包未在内部写入）
+      tex.format = 'rgba8unorm';
+      tex.source = makeCheckerCanvas();
+
+      const plane = new Object3D();
+      const mr = plane.addComponent(MeshRenderer);
+      // Z_AXIS：网格在 XY 平面，法线 +Z，与 Hover 默认视线方向一致，便于「正面」观察
+      mr.geometry = new PlaneGeometry(10, 10, 1, 1, Vector3.Z_AXIS);
+      mr.material = new LitMaterial();
+      mr.material.baseColor = new Color(1, 1, 1, 1);
+      mr.material.baseMap = tex;
+      mr.material.roughness = 0.55;
+      mr.material.metallic = 0.05;
+      mr.material.doubleSide = true;
+      mr.receiveShadow = true;
+      const colorPass = mr.material.shader.getDefaultColorShader();
+      colorPass.setUniform(`baseMapOffsetSize`, new Vector4(0, 0, 4, 4));
+      scene.addChild(plane);
+
+      const view = new View3D();
+      view.scene = scene;
+      view.camera = camera;
+      Engine3D.startRenderView(view);
+
+      const addrU = document.getElementById('addr-u');
+      const addrV = document.getElementById('addr-v');
+      const filt = document.getElementById('filt');
+      const mip = document.getElementById('mip');
+      const mipf = document.getElementById('mipf');
+      const mipfV = document.getElementById('mipf-v');
+      const ani = document.getElementById('ani');
+      const aniV = document.getElementById('ani-v');
+      const til = document.getElementById('til');
+      const tilV = document.getElementById('til-v');
+
+      function applySampler() {
+        tex.addressModeU = addrU.value;
+        tex.addressModeV = addrV.value;
+        tex.magFilter = filt.value;
+        tex.minFilter = filt.value;
+        tex.mipmapFilter = mipf.value;
+        tex.useMipmap = mip.checked;
+        tex.maxAnisotropy = Number(ani.value);
+        const t = Number(til.value);
+        colorPass.setUniform(`baseMapOffsetSize`, new Vector4(0, 0, t, t));
+        mipfV.textContent = mipf.value;
+        aniV.textContent = ani.value;
+        tilV.textContent = String(t);
+      }
+
+      [addrU, addrV, filt, mip, mipf, ani, til].forEach((el) =>
+        el.addEventListener('input', applySampler)
+      );
+      applySampler();
+
+      window.addEventListener('resize', () => {
+        camera.perspective(
+          55,
+          canvas.clientWidth / Math.max(canvas.clientHeight, 1),
+          0.1,
+          200
+        );
+      });
+
+      function tick() {
+        hud.innerHTML =
+          `<div><b>BitmapTexture2D</b> ${tex.width}×${tex.height} mipLevels≈${tex.mipmapCount}</div>` +
+          `<div>addressU=<b>${tex.addressModeU}</b> addressV=<b>${tex.addressModeV}</b></div>` +
+          `<div>min/mag=<b>${tex.minFilter}</b> mipmapF=<b>${tex.mipmapFilter}</b> useMipmap=<b>${tex.useMipmap}</b></div>` +
+          `<div>maxAnisotropy=<b>${tex.maxAnisotropy ?? '—'}</b></div>`;
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+
+    main();
+  </script>
+</body>
+</html>

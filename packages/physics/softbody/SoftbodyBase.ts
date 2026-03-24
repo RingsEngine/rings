@@ -1,4 +1,4 @@
-import { ComponentBase, GeometryBase, MeshRenderer } from "@rings/core";
+import { ComponentBase, GeometryBase, MeshRenderer } from "@rings-webgpu/core";
 import { Ammo, Physics } from "../Physics";
 import { ActivationState } from "../rigidbody/RigidbodyEnum";
 import { Rigidbody } from "../rigidbody/Rigidbody";

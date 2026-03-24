@@ -1,4 +1,4 @@
-import { Object3D, BiMap } from "@rings/core";
+import { Object3D, BiMap } from "@rings-webgpu/core";
 import { Ammo } from "../Physics";
 
 /**
