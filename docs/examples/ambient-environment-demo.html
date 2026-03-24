@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings — 环境基础照明（大气 + 弱填充光）演示</title>
+  <style>
+    html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
+    body { position: relative; font-family: system-ui, "Segoe UI", sans-serif; }
+    #canvas { display: block; width: 100%; height: 100%; }
+    .hud {
+      position: absolute; left: 8px; top: 8px; right: 220px; pointer-events: none;
+      font-size: 11px; line-height: 1.45; color: #e6edf3; text-shadow: 0 1px 3px #000;
+      font-family: ui-monospace, monospace;
+    }
+    .controls {
+      position: absolute; top: 0; right: 0; bottom: 0; width: 200px; padding: 10px;
+      overflow: auto; background: rgba(15, 20, 25, 0.92); color: #e6edf3;
+      font-size: 0.72rem; border-left: 1px solid #2d3a4d;
+    }
+    .controls h3 { margin: 0 0 8px; font-size: 0.75rem; color: #8b9cb3; font-weight: 600; }
+    .row { margin-bottom: 8px; }
+    .row label { display: block; margin-bottom: 2px; color: #8b9cb3; }
+    .row input[type="range"] { width: 100%; }
+    .row .val { float: right; color: #58a6ff; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" style="width: 100%; height: 100%;"></canvas>
+  <div class="hud" id="hud"></div>
+  <aside class="controls">
+    <h3>填充光（双点光）</h3>
+    <div class="row">
+      <label>强度倍率 <span class="val" id="mul-v">1.0</span></label>
+      <input type="range" id="mul" min="0" max="25" value="10" step="1" />
+    </div>
+    <p style="margin:10px 0 0;color:#8b9cb3;line-height:1.45">当前包无独立 AmbientLight：用 <b>AtmosphericComponent</b> + 大范围弱 <b>PointLight</b> 模拟均匀环境搭光。</p>
+  </aside>
+  <script type="module">
+    import {
+      Engine3D,
+      Scene3D,
+      Object3D,
+      Camera3D,
+      View3D,
+      Vector3,
+      LitMaterial,
+      BoxGeometry,
+      PlaneGeometry,
+      MeshRenderer,
+      AtmosphericComponent,
+      PointLight,
+      HoverCameraController,
+      Color,
+    } from 'https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js';
+
+    async function main() {
+      const canvas = document.getElementById('canvas');
+      const hud = document.getElementById('hud');
+      if (!canvas) return;
+      try {
+        await Engine3D.init({ canvasConfig: { canvas } });
+      } catch (e) {
+        document.body.innerHTML =
+          '<p style="padding:1rem;font-family:sans-serif">WebGPU 初始化失败，请使用 Chrome/Edge 并在 localhost 或 HTTPS 下打开。</p>';
+        console.error(e);
+        return;
+      }
+
+      const scene = new Scene3D();
+      scene.addComponent(AtmosphericComponent);
+
+      const cameraObj = new Object3D();
+      const camera = cameraObj.addComponent(Camera3D);
+      camera.perspective(55, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 1000);
+      const hover = cameraObj.addComponent(HoverCameraController);
+      hover.setCamera(32, -28, 11);
+      scene.addChild(cameraObj);
+
+      const baseA = 0.12;
+      const baseB = 0.1;
+
+      const fillA = new Object3D();
+      const plA = fillA.addComponent(PointLight);
+      plA.lightColor = new Color(0.85, 0.9, 1, 1);
+      plA.intensity = baseA;
+      plA.range = 40;
+      plA.castShadow = false;
+      fillA.transform.localPosition = new Vector3(0, 6, 0);
+      scene.addChild(fillA);
+
+      const fillB = new Object3D();
+      const plB = fillB.addComponent(PointLight);
+      plB.lightColor = new Color(1, 0.95, 0.88, 1);
+      plB.intensity = baseB;
+      plB.range = 35;
+      plB.castShadow = false;
+      fillB.transform.localPosition = new Vector3(-6, 3, 4);
+      scene.addChild(fillB);
+
+      const ground = new Object3D();
+      const gr = ground.addComponent(MeshRenderer);
+      gr.geometry = new PlaneGeometry(14, 14);
+      gr.material = new LitMaterial();
+      gr.material.baseColor = new Color(0.25, 0.26, 0.3, 1);
+      scene.addChild(ground);
+
+      const box = new Object3D();
+      const br = box.addComponent(MeshRenderer);
+      br.geometry = new BoxGeometry(1, 1, 1);
+      br.material = new LitMaterial();
+      br.material.baseColor = new Color(0.55, 0.52, 0.58, 1);
+      box.y = 0.5;
+      scene.addChild(box);
+
+      const view = new View3D();
+      view.scene = scene;
+      view.camera = camera;
+      Engine3D.startRenderView(view);
+
+      const mulEl = document.getElementById('mul');
+      const mulV = document.getElementById('mul-v');
+
+      function bind() {
+        const m = Number(mulEl.value) / 10;
+        plA.intensity = baseA * m;
+        plB.intensity = baseB * m;
+        mulV.textContent = m.toFixed(1);
+      }
+      mulEl.addEventListener('input', bind);
+      bind();
+
+      window.addEventListener('resize', () => {
+        camera.perspective(
+          55,
+          canvas.clientWidth / Math.max(canvas.clientHeight, 1),
+          0.1,
+          1000
+        );
+      });
+
+      function tick() {
+        hud.textContent = `大气 + 双弱点光 · fillA=${plA.intensity.toFixed(3)} fillB=${plB.intensity.toFixed(3)}`;
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+    main();
+  </script>
+</body>
+</html>

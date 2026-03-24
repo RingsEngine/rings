@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings — ThirdPersonCameraController 演示</title>
+  <style>
+    html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
+    body { position: relative; font-family: system-ui, "Segoe UI", sans-serif; }
+    #canvas { display: block; width: 100%; height: 100%; }
+    .hud {
+      position: absolute; left: 8px; top: 8px; right: 8px; pointer-events: none;
+      font-size: 11px; line-height: 1.45; color: #e6edf3; text-shadow: 0 1px 3px #000;
+      font-family: ui-monospace, monospace;
+    }
+    .hint {
+      position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+      color: #8b9cb3; font-size: 12px; text-align: center; pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" style="width: 100%; height: 100%;"></canvas>
+  <div class="hud" id="hud"></div>
+  <p class="hint">点击画布后拖拽环绕目标；滚轮拉近/拉远</p>
+  <script type="module">
+    import {
+      Engine3D,
+      Scene3D,
+      Object3D,
+      Camera3D,
+      View3D,
+      Vector3,
+      ThirdPersonCameraController,
+      LitMaterial,
+      BoxGeometry,
+      PlaneGeometry,
+      MeshRenderer,
+      AtmosphericComponent,
+      DirectLight,
+      Color,
+    } from 'https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js';
+
+    async function main() {
+      const canvas = document.getElementById('canvas');
+      const hud = document.getElementById('hud');
+      if (!canvas) return;
+      try {
+        await Engine3D.init({ canvasConfig: { canvas } });
+      } catch (e) {
+        document.body.innerHTML =
+          '<p style="padding:1rem;font-family:sans-serif">WebGPU 初始化失败，请使用 Chrome/Edge 并在 localhost 或 HTTPS 下打开。</p>';
+        console.error(e);
+        return;
+      }
+
+      const scene = new Scene3D();
+      scene.addComponent(AtmosphericComponent);
+
+      const sun = new Object3D();
+      const dl = sun.addComponent(DirectLight);
+      dl.lightColor = new Color(1, 0.98, 0.95, 1);
+      dl.intensity = 1.2;
+      sun.transform.rotationX = -45;
+      sun.transform.rotationY = 30;
+      scene.addChild(sun);
+
+      const ground = new Object3D();
+      const gmr = ground.addComponent(MeshRenderer);
+      gmr.geometry = new PlaneGeometry(24, 24);
+      gmr.material = new LitMaterial();
+      gmr.material.baseColor = new Color(0.2, 0.22, 0.25, 1);
+      ground.transform.rotationX = -90;
+      scene.addChild(ground);
+
+      const target = new Object3D();
+      target.y = 0.9;
+      const tmr = target.addComponent(MeshRenderer);
+      tmr.geometry = new BoxGeometry(0.7, 1.4, 0.7);
+      tmr.material = new LitMaterial();
+      tmr.material.baseColor = new Color(0.85, 0.45, 0.2, 1);
+      scene.addChild(target);
+
+      const camObj = new Object3D();
+      const camera = camObj.addComponent(Camera3D);
+      camera.perspective(55, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 200);
+      const tp = camObj.addComponent(ThirdPersonCameraController);
+      tp.focus = target;
+      tp.distance = 6;
+      scene.addChild(camObj);
+
+      const view = new View3D();
+      view.scene = scene;
+      view.camera = camera;
+      Engine3D.startRenderView(view);
+
+      window.addEventListener('resize', () => {
+        camera.perspective(55, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 200);
+      });
+
+      function tick() {
+        hud.textContent = `ThirdPerson · distance=${tp.distance.toFixed(2)}`;
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+    main();
+  </script>
+</body>
+</html>

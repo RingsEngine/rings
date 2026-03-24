@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings — Engine3D.setting.shadow 演示</title>
+  <style>
+    html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
+    body { position: relative; font-family: system-ui, "Segoe UI", sans-serif; }
+    #canvas { display: block; width: 100%; height: 100%; }
+    .hud {
+      position: absolute; left: 8px; top: 8px; right: 260px; pointer-events: none;
+      font-size: 11px; line-height: 1.45; color: #e6edf3; text-shadow: 0 1px 3px #000;
+      font-family: ui-monospace, monospace;
+    }
+    .controls {
+      position: absolute; top: 0; right: 0; bottom: 0; width: 240px; padding: 10px;
+      overflow: auto; background: rgba(15, 20, 25, 0.92); color: #e6edf3;
+      font-size: 0.72rem; border-left: 1px solid #2d3a4d;
+    }
+    .controls h3 { margin: 0 0 8px; font-size: 0.75rem; color: #8b9cb3; font-weight: 600; }
+    .row { margin-bottom: 8px; }
+    .row label { display: block; margin-bottom: 2px; color: #8b9cb3; }
+    .row input[type="range"] { width: 100%; }
+    .row .val { float: right; color: #58a6ff; }
+    .row select { width: 100%; padding: 4px; background: #1e293b; color: #e6edf3; border: 1px solid #334155; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" style="width: 100%; height: 100%;"></canvas>
+  <div class="hud" id="hud"></div>
+  <aside class="controls">
+    <h3>Engine3D.setting.shadow</h3>
+    <div class="row">
+      <label>type</label>
+      <select id="stype">
+        <option value="HARD">HARD</option>
+        <option value="PCF">PCF</option>
+        <option value="SOFT">SOFT</option>
+      </select>
+    </div>
+    <div class="row">
+      <label>shadowBias <span class="val" id="sb-v">0.05</span></label>
+      <input type="range" id="sb" min="1" max="50" value="5" step="1" />
+    </div>
+    <div class="row">
+      <label>shadowSoft（SOFT 时有效）<span class="val" id="ss-v">1</span></label>
+      <input type="range" id="ss" min="0" max="400" value="100" step="5" />
+    </div>
+    <div class="row">
+      <label>shadowSize（分辨率）<span class="val" id="sz-v">2048</span></label>
+      <input type="range" id="sz" min="10" max="13" value="11" step="1" />
+    </div>
+    <p style="margin:10px 0 0;color:#8b9cb3;line-height:1.45">平行光投射阴影；调节 bias / 类型以观察接缝与柔和度。</p>
+  </aside>
+  <script type="module">
+    import {
+      Engine3D,
+      Scene3D,
+      Object3D,
+      Camera3D,
+      View3D,
+      Color,
+      LitMaterial,
+      BoxGeometry,
+      PlaneGeometry,
+      MeshRenderer,
+      AtmosphericComponent,
+      DirectLight,
+      HoverCameraController,
+    } from 'https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js';
+
+    async function main() {
+      const canvas = document.getElementById('canvas');
+      const hud = document.getElementById('hud');
+      if (!canvas) return;
+      try {
+        await Engine3D.init({ canvasConfig: { canvas } });
+      } catch (e) {
+        document.body.innerHTML =
+          '<p style="padding:1rem;font-family:sans-serif">WebGPU 初始化失败，请使用 Chrome/Edge 并在 localhost 或 HTTPS 下打开。</p>';
+        console.error(e);
+        return;
+      }
+
+      const scene = new Scene3D();
+      scene.addComponent(AtmosphericComponent);
+
+      const camObj = new Object3D();
+      const camera = camObj.addComponent(Camera3D);
+      camera.perspective(50, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 150);
+      const hover = camObj.addComponent(HoverCameraController);
+      hover.setCamera(35, -25, -14);
+      scene.addChild(camObj);
+
+      const sun = new Object3D();
+      const dl = sun.addComponent(DirectLight);
+      dl.lightColor = new Color(1, 1, 1, 1);
+      dl.intensity = 1.2;
+      dl.castShadow = true;
+      sun.transform.rotationX = -55;
+      sun.transform.rotationY = 40;
+      scene.addChild(sun);
+
+      const ground = new Object3D();
+      const gr = ground.addComponent(MeshRenderer);
+      gr.geometry = new PlaneGeometry(20, 20);
+      gr.material = new LitMaterial();
+      gr.material.baseColor = new Color(0.85, 0.86, 0.88, 1);
+      gr.receiveShadow = true;
+      ground.transform.rotationX = -90;
+      scene.addChild(ground);
+
+      const boxObj = new Object3D();
+      const mr = boxObj.addComponent(MeshRenderer);
+      mr.geometry = new BoxGeometry(1.2, 2.2, 1.2);
+      mr.material = new LitMaterial();
+      mr.material.baseColor = new Color(0.55, 0.5, 0.45, 1);
+      mr.castShadow = true;
+      boxObj.y = 1.1;
+      scene.addChild(boxObj);
+
+      const view = new View3D();
+      view.scene = scene;
+      view.camera = camera;
+      Engine3D.startRenderView(view);
+
+      const stype = document.getElementById('stype');
+      const sb = document.getElementById('sb');
+      const sbV = document.getElementById('sb-v');
+      const ss = document.getElementById('ss');
+      const ssV = document.getElementById('ss-v');
+      const sz = document.getElementById('sz');
+      const szV = document.getElementById('sz-v');
+
+      function applyShadow() {
+        const S = Engine3D.setting.shadow;
+        S.enable = true;
+        S.type = stype.value;
+        S.shadowBias = Number(sb.value) / 100;
+        S.shadowSoft = Number(ss.value) / 100;
+        S.shadowSize = 1 << Number(sz.value);
+        sbV.textContent = S.shadowBias.toFixed(2);
+        ssV.textContent = S.shadowSoft.toFixed(2);
+        szV.textContent = String(S.shadowSize);
+      }
+      stype.addEventListener('change', applyShadow);
+      sb.addEventListener('input', applyShadow);
+      ss.addEventListener('input', applyShadow);
+      sz.addEventListener('input', applyShadow);
+      applyShadow();
+
+      window.addEventListener('resize', () => {
+        camera.perspective(50, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 150);
+      });
+
+      function tick() {
+        const S = Engine3D.setting.shadow;
+        hud.textContent = `shadow.type=${S.type} bias=${S.shadowBias.toFixed(2)} soft=${S.shadowSoft.toFixed(2)} size=${S.shadowSize}`;
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+    main();
+  </script>
+</body>
+</html>

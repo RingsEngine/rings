@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings — 第一个 3D 场景（可运行示例）</title>
+  <style>
+    html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
+    #canvas { display: block; width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" style="width: 100%; height: 100%;"></canvas>
+  <script type="module">
+
+    import {
+      Engine3D,
+      Scene3D,
+      Object3D,
+      Camera3D,
+      View3D,
+      LitMaterial,
+      BoxGeometry,
+      SphereGeometry,
+      PlaneGeometry,
+      MeshRenderer,
+      AtmosphericComponent,
+      DirectLight,
+      HoverCameraController,
+      Color,
+    } from 'https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js';
+
+    async function main() {
+      const canvas = document.getElementById('canvas');
+      if (!canvas) throw new Error('缺少 #canvas');
+
+      try {
+        await Engine3D.init({
+          canvasConfig: { canvas },
+        });
+      } catch (e) {
+        document.body.innerHTML =
+          '<p style="padding:1rem;font-family:sans-serif">WebGPU 初始化失败，请使用 Chrome/Edge 最新版并在 localhost 或 HTTPS 下打开。</p>';
+        console.error(e);
+        return;
+      }
+
+      const scene = new Scene3D();
+      const sky = scene.addComponent(AtmosphericComponent);
+      sky.sunY = 0.6;
+      sky.sunZ = 0.8;
+
+      const cameraObj = new Object3D();
+      const camera = cameraObj.addComponent(Camera3D);
+      camera.perspective(60, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 1000);
+
+      const hoverController = cameraObj.addComponent(HoverCameraController);
+      hoverController.setCamera(45, -30, 10);
+      scene.addChild(cameraObj);
+
+      const lightObj = new Object3D();
+      const light = lightObj.addComponent(DirectLight);
+      light.lightColor = new Color(1, 1, 1, 1);
+      light.intensity = 1.2;
+      light.castShadow = true;
+      scene.addChild(lightObj);
+
+      const ground = new Object3D();
+      const groundR = ground.addComponent(MeshRenderer);
+      groundR.geometry = new PlaneGeometry(10, 10);
+      groundR.material = new LitMaterial();
+      groundR.material.baseColor = new Color(0.3, 0.3, 0.3, 1);
+      groundR.receiveShadow = true;
+      scene.addChild(ground);
+
+      const box = new Object3D();
+      const boxR = box.addComponent(MeshRenderer);
+      boxR.geometry = new BoxGeometry(1, 1, 1);
+      boxR.material = new LitMaterial();
+      boxR.material.baseColor = new Color(0.8, 0.2, 0.2, 1);
+      boxR.castShadow = true;
+      box.y = 0.5;
+      scene.addChild(box);
+
+      const sphere = new Object3D();
+      const sphereR = sphere.addComponent(MeshRenderer);
+      sphereR.geometry = new SphereGeometry(0.5, 32, 32);
+      sphereR.material = new LitMaterial();
+      sphereR.material.baseColor = new Color(0.2, 0.8, 0.2, 1);
+      sphereR.castShadow = true;
+      sphere.x = 2;
+      sphere.y = 0.5;
+      scene.addChild(sphere);
+
+      const view = new View3D();
+      view.scene = scene;
+      view.camera = camera;
+      Engine3D.startRenderView(view);
+    }
+
+    main();
+  </script>
+</body>
+</html>

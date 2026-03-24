@@ -4,17 +4,19 @@
 
 核心物理模拟模块，提供刚体动力学、碰撞检测和物理材质系统。
 
+各功能点（`Physics` 初始化、`CollisionShapeUtil`、`Rigidbody`、调试与拖拽、事件与 `GhostTrigger`、`ClothSoftbody`、铰链与点对点约束等）在**对应小节正文之后**内嵌 **`rings-quick-demo`**（示例 / 代码 切换 + `iframe`），与《组件系统》中光照、网格等文档一致；运行前需 **`npm run build:physics`** 并以 HTTP 打开仓库根目录。
+
 #### 导入方式
 
 ```javascript
 // 物理引擎主模块
-import { Physics } from "@rings/physics";
+import { Physics } from "@rings-webgpu/physics";
 // 刚体组件
-import { Rigidbody } from "@rings/physics";
+import { Rigidbody } from "@rings-webgpu/physics";
 // 碰撞体工具
-import { CollisionShapeUtil } from "@rings/physics";
+import { CollisionShapeUtil } from "@rings-webgpu/physics";
 // 碰撞体形状
-import { BoxColliderShape, SphereColliderShape, CapsuleColliderShape } from "@rings/core";
+import { BoxColliderShape, SphereColliderShape, CapsuleColliderShape } from "@rings-webgpu/core";
 ```
 
 #### 核心功能
@@ -40,11 +42,12 @@ import { BoxColliderShape, SphereColliderShape, CapsuleColliderShape } from "@ri
 #### 属性使用示例
 
 ```javascript
-// 配置物理世界参数
+// 配置物理世界参数（Physics 类仅有 gravity / fixedTimeStep / maxSubSteps 等）
 Physics.gravity = new Vector3(0, -15, 0); // 增强重力
-Physics.solverIterations = 15; // 更稳定的约束求解
-Physics.fixedTimeStep = 1 / 90; // 90Hz物理更新
-Physics.enableCCD = true; // 启用连续碰撞检测
+Physics.fixedTimeStep = 1 / 90; // 90Hz 固定子步
+Physics.maxSubSteps = 10;
+
+// 求解迭代次数、CCD 等不在 Physics 上暴露，需对 btRigidBody / Ammo 直接配置
 
 // 获取当前配置
 console.log("当前重力:", Physics.gravity);
@@ -56,26 +59,77 @@ console.log("物理步长:", Physics.fixedTimeStep);
 基于源码 `packages/physics/Physics.ts` 和实际使用：
 
 ```javascript
-// 初始化物理世界（通常在Engine3D.init后自动完成）
-import { Physics } from "@rings/physics";
+// 初始化：需业务侧显式 await，核心引擎不会自动调用 Physics.init
+import { Physics, Ammo } from "@rings-webgpu/physics";
+
+await Physics.init({ useSoftBody: false, useDrag: false });
 
 // 设置重力
 Physics.gravity = new Vector3(0, -9.8, 0);
 
 // 设置物理模拟参数
-Physics.fixedTimeStep = 1/60;
+Physics.fixedTimeStep = 1 / 60;
 Physics.maxSubSteps = 10;
 
-// 射线检测（通过PhysicsDragger或自定义实现）
-// 实际射线检测需使用Ammo.js API：
+// 每帧步进：需在渲染循环中调用（默认 timeStep = Time.delta * 0.001）
+Physics.update();
+
+// 射线检测：使用 Ammo API
 const rayCallback = new Ammo.ClosestRayResultCallback(fromVec, toVec);
 Physics.world.rayTest(fromVec, toVec, rayCallback);
 
-// 调试绘制
-Physics.debugDrawer.enable = true;
+// 调试绘制：先 initDebugDrawer，再使用 debugDrawer
+// Physics.initDebugDrawer(graphic3D, options);
+// Physics.debugDrawer.enable = true;
 ```
 
-**注意**：源码中Physics类主要管理物理世界，具体材质创建、约束添加等功能需要通过刚体组件或Ammo.js API实现。
+**注意**：源码中 Physics 类主要管理物理世界，具体材质创建、约束添加等功能需要通过刚体组件或 Ammo.js API 实现。
+
+#### 可运行示例（Physics 初始化与步进 + 场景）
+
+需先 **`npm run build:physics`**，在仓库根目录 **`npx serve .`** 等 HTTP 访问；示例 HTML 通过 **import map** 将 `@rings-webgpu/core` 指向 CDN 包，`@rings-webgpu/physics` 指向 **`../../packages/physics/dist/physics.es.js`**。
+
+<div class="rings-quick-demo" style="margin: 1em 0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+  <input type="radio" name="rings-phy-basics-tab" id="rings-phy-basics-tab-preview" checked style="position: absolute; opacity: 0; pointer-events: none;">
+  <input type="radio" name="rings-phy-basics-tab" id="rings-phy-basics-tab-code" style="position: absolute; opacity: 0; pointer-events: none;">
+  <style>
+    .rings-quick-demo .rings-tab-bar { display: flex; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+    .rings-quick-demo .rings-tab-bar label { flex: 1; padding: 10px 16px; cursor: pointer; font-size: 14px; color: #64748b; text-align: center; margin: 0; }
+    .rings-quick-demo #rings-phy-basics-tab-preview:checked ~ .rings-tab-bar label[for="rings-phy-basics-tab-preview"],
+    .rings-quick-demo #rings-phy-basics-tab-code:checked ~ .rings-tab-bar label[for="rings-phy-basics-tab-code"] { font-weight: 600; color: #0f172a; }
+    .rings-quick-demo .rings-demo-preview,
+    .rings-quick-demo .rings-demo-code { display: none; height: 420px; }
+    .rings-quick-demo #rings-phy-basics-tab-preview:checked ~ .rings-demo-preview,
+    .rings-quick-demo #rings-phy-basics-tab-code:checked ~ .rings-demo-code { display: block; }
+  </style>
+  <div class="rings-tab-bar">
+    <label for="rings-phy-basics-tab-preview">示例</label>
+    <label for="rings-phy-basics-tab-code">代码</label>
+  </div>
+  <div class="rings-demo-preview" style="background: #fff;">
+    <iframe src="examples/physics-basics-demo.html" title="Rings 物理：世界与刚体基础" style="width: 100%; height: 100%; border: none; min-height: 420px;"></iframe>
+  </div>
+  <div class="rings-demo-code" style="overflow: auto; background: #1e293b;">
+    <pre style="margin: 0; padding: 16px; font-size: 12px; line-height: 1.55; color: #e2e8f0; white-space: pre-wrap;"><code>完整 HTML：docs/examples/physics-basics-demo.html
+
+要点：
+• import map：@rings-webgpu/core、@rings-webgpu/physics（本地 dist 或 npm 安装后的包名与发布一致）
+• await Engine3D.init({ canvasConfig: { canvas }, beforeRender: () => { if (Physics.isInited) Physics.update(); } })
+• await Physics.init({ useSoftBody: false, useDrag: false })
+• 地面 Rigidbody.mass = 0 + ColliderComponent；掉落体 Rigidbody + ColliderComponent</code></pre>
+  </div>
+</div>
+
+#### 与真实物理/工程实践的差距及待补充
+
+| 类别 | 说明 |
+|------|------|
+| 仿真模型 | 基于 Bullet 离散时间步与子步，高速物体仍可能穿透；非「连续介质」真实流体/软体。 |
+| 单位与尺度 | 建议与渲染统一为米级；重力默认 `(0,-9.8,0)` 为地表近似，未建模纬度/海拔。 |
+| 集成方式 | `Physics.init` / `Physics.update` 需业务接入；核心 `Engine3D` 不会自动步进物理。 |
+| 变换同步 | 刚体结果常写回 `localPosition` / `localQuaternion`，有父节点时层级与表现需自行校验；`PhysicsTransformSync` 默认关闭。 |
+| 形状能力 | `Rigidbody` + `ColliderComponent` 自动建形目前主要为 Box/Capsule/Sphere；复杂形状需 `CollisionShapeUtil` 或自定义。 |
+| 包依赖 | 已发布包 peer 为 **`@rings-webgpu/core`**，需与主工程核心包版本一致。 |
 
 ### CollisionShapeUtil 碰撞体工具
 
@@ -85,9 +139,9 @@ Physics.debugDrawer.enable = true;
 
 ```javascript
 // 通过Rigidbody类访问（源码中CollisionShapeUtil作为Rigidbody的静态属性）
-import { Rigidbody } from "@rings/physics";
+import { Rigidbody } from "@rings-webgpu/physics";
 // 直接使用CollisionShapeUtil工具类
-import { CollisionShapeUtil } from "@rings/physics";
+import { CollisionShapeUtil } from "@rings-webgpu/physics";
 ```
 
 #### 支持的碰撞体类型
@@ -107,28 +161,63 @@ import { CollisionShapeUtil } from "@rings/physics";
 基于源码 `packages/physics/utils/CollisionShapeUtil.ts` 的实际实现：
 
 ```javascript
-// 创建基本形状碰撞体
-const boxShape = CollisionShapeUtil.createBoxShape(size);
-const sphereShape = CollisionShapeUtil.createSphereShape(radius);
-const capsuleShape = CollisionShapeUtil.createCapsuleShape(radius, height);
-const cylinderShape = CollisionShapeUtil.createCylinderShape(radius, height);
-const coneShape = CollisionShapeUtil.createConeShape(radius, height);
+// 基本形状：首参为 Object3D，尺寸/半径可从包围盒推断，也可显式传入
+const boxShape = CollisionShapeUtil.createBoxShape(object3D /*, size? */);
+const sphereShape = CollisionShapeUtil.createSphereShape(object3D /*, radius? */);
+const capsuleShape = CollisionShapeUtil.createCapsuleShape(object3D /*, radius?, height? */);
+const cylinderShape = CollisionShapeUtil.createCylinderShape(object3D /*, radius?, height? */);
+const coneShape = CollisionShapeUtil.createConeShape(object3D /*, radius?, height? */);
 
-// 从几何体创建复杂形状
-const convexShape = CollisionShapeUtil.createConvexHull(geometry);
-const meshShape = CollisionShapeUtil.createTriangleMesh(geometry);
+// 复杂形状：基于 Object3D 或显式 vertices/indices
+const convexShape = CollisionShapeUtil.createConvexHullShape(object3D);
+// 静态复杂网格优先 BVH；动态凸网格见 createConvexTriangleMeshShape / GImpact
+const meshShape = CollisionShapeUtil.createBvhTriangleMeshShape(object3D);
 
 // 创建复合碰撞形状
 const compoundShape = CollisionShapeUtil.createCompoundShape(childShapes);
 
-// 从Object3D对象创建复合形状（包含所有子对象）
-const compoundShape = CollisionShapeUtil.createCompoundShapeFromObject(object3D);
+// 从 Object3D 创建复合形状（包含子对象）
+const compoundFromScene = CollisionShapeUtil.createCompoundShapeFromObject(object3D);
 
-// 从单个Object3D创建形状
+// 从单个 Object3D 按几何类型自动选择形状
 const shape = CollisionShapeUtil.createShapeFromObject(object3D);
 ```
 
 **注意**：源码中CollisionShapeUtil主要提供形状创建功能，材质设置通过刚体组件实现。
+
+#### 可运行示例（CollisionShapeUtil + Rigidbody.shape）
+
+`Rigidbody.shape` 绑定 `createCylinderShape` / `createSphereShape` / `createBoxShape` 等（运行条件同上）。
+
+<div class="rings-quick-demo" style="margin: 1em 0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+  <input type="radio" name="rings-phy-shapes-tab" id="rings-phy-shapes-tab-preview" checked style="position: absolute; opacity: 0; pointer-events: none;">
+  <input type="radio" name="rings-phy-shapes-tab" id="rings-phy-shapes-tab-code" style="position: absolute; opacity: 0; pointer-events: none;">
+  <style>
+    .rings-quick-demo .rings-tab-bar { display: flex; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+    .rings-quick-demo .rings-tab-bar label { flex: 1; padding: 10px 16px; cursor: pointer; font-size: 14px; color: #64748b; text-align: center; margin: 0; }
+    .rings-quick-demo #rings-phy-shapes-tab-preview:checked ~ .rings-tab-bar label[for="rings-phy-shapes-tab-preview"],
+    .rings-quick-demo #rings-phy-shapes-tab-code:checked ~ .rings-tab-bar label[for="rings-phy-shapes-tab-code"] { font-weight: 600; color: #0f172a; }
+    .rings-quick-demo .rings-demo-preview,
+    .rings-quick-demo .rings-demo-code { display: none; height: 420px; }
+    .rings-quick-demo #rings-phy-shapes-tab-preview:checked ~ .rings-demo-preview,
+    .rings-quick-demo #rings-phy-shapes-tab-code:checked ~ .rings-demo-code { display: block; }
+  </style>
+  <div class="rings-tab-bar">
+    <label for="rings-phy-shapes-tab-preview">示例</label>
+    <label for="rings-phy-shapes-tab-code">代码</label>
+  </div>
+  <div class="rings-demo-preview" style="background: #fff;">
+    <iframe src="examples/physics-collision-shapes-demo.html" title="Rings 物理：CollisionShapeUtil" style="width: 100%; height: 100%; border: none; min-height: 420px;"></iframe>
+  </div>
+  <div class="rings-demo-code" style="overflow: auto; background: #1e293b;">
+    <pre style="margin: 0; padding: 16px; font-size: 12px; line-height: 1.55; color: #e2e8f0; white-space: pre-wrap;"><code>完整 HTML：docs/examples/physics-collision-shapes-demo.html
+
+要点：
+• const rb = obj.addComponent(Rigidbody);
+• rb.shape = CollisionShapeUtil.createCylinderShape(obj); // 首参为 Object3D
+• 静态地面同样可用 CollisionShapeUtil.createBoxShape(ground) + mass = 0</code></pre>
+  </div>
+</div>
 
 #### 碰撞体参数配置
 
@@ -153,7 +242,7 @@ const shape = CollisionShapeUtil.createShapeFromObject(object3D);
 #### 导入方式
 
 ```javascript
-import { Rigidbody } from "@rings/physics";
+import { Rigidbody } from "@rings-webgpu/physics";
 ```
 
 #### 组件功能
@@ -304,6 +393,37 @@ function applyForce() {
 }
 ```
 
+#### 可运行示例（Rigidbody + ColliderComponent）
+
+与 **Physics「常用方法」** 下「世界与刚体基础」示例相同：`ColliderComponent` 提供盒/球/胶囊枚举形状，与 `Rigidbody` 同挂于 `Object3D`。
+
+<div class="rings-quick-demo" style="margin: 1em 0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+  <input type="radio" name="rings-phy-rigid-tab" id="rings-phy-rigid-tab-preview" checked style="position: absolute; opacity: 0; pointer-events: none;">
+  <input type="radio" name="rings-phy-rigid-tab" id="rings-phy-rigid-tab-code" style="position: absolute; opacity: 0; pointer-events: none;">
+  <style>
+    .rings-quick-demo .rings-tab-bar { display: flex; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+    .rings-quick-demo .rings-tab-bar label { flex: 1; padding: 10px 16px; cursor: pointer; font-size: 14px; color: #64748b; text-align: center; margin: 0; }
+    .rings-quick-demo #rings-phy-rigid-tab-preview:checked ~ .rings-tab-bar label[for="rings-phy-rigid-tab-preview"],
+    .rings-quick-demo #rings-phy-rigid-tab-code:checked ~ .rings-tab-bar label[for="rings-phy-rigid-tab-code"] { font-weight: 600; color: #0f172a; }
+    .rings-quick-demo .rings-demo-preview,
+    .rings-quick-demo .rings-demo-code { display: none; height: 420px; }
+    .rings-quick-demo #rings-phy-rigid-tab-preview:checked ~ .rings-demo-preview,
+    .rings-quick-demo #rings-phy-rigid-tab-code:checked ~ .rings-demo-code { display: block; }
+  </style>
+  <div class="rings-tab-bar">
+    <label for="rings-phy-rigid-tab-preview">示例</label>
+    <label for="rings-phy-rigid-tab-code">代码</label>
+  </div>
+  <div class="rings-demo-preview" style="background: #fff;">
+    <iframe src="examples/physics-basics-demo.html" title="Rings 物理：刚体与碰撞体" style="width: 100%; height: 100%; border: none; min-height: 420px;"></iframe>
+  </div>
+  <div class="rings-demo-code" style="overflow: auto; background: #1e293b;">
+    <pre style="margin: 0; padding: 16px; font-size: 12px; line-height: 1.55; color: #e2e8f0; white-space: pre-wrap;"><code>与 physics-basics-demo.html 相同；见上文「Physics 初始化与步进」代码页要点。
+
+Collider：col.shape.setFromCenterAndSize(center, size) 或 BoxColliderShape 等。</code></pre>
+  </div>
+</div>
+
 ### 物理引擎使用总结
 
 基于源码分析，物理引擎的实际使用方式如下：
@@ -311,7 +431,7 @@ function applyForce() {
 #### 1. 物理世界配置
 ```javascript
 // 在Engine3D.init后，物理世界已自动初始化
-import { Physics } from "@rings/physics";
+import { Physics } from "@rings-webgpu/physics";
 
 // 可配置参数
 Physics.gravity = new Vector3(0, -9.8, 0);
@@ -353,12 +473,43 @@ Physics.debugDrawer.updateFreq = 1; // 每帧更新
 Physics.debugDrawer.maxLineCount = 25000; // 最大线数限制
 ```
 
+#### 可运行示例（PhysicsDragger）
+
+`Physics.init({ useDrag: true })` 后由内置拖拽器配合输入与射线拾取刚体（运行条件同上）。
+
+<div class="rings-quick-demo" style="margin: 1em 0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+  <input type="radio" name="rings-phy-drag-tab" id="rings-phy-drag-tab-preview" checked style="position: absolute; opacity: 0; pointer-events: none;">
+  <input type="radio" name="rings-phy-drag-tab" id="rings-phy-drag-tab-code" style="position: absolute; opacity: 0; pointer-events: none;">
+  <style>
+    .rings-quick-demo .rings-tab-bar { display: flex; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+    .rings-quick-demo .rings-tab-bar label { flex: 1; padding: 10px 16px; cursor: pointer; font-size: 14px; color: #64748b; text-align: center; margin: 0; }
+    .rings-quick-demo #rings-phy-drag-tab-preview:checked ~ .rings-tab-bar label[for="rings-phy-drag-tab-preview"],
+    .rings-quick-demo #rings-phy-drag-tab-code:checked ~ .rings-tab-bar label[for="rings-phy-drag-tab-code"] { font-weight: 600; color: #0f172a; }
+    .rings-quick-demo .rings-demo-preview,
+    .rings-quick-demo .rings-demo-code { display: none; height: 420px; }
+    .rings-quick-demo #rings-phy-drag-tab-preview:checked ~ .rings-demo-preview,
+    .rings-quick-demo #rings-phy-drag-tab-code:checked ~ .rings-demo-code { display: block; }
+  </style>
+  <div class="rings-tab-bar">
+    <label for="rings-phy-drag-tab-preview">示例</label>
+    <label for="rings-phy-drag-tab-code">代码</label>
+  </div>
+  <div class="rings-demo-preview" style="background: #fff;">
+    <iframe src="examples/physics-drag-demo.html" title="Rings 物理：拖拽" style="width: 100%; height: 100%; border: none; min-height: 420px;"></iframe>
+  </div>
+  <div class="rings-demo-code" style="overflow: auto; background: #1e293b;">
+    <pre style="margin: 0; padding: 16px; font-size: 12px; line-height: 1.55; color: #e2e8f0; white-space: pre-wrap;"><code>完整 HTML：docs/examples/physics-drag-demo.html
+
+要点：await Physics.init({ useDrag: true })</code></pre>
+  </div>
+</div>
+
 #### 4. 物理事件系统
 
 基于源码 `packages/physics/utils/ContactProcessedUtil.ts`：
 
 ```javascript
-import { ContactProcessedUtil } from "@rings/physics";
+import { ContactProcessedUtil } from "@rings-webgpu/physics";
 
 // 注册碰撞事件
 ContactProcessedUtil.registerCollisionCallback(
@@ -381,6 +532,37 @@ if (collision) {
 }
 ```
 
+#### 可运行示例（GhostTrigger / 触发与回调）
+
+`GhostTrigger` + `CollisionShapeUtil.createBoxShape`；可与 `collisionEvent` 配合观察与刚体重叠（运行条件同上）。
+
+<div class="rings-quick-demo" style="margin: 1em 0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+  <input type="radio" name="rings-phy-ghost-tab" id="rings-phy-ghost-tab-preview" checked style="position: absolute; opacity: 0; pointer-events: none;">
+  <input type="radio" name="rings-phy-ghost-tab" id="rings-phy-ghost-tab-code" style="position: absolute; opacity: 0; pointer-events: none;">
+  <style>
+    .rings-quick-demo .rings-tab-bar { display: flex; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+    .rings-quick-demo .rings-tab-bar label { flex: 1; padding: 10px 16px; cursor: pointer; font-size: 14px; color: #64748b; text-align: center; margin: 0; }
+    .rings-quick-demo #rings-phy-ghost-tab-preview:checked ~ .rings-tab-bar label[for="rings-phy-ghost-tab-preview"],
+    .rings-quick-demo #rings-phy-ghost-tab-code:checked ~ .rings-tab-bar label[for="rings-phy-ghost-tab-code"] { font-weight: 600; color: #0f172a; }
+    .rings-quick-demo .rings-demo-preview,
+    .rings-quick-demo .rings-demo-code { display: none; height: 420px; }
+    .rings-quick-demo #rings-phy-ghost-tab-preview:checked ~ .rings-demo-preview,
+    .rings-quick-demo #rings-phy-ghost-tab-code:checked ~ .rings-demo-code { display: block; }
+  </style>
+  <div class="rings-tab-bar">
+    <label for="rings-phy-ghost-tab-preview">示例</label>
+    <label for="rings-phy-ghost-tab-code">代码</label>
+  </div>
+  <div class="rings-demo-preview" style="background: #fff;">
+    <iframe src="examples/physics-ghost-trigger-demo.html" title="Rings 物理：GhostTrigger" style="width: 100%; height: 100%; border: none; min-height: 420px;"></iframe>
+  </div>
+  <div class="rings-demo-code" style="overflow: auto; background: #1e293b;">
+    <pre style="margin: 0; padding: 16px; font-size: 12px; line-height: 1.55; color: #e2e8f0; white-space: pre-wrap;"><code>完整 HTML：docs/examples/physics-ghost-trigger-demo.html
+
+要点：ghost.shape = CollisionShapeUtil.createBoxShape(zoneObj);</code></pre>
+  </div>
+</div>
+
 #### 性能建议
 
 1. 静态物体使用 Static 类型（collisionFlags = 1）
@@ -397,20 +579,20 @@ if (collision) {
 
 | 类名                  | 导入路径                  | 描述                   |
 | --------------------- | ------------------------- | ---------------------- |
-| Physics               | `@rings/physics`          | 物理引擎主类           |
-| Rigidbody             | `@rings/physics`          | 刚体组件               |
-| CollisionShapeUtil    | `@rings/physics`          | 碰撞体工具类           |
-| HingeConstraint       | `@rings/physics`          | 铰链约束               |
-| SliderConstraint      | `@rings/physics`          | 滑动约束               |
-| FixedConstraint       | `@rings/physics`          | 固定约束               |
-| PointToPointConstraint| `@rings/physics`        | 点对点约束             |
-| ConeTwistConstraint   | `@rings/physics`          | 锥形扭曲约束           |
-| Generic6DofConstraint | `@rings/physics`          | 6自由度约束            |
-| Generic6DofSpringConstraint| `@rings/physics`   | 6自由度弹簧约束        |
-| ClothSoftbody         | `@rings/physics`          | 布料软体组件           |
-| ContactProcessedUtil  | `@rings/physics`          | 碰撞事件工具类         |
-| RigidBodyUtil         | `@rings/physics`          | 刚体工具类             |
-| PhysicsDragger        | `@rings/physics`          | 物理拖拽工具           |
+| Physics               | `@rings-webgpu/physics`          | 物理引擎主类           |
+| Rigidbody             | `@rings-webgpu/physics`          | 刚体组件               |
+| CollisionShapeUtil    | `@rings-webgpu/physics`          | 碰撞体工具类           |
+| HingeConstraint       | `@rings-webgpu/physics`          | 铰链约束               |
+| SliderConstraint      | `@rings-webgpu/physics`          | 滑动约束               |
+| FixedConstraint       | `@rings-webgpu/physics`          | 固定约束               |
+| PointToPointConstraint| `@rings-webgpu/physics`        | 点对点约束             |
+| ConeTwistConstraint   | `@rings-webgpu/physics`          | 锥形扭曲约束           |
+| Generic6DofConstraint | `@rings-webgpu/physics`          | 6自由度约束            |
+| Generic6DofSpringConstraint| `@rings-webgpu/physics`   | 6自由度弹簧约束        |
+| ClothSoftbody         | `@rings-webgpu/physics`          | 布料软体组件           |
+| ContactProcessedUtil  | `@rings-webgpu/physics`          | 碰撞事件工具类         |
+| RigidBodyUtil         | `@rings-webgpu/physics`          | 刚体工具类             |
+| PhysicsDragger        | `@rings-webgpu/physics`          | 物理拖拽工具           |
 
 ##### 调试模式常量
 
@@ -444,7 +626,7 @@ if (collision) {
 #### 导入方式
 
 ```javascript
-import { ClothSoftbody } from "@rings/physics";
+import { ClothSoftbody } from "@rings-webgpu/physics";
 ```
 
 #### 组件功能
@@ -522,6 +704,38 @@ function update() {
 }
 ```
 
+#### 可运行示例（ClothSoftbody）
+
+`Physics.init({ useSoftBody: true })` + `PlaneGeometry` 分段 + `fixNodeIndices`（运行条件同上）。
+
+<div class="rings-quick-demo" style="margin: 1em 0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+  <input type="radio" name="rings-phy-cloth-tab" id="rings-phy-cloth-tab-preview" checked style="position: absolute; opacity: 0; pointer-events: none;">
+  <input type="radio" name="rings-phy-cloth-tab" id="rings-phy-cloth-tab-code" style="position: absolute; opacity: 0; pointer-events: none;">
+  <style>
+    .rings-quick-demo .rings-tab-bar { display: flex; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+    .rings-quick-demo .rings-tab-bar label { flex: 1; padding: 10px 16px; cursor: pointer; font-size: 14px; color: #64748b; text-align: center; margin: 0; }
+    .rings-quick-demo #rings-phy-cloth-tab-preview:checked ~ .rings-tab-bar label[for="rings-phy-cloth-tab-preview"],
+    .rings-quick-demo #rings-phy-cloth-tab-code:checked ~ .rings-tab-bar label[for="rings-phy-cloth-tab-code"] { font-weight: 600; color: #0f172a; }
+    .rings-quick-demo .rings-demo-preview,
+    .rings-quick-demo .rings-demo-code { display: none; height: 420px; }
+    .rings-quick-demo #rings-phy-cloth-tab-preview:checked ~ .rings-demo-preview,
+    .rings-quick-demo #rings-phy-cloth-tab-code:checked ~ .rings-demo-code { display: block; }
+  </style>
+  <div class="rings-tab-bar">
+    <label for="rings-phy-cloth-tab-preview">示例</label>
+    <label for="rings-phy-cloth-tab-code">代码</label>
+  </div>
+  <div class="rings-demo-preview" style="background: #fff;">
+    <iframe src="examples/physics-cloth-demo.html" title="Rings 物理：布料" style="width: 100%; height: 100%; border: none; min-height: 420px;"></iframe>
+  </div>
+  <div class="rings-demo-code" style="overflow: auto; background: #1e293b;">
+    <pre style="margin: 0; padding: 16px; font-size: 12px; line-height: 1.55; color: #e2e8f0; white-space: pre-wrap;"><code>完整 HTML：docs/examples/physics-cloth-demo.html
+
+要点：await Physics.init({ useSoftBody: true })
+cloth.fixNodeIndices = ['leftTop', 'rightTop']</code></pre>
+  </div>
+</div>
+
 #### 性能优化建议
 
 1. 合理设置网格分辨率
@@ -537,7 +751,7 @@ function update() {
 #### HingeConstraint 铰链约束
 
 ```javascript
-import { HingeConstraint } from "@rings/physics";
+import { HingeConstraint } from "@rings-webgpu/physics";
 ```
 
 - **功能**：创建单轴旋转约束，模拟门铰链、关节等旋转行为
@@ -574,7 +788,7 @@ import { HingeConstraint } from "@rings/physics";
 - **常见问题解决**：
 
   1. **旋转轴不对齐**：确保 axisA/B 方向一致
-  2. **抖动严重**：降低 biasFactor，增加 solverIterations
+  2. **抖动严重**：降低 biasFactor；全局求解迭代需通过 `Physics.world` / Ammo 的 solver 配置，而非 `Physics.solverIterations` 属性
   3. **约束失效**：检查锚点位置是否合理
   4. **穿模问题**：适当减小 limit 范围
 
@@ -601,10 +815,41 @@ function updateDoor() {
 }
 ```
 
+#### 可运行示例（HingeConstraint）
+
+组件式铰链：`door.addComponent(HingeConstraint)`，单刚体模式可无 `targetRigidbody`（运行条件同上）。
+
+<div class="rings-quick-demo" style="margin: 1em 0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+  <input type="radio" name="rings-phy-hinge-tab" id="rings-phy-hinge-tab-preview" checked style="position: absolute; opacity: 0; pointer-events: none;">
+  <input type="radio" name="rings-phy-hinge-tab" id="rings-phy-hinge-tab-code" style="position: absolute; opacity: 0; pointer-events: none;">
+  <style>
+    .rings-quick-demo .rings-tab-bar { display: flex; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+    .rings-quick-demo .rings-tab-bar label { flex: 1; padding: 10px 16px; cursor: pointer; font-size: 14px; color: #64748b; text-align: center; margin: 0; }
+    .rings-quick-demo #rings-phy-hinge-tab-preview:checked ~ .rings-tab-bar label[for="rings-phy-hinge-tab-preview"],
+    .rings-quick-demo #rings-phy-hinge-tab-code:checked ~ .rings-tab-bar label[for="rings-phy-hinge-tab-code"] { font-weight: 600; color: #0f172a; }
+    .rings-quick-demo .rings-demo-preview,
+    .rings-quick-demo .rings-demo-code { display: none; height: 420px; }
+    .rings-quick-demo #rings-phy-hinge-tab-preview:checked ~ .rings-demo-preview,
+    .rings-quick-demo #rings-phy-hinge-tab-code:checked ~ .rings-demo-code { display: block; }
+  </style>
+  <div class="rings-tab-bar">
+    <label for="rings-phy-hinge-tab-preview">示例</label>
+    <label for="rings-phy-hinge-tab-code">代码</label>
+  </div>
+  <div class="rings-demo-preview" style="background: #fff;">
+    <iframe src="examples/physics-hinge-demo.html" title="Rings 物理：铰链" style="width: 100%; height: 100%; border: none; min-height: 420px;"></iframe>
+  </div>
+  <div class="rings-demo-code" style="overflow: auto; background: #1e293b;">
+    <pre style="margin: 0; padding: 16px; font-size: 12px; line-height: 1.55; color: #e2e8f0; white-space: pre-wrap;"><code>完整 HTML：docs/examples/physics-hinge-demo.html
+
+要点：hinge.pivotSelf / axisSelf；hinge.setLimit(low, high, softness, biasFactor)</code></pre>
+  </div>
+</div>
+
 #### SliderConstraint 滑动约束
 
 ```javascript
-import { SliderConstraint } from "@rings/physics";
+import { SliderConstraint } from "@rings-webgpu/physics";
 ```
 
 - 功能：限制物体沿指定轴滑动
@@ -623,7 +868,7 @@ const slider = new SliderConstraint(bodyA, bodyB, {
 #### FixedConstraint 固定约束
 
 ```javascript
-import { FixedConstraint } from "@rings/physics";
+import { FixedConstraint } from "@rings-webgpu/physics";
 ```
 
 - 功能：完全固定两个物体的相对位置和旋转
@@ -641,7 +886,7 @@ const fixed = new FixedConstraint(bodyA, bodyB, {
 #### PointToPointConstraint 点对点约束
 
 ```javascript
-import { PointToPointConstraint } from "@rings/physics";
+import { PointToPointConstraint } from "@rings-webgpu/physics";
 ```
 
 - 功能：将两个物体的特定点连接在一起
@@ -656,10 +901,41 @@ const p2p = new PointToPointConstraint(bodyA, bodyB, {
 });
 ```
 
+#### 可运行示例（PointToPointConstraint）
+
+`bob.addComponent(PointToPointConstraint)` + `targetRigidbody` 指向锚点刚体（运行条件同上）。
+
+<div class="rings-quick-demo" style="margin: 1em 0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+  <input type="radio" name="rings-phy-p2p-tab" id="rings-phy-p2p-tab-preview" checked style="position: absolute; opacity: 0; pointer-events: none;">
+  <input type="radio" name="rings-phy-p2p-tab" id="rings-phy-p2p-tab-code" style="position: absolute; opacity: 0; pointer-events: none;">
+  <style>
+    .rings-quick-demo .rings-tab-bar { display: flex; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+    .rings-quick-demo .rings-tab-bar label { flex: 1; padding: 10px 16px; cursor: pointer; font-size: 14px; color: #64748b; text-align: center; margin: 0; }
+    .rings-quick-demo #rings-phy-p2p-tab-preview:checked ~ .rings-tab-bar label[for="rings-phy-p2p-tab-preview"],
+    .rings-quick-demo #rings-phy-p2p-tab-code:checked ~ .rings-tab-bar label[for="rings-phy-p2p-tab-code"] { font-weight: 600; color: #0f172a; }
+    .rings-quick-demo .rings-demo-preview,
+    .rings-quick-demo .rings-demo-code { display: none; height: 420px; }
+    .rings-quick-demo #rings-phy-p2p-tab-preview:checked ~ .rings-demo-preview,
+    .rings-quick-demo #rings-phy-p2p-tab-code:checked ~ .rings-demo-code { display: block; }
+  </style>
+  <div class="rings-tab-bar">
+    <label for="rings-phy-p2p-tab-preview">示例</label>
+    <label for="rings-phy-p2p-tab-code">代码</label>
+  </div>
+  <div class="rings-demo-preview" style="background: #fff;">
+    <iframe src="examples/physics-point-constraint-demo.html" title="Rings 物理：点对点约束" style="width: 100%; height: 100%; border: none; min-height: 420px;"></iframe>
+  </div>
+  <div class="rings-demo-code" style="overflow: auto; background: #1e293b;">
+    <pre style="margin: 0; padding: 16px; font-size: 12px; line-height: 1.55; color: #e2e8f0; white-space: pre-wrap;"><code>完整 HTML：docs/examples/physics-point-constraint-demo.html
+
+要点：p2p.targetRigidbody = anchorRigidbody; pivotSelf / pivotTarget</code></pre>
+  </div>
+</div>
+
 #### ConeTwistConstraint 锥形扭曲约束
 
 ```javascript
-import { ConeTwistConstraint } from "@rings/physics";
+import { ConeTwistConstraint } from "@rings-webgpu/physics";
 ```
 
 - 功能：模拟球窝关节，限制旋转角度
@@ -680,7 +956,7 @@ const coneTwist = new ConeTwistConstraint(bodyA, bodyB, {
 #### Generic6DofConstraint 通用 6 自由度约束
 
 ```javascript
-import { Generic6DofConstraint } from "@rings/physics";
+import { Generic6DofConstraint } from "@rings-webgpu/physics";
 ```
 
 - 功能：提供 6 个自由度的完全控制
@@ -701,7 +977,7 @@ const dof = new Generic6DofConstraint(bodyA, bodyB, {
 #### Generic6DofSpringConstraint 通用 6 自由度弹簧约束
 
 ```javascript
-import { Generic6DofSpringConstraint } from "@rings/physics";
+import { Generic6DofSpringConstraint } from "@rings-webgpu/physics";
 ```
 
 - 功能：带弹簧效果的 6 自由度约束
@@ -761,7 +1037,7 @@ Physics.checkBound(rigidbody);
 
 ```javascript
 // RigidBodyUtil 工具类
-import { RigidBodyUtil } from "@rings/physics";
+import { RigidBodyUtil } from "@rings-webgpu/physics";
 
 // 激活所有碰撞体
 RigidBodyUtil.activateCollisionBodies();
@@ -770,7 +1046,7 @@ RigidBodyUtil.activateCollisionBodies();
 RigidBodyUtil.clearForcesAndVelocities(btRigidbody);
 
 // 物理材质工具
-import { PhysicsMaterialUtil } from "@rings/physics";
+import { PhysicsMaterialUtil } from "@rings-webgpu/physics";
 
 // 创建物理材质
 const material = PhysicsMaterialUtil.createMaterial(0.5, 0.3, 0.1);

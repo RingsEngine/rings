@@ -46,14 +46,17 @@ export class BitmapTexture2D extends Texture {
             imageOrientation: this.flipY ? "flipY" : "from-image",
             premultiplyAlpha: "none",
           });
+          this.format = GPUTextureFormat.rgba8unorm;
           this.generate(imageBitmap);
         }
       });
     } else {
       if (
         this._source instanceof HTMLCanvasElement ||
-        this._source instanceof ImageBitmap
+        this._source instanceof ImageBitmap ||
+        this._source instanceof OffscreenCanvas
       ) {
+        this.format = GPUTextureFormat.rgba8unorm;
         this.generate(this._source);
       }
     }

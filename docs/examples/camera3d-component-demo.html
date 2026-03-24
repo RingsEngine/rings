@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings — Camera3D 演示（可运行示例）</title>
+  <style>
+    html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
+    body { position: relative; font-family: system-ui, "Segoe UI", sans-serif; }
+    #canvas { display: block; width: 100%; height: 100%; }
+    .hud {
+      position: absolute; left: 8px; top: 8px; right: 220px; pointer-events: none;
+      font-size: 11px; line-height: 1.45; color: #e6edf3; text-shadow: 0 1px 3px #000;
+      font-family: ui-monospace, monospace;
+    }
+    .controls {
+      position: absolute; top: 0; right: 0; bottom: 0; width: 200px; padding: 10px;
+      overflow: auto; background: rgba(15, 20, 25, 0.92); color: #e6edf3;
+      font-size: 0.78rem; border-left: 1px solid #2d3a4d;
+    }
+    .controls h3 { margin: 0 0 8px; font-size: 0.8rem; color: #8b9cb3; font-weight: 600; }
+    .row { margin-bottom: 10px; }
+    .row label { display: block; margin-bottom: 3px; color: #8b9cb3; }
+    .row input[type="range"] { width: 100%; }
+    .row .val { float: right; color: #58a6ff; }
+    .radio-row label { display: inline-flex; align-items: center; gap: 5px; margin-right: 8px; cursor: pointer; color: #e6edf3; }
+    @media (max-width: 520px) {
+      .hud { right: 8px; }
+      .controls { width: 100%; height: auto; max-height: 45%; top: auto; left: 0; border-left: none; border-top: 1px solid #2d3a4d; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" style="width: 100%; height: 100%;"></canvas>
+  <div class="hud" id="hud"></div>
+  <aside class="controls" id="controls">
+    <h3>投影</h3>
+    <div class="row radio-row">
+      <label><input type="radio" name="proj" value="perspective" checked /> perspective()</label>
+      <label><input type="radio" name="proj" value="ortho" /> ortho()</label>
+    </div>
+    <div class="row" id="row-fov">
+      <label>fov<span class="val" id="fov-val">60</span></label>
+      <input type="range" id="fov" min="25" max="100" value="60" step="1" />
+    </div>
+    <div class="row" id="row-frustum" style="display:none">
+      <label>frustumSize<span class="val" id="frustum-val">32</span></label>
+      <input type="range" id="frustum" min="8" max="80" value="32" step="1" />
+    </div>
+    <div class="row">
+      <label>near<span class="val" id="near-val">0.1</span></label>
+      <input type="range" id="near" min="1" max="50" value="1" step="1" />
+    </div>
+    <div class="row">
+      <label>far<span class="val" id="far-val">1000</span></label>
+      <input type="range" id="far" min="100" max="3000" value="1000" step="50" />
+    </div>
+    <p style="margin:8px 0 0;color:#8b9cb3;line-height:1.45">near 滑块÷10；点击画布可看 ray / screenPointToWorld。拖拽旋转（HoverCameraController）。</p>
+  </aside>
+
+  <script type="module">
+    import {
+      Engine3D,
+      Scene3D,
+      Object3D,
+      Camera3D,
+      View3D,
+      Vector3,
+      CameraType,
+      LitMaterial,
+      BoxGeometry,
+      SphereGeometry,
+      PlaneGeometry,
+      MeshRenderer,
+      AtmosphericComponent,
+      DirectLight,
+      HoverCameraController,
+      Color,
+    } from 'https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js';
+
+    const BOX_CENTER = new Vector3(0, 0.5, 0);
+
+    function formatVec3(v) {
+      return `${v.x.toFixed(2)}, ${v.y.toFixed(2)}, ${v.z.toFixed(2)}`;
+    }
+
+    async function main() {
+      const canvas = document.getElementById('canvas');
+      const hud = document.getElementById('hud');
+      if (!canvas) throw new Error('缺少 #canvas');
+
+      try {
+        await Engine3D.init({ canvasConfig: { canvas } });
+      } catch (e) {
+        document.body.innerHTML =
+          '<p style="padding:1rem;font-family:sans-serif">WebGPU 初始化失败，请使用 Chrome/Edge 最新版并在 localhost 或 HTTPS 下打开。</p>';
+        console.error(e);
+        return;
+      }
+
+      const scene = new Scene3D();
+      const sky = scene.addComponent(AtmosphericComponent);
+      sky.sunY = 0.6;
+      sky.sunZ = 0.8;
+
+      const cameraObj = new Object3D();
+      const camera = cameraObj.addComponent(Camera3D);
+
+      const aspect = () =>
+        canvas.clientWidth / Math.max(canvas.clientHeight, 1);
+
+      let projMode = 'perspective';
+      let fov = 60;
+      let frustumSize = 32;
+      let near = 0.1;
+      let far = 1000;
+
+      function applyProjection() {
+        const a = aspect();
+        if (projMode === 'perspective') {
+          camera.perspective(fov, a, near, far);
+        } else {
+          camera.ortho(frustumSize, near, far);
+        }
+      }
+
+      applyProjection();
+      const hover = cameraObj.addComponent(HoverCameraController);
+      hover.setCamera(35, -25, 12);
+      scene.addChild(cameraObj);
+
+      const lightObj = new Object3D();
+      const light = lightObj.addComponent(DirectLight);
+      light.lightColor = new Color(1, 1, 1, 1);
+      light.intensity = 1.2;
+      light.castShadow = true;
+      scene.addChild(lightObj);
+
+      const ground = new Object3D();
+      const groundR = ground.addComponent(MeshRenderer);
+      groundR.geometry = new PlaneGeometry(10, 10);
+      groundR.material = new LitMaterial();
+      groundR.material.baseColor = new Color(0.3, 0.3, 0.3, 1);
+      groundR.receiveShadow = true;
+      scene.addChild(ground);
+
+      const box = new Object3D();
+      const boxR = box.addComponent(MeshRenderer);
+      boxR.geometry = new BoxGeometry(1, 1, 1);
+      boxR.material = new LitMaterial();
+      boxR.material.baseColor = new Color(0.8, 0.2, 0.2, 1);
+      boxR.castShadow = true;
+      box.y = 0.5;
+      scene.addChild(box);
+
+      const sphere = new Object3D();
+      const sphereR = sphere.addComponent(MeshRenderer);
+      sphereR.geometry = new SphereGeometry(0.5, 32, 32);
+      sphereR.material = new LitMaterial();
+      sphereR.material.baseColor = new Color(0.2, 0.8, 0.2, 1);
+      sphereR.castShadow = true;
+      sphere.x = 2;
+      sphere.y = 0.5;
+      scene.addChild(sphere);
+
+      const view = new View3D();
+      view.scene = scene;
+      view.camera = camera;
+      Engine3D.startRenderView(view);
+
+      const fovEl = document.getElementById('fov');
+      const fovVal = document.getElementById('fov-val');
+      const frustumEl = document.getElementById('frustum');
+      const frustumVal = document.getElementById('frustum-val');
+      const nearEl = document.getElementById('near');
+      const nearVal = document.getElementById('near-val');
+      const farEl = document.getElementById('far');
+      const farVal = document.getElementById('far-val');
+      const rowFov = document.getElementById('row-fov');
+      const rowFrustum = document.getElementById('row-frustum');
+
+      function readUi() {
+        fov = Number(fovEl.value);
+        frustumSize = Number(frustumEl.value);
+        near = Number(nearEl.value) / 10;
+        far = Number(farEl.value);
+        fovVal.textContent = String(fov);
+        frustumVal.textContent = String(frustumSize);
+        nearVal.textContent = near.toFixed(1);
+        farVal.textContent = String(far);
+      }
+
+      document.querySelectorAll('input[name="proj"]').forEach((r) => {
+        r.addEventListener('change', () => {
+          projMode = r.value;
+          rowFov.style.display = projMode === 'perspective' ? '' : 'none';
+          rowFrustum.style.display = projMode === 'ortho' ? '' : 'none';
+          readUi();
+          applyProjection();
+        });
+      });
+      [fovEl, frustumEl, nearEl, farEl].forEach((el) => {
+        el.addEventListener('input', () => {
+          readUi();
+          applyProjection();
+        });
+      });
+
+      readUi();
+
+      window.addEventListener('resize', () => {
+        applyProjection();
+      });
+
+      let lastRayStr = '（点击画布）';
+      canvas.addEventListener(
+        'pointerdown',
+        (e) => {
+          if (e.target !== canvas) return;
+          const x = e.offsetX;
+          const y = e.offsetY;
+          const ray = camera.screenPointToRay(x, y);
+          const w0 = camera.screenPointToWorld(x, y, 0.01);
+          const w1 = camera.screenPointToWorld(x, y, 0.5);
+          lastRayStr =
+            `ray.origin: ${formatVec3(ray.origin)}\n` +
+            `ray.direction: ${formatVec3(ray.direction)}\n` +
+            `screenPointToWorld(z=0.01): ${formatVec3(w0)}\n` +
+            `screenPointToWorld(z=0.5): ${formatVec3(w1)}`;
+        },
+        { passive: true }
+      );
+
+      function tick() {
+        const screen = camera.worldToScreenPoint(BOX_CENTER);
+        const typeName =
+          camera.type === CameraType.perspective
+            ? 'perspective'
+            : camera.type === CameraType.ortho
+              ? 'ortho'
+              : 'other';
+        hud.innerHTML =
+          `<div><b>camera.type</b> ${typeName}</div>` +
+          `<div><b>fov / frustumSize</b> ${projMode === 'perspective' ? fov : frustumSize}</div>` +
+          `<div><b>near / far</b> ${near.toFixed(2)} / ${far}</div>` +
+          `<div><b>worldToScreenPoint(红盒中心)</b></div>` +
+          `<div>${formatVec3(screen)}</div>` +
+          `<div style="margin-top:8px"><b>点击 — screenPointToRay / screenPointToWorld</b></div>` +
+          `<div style="white-space:pre-wrap">${lastRayStr}</div>`;
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+
+    main();
+  </script>
+</body>
+</html>

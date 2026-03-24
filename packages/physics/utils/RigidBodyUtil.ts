@@ -1,4 +1,4 @@
-import { Vector3, Quaternion, Object3D } from "@rings/core";
+import { Vector3, Quaternion, Object3D } from "@rings-webgpu/core";
 import { Physics, Ammo } from "../Physics";
 import { TempPhyMath } from "./TempPhyMath";
 

@@ -11,7 +11,7 @@ import {
   BoxGeometry,
   SphereGeometry,
   CylinderGeometry,
-} from "@rings/core";
+} from "@rings-webgpu/core";
 import { Physics, Ammo } from "../Physics";
 import { TempPhyMath } from "./TempPhyMath";
 

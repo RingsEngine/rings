@@ -3,8 +3,8 @@ const path = require("path");
 export default defineConfig({
   resolve: {
     alias: {
-      "@rings/core": path.resolve(__dirname, "../../src"),
-      "@rings": path.resolve(__dirname, "../"),
+      "@rings-webgpu/core": path.resolve(__dirname, "../../src"),
+      "@rings-webgpu/ammo": path.resolve(__dirname, "../ammo/ammo.js"),
     },
   },
   build: {
@@ -15,10 +15,11 @@ export default defineConfig({
       fileName: (format) => `physics.${format}.js`,
     },
     rollupOptions: {
-      external: ["@rings/core"],
+      external: ["@rings-webgpu/core", "@rings-webgpu/ammo"],
       output: {
         globals: {
-          "@rings/core": "Rings",
+          "@rings-webgpu/core": "Rings",
+          "@rings-webgpu/ammo": "Ammo",
         },
       },
     },

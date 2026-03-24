@@ -6,7 +6,7 @@ import {
   ComponentBase,
   Quaternion,
   SphereColliderShape,
-} from "@rings/core";
+} from "@rings-webgpu/core";
 import { Ammo, Physics } from "../Physics";
 import { TempPhyMath } from "../utils/TempPhyMath";
 import { ActivationState, CollisionFlags } from "./RigidbodyEnum";

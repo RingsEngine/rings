@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings — PointLight（点光源）演示</title>
+  <style>
+    html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
+    body { position: relative; font-family: system-ui, "Segoe UI", sans-serif; }
+    #canvas { display: block; width: 100%; height: 100%; }
+    .hud {
+      position: absolute; left: 8px; top: 8px; right: 220px; pointer-events: none;
+      font-size: 11px; line-height: 1.45; color: #e6edf3; text-shadow: 0 1px 3px #000;
+      font-family: ui-monospace, monospace;
+    }
+    .controls {
+      position: absolute; top: 0; right: 0; bottom: 0; width: 200px; padding: 10px;
+      overflow: auto; background: rgba(15, 20, 25, 0.92); color: #e6edf3;
+      font-size: 0.72rem; border-left: 1px solid #2d3a4d;
+    }
+    .controls h3 { margin: 0 0 8px; font-size: 0.75rem; color: #8b9cb3; font-weight: 600; }
+    .row { margin-bottom: 8px; }
+    .row label { display: block; margin-bottom: 2px; color: #8b9cb3; }
+    .row input[type="range"] { width: 100%; }
+    .row .val { float: right; color: #58a6ff; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" style="width: 100%; height: 100%;"></canvas>
+  <div class="hud" id="hud"></div>
+  <aside class="controls">
+    <h3>PointLight</h3>
+    <div class="row">
+      <label>intensity <span class="val" id="int-v">2</span></label>
+      <input type="range" id="int" min="0" max="25" value="20" step="1" />
+    </div>
+    <div class="row">
+      <label>range <span class="val" id="range-v">12</span></label>
+      <input type="range" id="range" min="4" max="28" value="12" step="1" />
+    </div>
+    <p style="margin:10px 0 0;color:#8b9cb3;line-height:1.45">橙色点光在右侧；无平行光便于观察衰减。</p>
+  </aside>
+  <script type="module">
+    import {
+      Engine3D,
+      Scene3D,
+      Object3D,
+      Camera3D,
+      View3D,
+      Vector3,
+      LitMaterial,
+      BoxGeometry,
+      SphereGeometry,
+      PlaneGeometry,
+      MeshRenderer,
+      AtmosphericComponent,
+      PointLight,
+      HoverCameraController,
+      Color,
+    } from 'https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js';
+
+    async function main() {
+      const canvas = document.getElementById('canvas');
+      const hud = document.getElementById('hud');
+      if (!canvas) return;
+      try {
+        await Engine3D.init({ canvasConfig: { canvas } });
+      } catch (e) {
+        document.body.innerHTML =
+          '<p style="padding:1rem;font-family:sans-serif">WebGPU 初始化失败，请使用 Chrome/Edge 并在 localhost 或 HTTPS 下打开。</p>';
+        console.error(e);
+        return;
+      }
+
+      const scene = new Scene3D();
+      scene.addComponent(AtmosphericComponent);
+
+      const cameraObj = new Object3D();
+      const camera = cameraObj.addComponent(Camera3D);
+      camera.perspective(60, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 1000);
+      const hover = cameraObj.addComponent(HoverCameraController);
+      hover.setCamera(35, -25, 14);
+      scene.addChild(cameraObj);
+
+      const pointObj = new Object3D();
+      const pointLight = pointObj.addComponent(PointLight);
+      pointLight.lightColor = new Color(1, 0.42, 0.12, 1);
+      pointLight.intensity = 2;
+      pointLight.range = 12;
+      pointLight.at = 0.12;
+      pointLight.quadratic = 0.45;
+      pointLight.castShadow = false;
+      pointObj.transform.localPosition = new Vector3(3.8, 2.2, 1.5);
+      scene.addChild(pointObj);
+
+      const ground = new Object3D();
+      const gr = ground.addComponent(MeshRenderer);
+      gr.geometry = new PlaneGeometry(14, 14);
+      gr.material = new LitMaterial();
+      gr.material.baseColor = new Color(0.18, 0.2, 0.22, 1);
+      gr.receiveShadow = true;
+      scene.addChild(ground);
+
+      const box = new Object3D();
+      const br = box.addComponent(MeshRenderer);
+      br.geometry = new BoxGeometry(1, 1, 1);
+      br.material = new LitMaterial();
+      br.material.baseColor = new Color(0.55, 0.52, 0.48, 1);
+      box.y = 0.5;
+      scene.addChild(box);
+
+      const sphere = new Object3D();
+      const sr = sphere.addComponent(MeshRenderer);
+      sr.geometry = new SphereGeometry(0.4, 28, 28);
+      sr.material = new LitMaterial();
+      sr.material.baseColor = new Color(0.45, 0.65, 0.5, 1);
+      sphere.x = -2;
+      sphere.y = 0.4;
+      scene.addChild(sphere);
+
+      const view = new View3D();
+      view.scene = scene;
+      view.camera = camera;
+      Engine3D.startRenderView(view);
+
+      const intEl = document.getElementById('int');
+      const intV = document.getElementById('int-v');
+      const rangeEl = document.getElementById('range');
+      const rangeV = document.getElementById('range-v');
+
+      function bind() {
+        pointLight.intensity = Number(intEl.value) / 10;
+        pointLight.range = Number(rangeEl.value);
+        intV.textContent = pointLight.intensity.toFixed(1);
+        rangeV.textContent = String(pointLight.range);
+      }
+      intEl.addEventListener('input', bind);
+      rangeEl.addEventListener('input', bind);
+      bind();
+
+      window.addEventListener('resize', () => {
+        camera.perspective(
+          60,
+          canvas.clientWidth / Math.max(canvas.clientHeight, 1),
+          0.1,
+          1000
+        );
+      });
+
+      function tick() {
+        hud.textContent = `PointLight · I=${pointLight.intensity.toFixed(2)} range=${pointLight.range} pos=(${pointObj.transform.localPosition.x.toFixed(1)},${pointObj.transform.localPosition.y.toFixed(1)},${pointObj.transform.localPosition.z.toFixed(1)})`;
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+    main();
+  </script>
+</body>
+</html>

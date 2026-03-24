@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings — 材质演示（LitMaterial / UnLitMaterial）</title>
+  <style>
+    html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
+    body { position: relative; font-family: system-ui, "Segoe UI", sans-serif; }
+    #canvas { display: block; width: 100%; height: 100%; }
+    .hud {
+      position: absolute; left: 8px; top: 8px; right: 280px; pointer-events: none;
+      font-size: 11px; line-height: 1.45; color: #e6edf3; text-shadow: 0 1px 3px #000;
+      font-family: ui-monospace, monospace;
+    }
+    .controls {
+      position: absolute; top: 0; right: 0; bottom: 0; width: 260px; padding: 10px;
+      overflow: auto; background: rgba(15, 20, 25, 0.92); color: #e6edf3;
+      font-size: 0.72rem; border-left: 1px solid #2d3a4d;
+    }
+    .controls h3 { margin: 12px 0 6px; font-size: 0.75rem; color: #8b9cb3; font-weight: 600; }
+    .controls h3:first-child { margin-top: 0; }
+    .row { margin-bottom: 8px; }
+    .row label { display: block; margin-bottom: 4px; color: #8b9cb3; }
+    .row input[type="range"] { width: 100%; }
+    .row .val { float: right; color: #58a6ff; }
+    .row input[type="checkbox"] { margin-right: 6px; }
+    @media (max-width: 560px) {
+      .hud { right: 8px; }
+      .controls { width: 100%; height: auto; max-height: 48%; top: auto; left: 0; border-left: none; border-top: 1px solid #2d3a4d; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" style="width: 100%; height: 100%;"></canvas>
+  <div class="hud" id="hud"></div>
+  <aside class="controls">
+    <h3>LitMaterial（主球体）</h3>
+    <div class="row">
+      <label>metallic <span class="val" id="m-v">0.25</span></label>
+      <input type="range" id="m" min="0" max="100" value="25" step="1" />
+    </div>
+    <div class="row">
+      <label>roughness <span class="val" id="r-v">0.35</span></label>
+      <input type="range" id="r" min="0" max="100" value="35" step="1" />
+    </div>
+    <div class="row">
+      <label>emissiveIntensity <span class="val" id="e-v">0</span></label>
+      <input type="range" id="e" min="0" max="500" value="0" step="5" />
+    </div>
+    <div class="row">
+      <label>envIntensity（shader）<span class="val" id="env-v">1</span></label>
+      <input type="range" id="env" min="0" max="300" value="100" step="5" />
+    </div>
+    <div class="row">
+      <label>clearcoatFactor <span class="val" id="cc-v">0</span></label>
+      <input type="range" id="cc" min="0" max="100" value="0" step="1" />
+    </div>
+    <div class="row">
+      <label><input type="checkbox" id="ds" /> doubleSide</label>
+    </div>
+    <h3>UnLitMaterial（左侧小立方体）</h3>
+    <div class="row">
+      <label>baseColor 饱和度 <span class="val" id="u-v">1</span></label>
+      <input type="range" id="u" min="0" max="100" value="100" step="1" />
+    </div>
+    <p style="margin:10px 0 0;color:#8b9cb3;line-height:1.45">主球为 <code>LitMaterial</code> + 程序化 <code>baseMap</code>；左侧为 <code>UnLitMaterial</code> 不受场景光影响。默认 StandShader 金属/粗糙为 1，此处用滑条覆盖为常见 PBR。</p>
+  </aside>
+
+  <script type="module">
+    import {
+      Engine3D,
+      Scene3D,
+      Object3D,
+      Camera3D,
+      View3D,
+      Vector3,
+      Color,
+      LitMaterial,
+      UnLitMaterial,
+      SphereGeometry,
+      BoxGeometry,
+      PlaneGeometry,
+      MeshRenderer,
+      AtmosphericComponent,
+      DirectLight,
+      HoverCameraController,
+      BitmapTexture2D,
+    } from 'https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js';
+
+    function makeCheckerCanvas() {
+      const c = document.createElement('canvas');
+      c.width = 256;
+      c.height = 256;
+      const ctx = c.getContext('2d');
+      const n = 8;
+      const s = 256 / n;
+      for (let y = 0; y < n; y++) {
+        for (let x = 0; x < n; x++) {
+          ctx.fillStyle = (x + y) % 2 ? '#3d5a80' : '#98c1d9';
+          ctx.fillRect(x * s, y * s, s, s);
+        }
+      }
+      return c;
+    }
+
+    async function main() {
+      const canvas = document.getElementById('canvas');
+      const hud = document.getElementById('hud');
+      if (!canvas) throw new Error('缺少 #canvas');
+
+      try {
+        await Engine3D.init({ canvasConfig: { canvas } });
+      } catch (e) {
+        document.body.innerHTML =
+          '<p style="padding:1rem;font-family:sans-serif">WebGPU 初始化失败，请使用 Chrome/Edge 最新版并在 localhost 或 HTTPS 下打开。</p>';
+        console.error(e);
+        return;
+      }
+
+      const scene = new Scene3D();
+      const sky = scene.addComponent(AtmosphericComponent);
+      sky.sunY = 0.55;
+      sky.sunZ = 0.65;
+
+      const cameraObj = new Object3D();
+      const camera = cameraObj.addComponent(Camera3D);
+      camera.perspective(55, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 200);
+      const hover = cameraObj.addComponent(HoverCameraController);
+      // 地面 rotationX=-90 后法线朝 +Z，相机置于 +Z 侧并略俯视场景中心
+      hover.setCamera(0, -10, -16);
+      scene.addChild(cameraObj);
+
+      const dirObj = new Object3D();
+      const dirLight = dirObj.addComponent(DirectLight);
+      dirLight.lightColor = new Color(1, 0.98, 0.95, 1);
+      dirLight.intensity = 1.35;
+      dirLight.castShadow = true;
+      dirLight.indirect = 0.3;
+      dirObj.transform.rotationX = -48;
+      dirObj.transform.rotationY = 32;
+      scene.addChild(dirObj);
+
+      const ground = new Object3D();
+      const gR = ground.addComponent(MeshRenderer);
+      gR.geometry = new PlaneGeometry(18, 18);
+      gR.material = new LitMaterial();
+      gR.material.baseColor = new Color(0.22, 0.24, 0.28, 1);
+      gR.material.metallic = 0.05;
+      gR.material.roughness = 0.55;
+      gR.receiveShadow = true;
+      ground.rotationX = -90;
+      scene.addChild(ground);
+
+      const tex = new BitmapTexture2D(true);
+      tex.name = 'mat-demo-checker';
+      tex.format = 'rgba8unorm';
+      tex.source = makeCheckerCanvas();
+
+      const lit = new LitMaterial();
+      lit.baseMap = tex;
+      lit.baseColor = new Color(1, 1, 1, 1);
+      lit.metallic = 0.25;
+      lit.roughness = 0.35;
+      lit.emissiveIntensity = 0;
+      lit.shader.setUniformFloat('envIntensity', 1);
+      lit.clearcoatFactor = 0;
+
+      const sphere = new Object3D();
+      const sR = sphere.addComponent(MeshRenderer);
+      sR.geometry = new SphereGeometry(1.1, 48, 48);
+      sR.material = lit;
+      sR.castShadow = true;
+      sR.receiveShadow = true;
+      sphere.y = 1.15;
+      scene.addChild(sphere);
+
+      const unlit = new UnLitMaterial();
+      unlit.baseColor = new Color(0.95, 0.45, 0.15, 1);
+
+      const cube = new Object3D();
+      const cR = cube.addComponent(MeshRenderer);
+      cR.geometry = new BoxGeometry(0.85, 0.85, 0.85);
+      cR.material = unlit;
+      cR.castShadow = true;
+      cube.x = -2.8;
+      cube.y = 0.5;
+      scene.addChild(cube);
+
+      const view = new View3D();
+      view.scene = scene;
+      view.camera = camera;
+      Engine3D.startRenderView(view);
+
+      const m = document.getElementById('m');
+      const mV = document.getElementById('m-v');
+      const r = document.getElementById('r');
+      const rV = document.getElementById('r-v');
+      const e = document.getElementById('e');
+      const eV = document.getElementById('e-v');
+      const env = document.getElementById('env');
+      const envV = document.getElementById('env-v');
+      const cc = document.getElementById('cc');
+      const ccV = document.getElementById('cc-v');
+      const ds = document.getElementById('ds');
+      const u = document.getElementById('u');
+      const uV = document.getElementById('u-v');
+
+      function bind() {
+        lit.metallic = Number(m.value) / 100;
+        lit.roughness = Number(r.value) / 100;
+        lit.emissiveIntensity = Number(e.value) / 100;
+        lit.shader.setUniformFloat('envIntensity', Number(env.value) / 100);
+        lit.clearcoatFactor = Number(cc.value) / 100;
+        lit.doubleSide = ds.checked;
+        const sat = Number(u.value) / 100;
+        unlit.baseColor = new Color(0.95 * sat + 0.05, 0.45 * sat + 0.05, 0.15 * sat + 0.05, 1);
+        mV.textContent = lit.metallic.toFixed(2);
+        rV.textContent = lit.roughness.toFixed(2);
+        eV.textContent = lit.emissiveIntensity.toFixed(2);
+        envV.textContent = (Number(env.value) / 100).toFixed(2);
+        ccV.textContent = lit.clearcoatFactor.toFixed(2);
+        uV.textContent = sat.toFixed(2);
+      }
+
+      [m, r, e, env, cc, ds, u].forEach((el) => el.addEventListener('input', bind));
+      bind();
+
+      window.addEventListener('resize', () => {
+        camera.perspective(
+          55,
+          canvas.clientWidth / Math.max(canvas.clientHeight, 1),
+          0.1,
+          200
+        );
+      });
+
+      function tick() {
+        let envI = 1;
+        try {
+          envI = lit.shader.getUniformFloat('envIntensity');
+        } catch (_) {}
+        hud.innerHTML =
+          `<div><b>Lit</b> metallic=${lit.metallic.toFixed(2)} rough=${lit.roughness.toFixed(2)} emissive=${lit.emissiveIntensity.toFixed(2)}</div>` +
+          `<div>envIntensity=${envI.toFixed(2)} doubleSide=${lit.doubleSide}</div>` +
+          `<div><b>UnLit</b> baseColor ≈ (${unlit.baseColor.r.toFixed(2)},${unlit.baseColor.g.toFixed(2)},${unlit.baseColor.b.toFixed(2)})</div>`;
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+
+    main();
+  </script>
+</body>
+</html>

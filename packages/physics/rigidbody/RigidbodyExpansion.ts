@@ -1,4 +1,4 @@
-import { Vector3, Transform } from "@rings/core";
+import { Vector3, Transform } from "@rings-webgpu/core";
 import { Ammo, Physics } from "../Physics";
 import { RigidBodyUtil } from "../utils/RigidBodyUtil";
 import { ContactProcessedUtil } from "../utils/ContactProcessedUtil";

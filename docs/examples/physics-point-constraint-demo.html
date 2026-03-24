@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings — 物理：点对点约束 PointToPointConstraint</title>
+  <script type="importmap">
+    {
+      "imports": {
+        "@rings-webgpu/core": "https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js",
+        "@rings-webgpu/physics": "../../packages/physics/dist/physics.es.js"
+      }
+    }
+  </script>
+  <style>
+    html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
+    #canvas { display: block; width: 100%; height: 100%; }
+    .hud {
+      position: absolute; left: 8px; top: 8px; right: 8px; pointer-events: none;
+      font-size: 11px; color: #e6edf3; text-shadow: 0 1px 3px #000;
+      font-family: ui-monospace, monospace;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div class="hud">
+    上球为静态锚点，下球为动态，<code>PointToPointConstraint</code> 用局部枢轴连接两球心附近。
+  </div>
+  <script type="module">
+    import {
+      Engine3D, Scene3D, Object3D, Camera3D, View3D, Color, Vector3,
+      LitMaterial, SphereGeometry, BoxGeometry, MeshRenderer,
+      AtmosphericComponent, DirectLight, HoverCameraController,
+      ColliderComponent,
+    } from "@rings-webgpu/core";
+    import { Physics, Rigidbody, PointToPointConstraint } from "@rings-webgpu/physics";
+
+    async function main() {
+      const canvas = document.getElementById("canvas");
+      if (!canvas) return;
+
+      try {
+        await Engine3D.init({
+          canvasConfig: { canvas },
+          beforeRender: () => { if (Physics.isInited) Physics.update(); },
+        });
+      } catch (e) {
+        document.body.innerHTML = "<p style=\"padding:1rem\">WebGPU 初始化失败。</p>";
+        console.error(e);
+        return;
+      }
+
+      await Physics.init({});
+
+      const scene = new Scene3D();
+      scene.addComponent(AtmosphericComponent);
+
+      const camObj = new Object3D();
+      const camera = camObj.addComponent(Camera3D);
+      camera.perspective(55, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 200);
+      camObj.addComponent(HoverCameraController).setCamera(20, -30, 14);
+      scene.addChild(camObj);
+
+      const lightObj = new Object3D();
+      lightObj.addComponent(DirectLight).intensity = 1.15;
+      scene.addChild(lightObj);
+
+      const ground = new Object3D();
+      const gMr = ground.addComponent(MeshRenderer);
+      gMr.geometry = new BoxGeometry(18, 0.2, 18);
+      gMr.material = new LitMaterial();
+      gMr.material.baseColor = new Color(0.26, 0.28, 0.32, 1);
+      const gCol = ground.addComponent(ColliderComponent);
+      gCol.shape.setFromCenterAndSize(new Vector3(0, 0, 0), new Vector3(18, 0.2, 18));
+      const gRb = ground.addComponent(Rigidbody);
+      gRb.mass = 0;
+      scene.addChild(ground);
+
+      const anchor = new Object3D();
+      anchor.y = 5;
+      const aMr = anchor.addComponent(MeshRenderer);
+      aMr.geometry = new SphereGeometry(0.45, 20, 20);
+      aMr.material = new LitMaterial();
+      aMr.material.baseColor = new Color(0.85, 0.85, 0.35, 1);
+      const aCol = anchor.addComponent(ColliderComponent);
+      aCol.shape.setFromCenterAndSize(new Vector3(0, 0, 0), new Vector3(0.9, 0.9, 0.9));
+      const aRb = anchor.addComponent(Rigidbody);
+      aRb.mass = 0;
+      scene.addChild(anchor);
+
+      const bob = new Object3D();
+      bob.y = 2.5;
+      const bMr = bob.addComponent(MeshRenderer);
+      bMr.geometry = new SphereGeometry(0.5, 20, 20);
+      bMr.material = new LitMaterial();
+      bMr.material.baseColor = new Color(0.4, 0.65, 0.95, 1);
+      const bCol = bob.addComponent(ColliderComponent);
+      bCol.shape.setFromCenterAndSize(new Vector3(0, 0, 0), new Vector3(1, 1, 1));
+      const bRb = bob.addComponent(Rigidbody);
+      bRb.mass = 1.5;
+
+      const p2p = bob.addComponent(PointToPointConstraint);
+      p2p.targetRigidbody = aRb;
+      p2p.pivotSelf = new Vector3(0, 0.45, 0);
+      p2p.pivotTarget = new Vector3(0, -0.45, 0);
+
+      scene.addChild(bob);
+
+      const view = new View3D();
+      view.scene = scene;
+      view.camera = camera;
+      Engine3D.startRenderView(view);
+    }
+
+    main().catch(console.error);
+  </script>
+  <p style="position:absolute;bottom:6px;left:8px;font-size:10px;color:#8b9cb3;margin:0">
+    需 <code>npm run build:physics</code> + 仓库根目录 HTTP 访问。
+  </p>
+</body>
+</html>

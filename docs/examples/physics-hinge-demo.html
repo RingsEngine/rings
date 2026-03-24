@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings — 物理：铰链约束 HingeConstraint</title>
+  <script type="importmap">
+    {
+      "imports": {
+        "@rings-webgpu/core": "https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js",
+        "@rings-webgpu/physics": "../../packages/physics/dist/physics.es.js"
+      }
+    }
+  </script>
+  <style>
+    html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
+    #canvas { display: block; width: 100%; height: 100%; }
+    .hud {
+      position: absolute; left: 8px; top: 8px; right: 8px; pointer-events: none;
+      font-size: 11px; color: #e6edf3; text-shadow: 0 1px 3px #000;
+      font-family: ui-monospace, monospace;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div class="hud">
+    单刚体铰链（无 targetRigidbody）：门板绕底部枢轴摆动，<code>setLimit</code> 限制角度。
+  </div>
+  <script type="module">
+    import {
+      Engine3D, Scene3D, Object3D, Camera3D, View3D, Color, Vector3,
+      LitMaterial, BoxGeometry, MeshRenderer,
+      AtmosphericComponent, DirectLight, HoverCameraController,
+      ColliderComponent, BoxColliderShape,
+    } from "@rings-webgpu/core";
+    import { Physics, Rigidbody, HingeConstraint } from "@rings-webgpu/physics";
+
+    async function main() {
+      const canvas = document.getElementById("canvas");
+      if (!canvas) return;
+
+      try {
+        await Engine3D.init({
+          canvasConfig: { canvas },
+          beforeRender: () => { if (Physics.isInited) Physics.update(); },
+        });
+      } catch (e) {
+        document.body.innerHTML = "<p style=\"padding:1rem\">WebGPU 初始化失败。</p>";
+        console.error(e);
+        return;
+      }
+
+      await Physics.init({});
+
+      const scene = new Scene3D();
+      scene.addComponent(AtmosphericComponent);
+
+      const camObj = new Object3D();
+      const camera = camObj.addComponent(Camera3D);
+      camera.perspective(55, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 200);
+      camObj.addComponent(HoverCameraController).setCamera(35, -25, 12);
+      scene.addChild(camObj);
+
+      const lightObj = new Object3D();
+      lightObj.addComponent(DirectLight).intensity = 1.2;
+      scene.addChild(lightObj);
+
+      const ground = new Object3D();
+      const gMr = ground.addComponent(MeshRenderer);
+      gMr.geometry = new BoxGeometry(20, 0.25, 20);
+      gMr.material = new LitMaterial();
+      gMr.material.baseColor = new Color(0.28, 0.3, 0.34, 1);
+      const gCol = ground.addComponent(ColliderComponent);
+      gCol.shape.setFromCenterAndSize(new Vector3(0, 0, 0), new Vector3(20, 0.25, 20));
+      const gRb = ground.addComponent(Rigidbody);
+      gRb.mass = 0;
+      scene.addChild(ground);
+
+      const door = new Object3D();
+      door.y = 1;
+      const dMr = door.addComponent(MeshRenderer);
+      dMr.geometry = new BoxGeometry(0.15, 2, 1);
+      dMr.material = new LitMaterial();
+      dMr.material.baseColor = new Color(0.75, 0.55, 0.3, 1);
+      const dCol = door.addComponent(ColliderComponent);
+      dCol.shape.setFromCenterAndSize(new Vector3(0, 0, 0), new Vector3(0.15, 2, 1));
+      const dRb = door.addComponent(Rigidbody);
+      dRb.mass = 2;
+      dRb.restitution = 0.05;
+
+      const hinge = door.addComponent(HingeConstraint);
+      hinge.pivotSelf = new Vector3(0, -1, 0);
+      hinge.axisSelf = new Vector3(0, 0, 1);
+      hinge.setLimit(-Math.PI * 0.55, Math.PI * 0.55, 0.15, 0.25);
+
+      scene.addChild(door);
+
+      const view = new View3D();
+      view.scene = scene;
+      view.camera = camera;
+      Engine3D.startRenderView(view);
+    }
+
+    main().catch(console.error);
+  </script>
+  <p style="position:absolute;bottom:6px;left:8px;font-size:10px;color:#8b9cb3;margin:0">
+    需 <code>npm run build:physics</code> + 仓库根目录 HTTP 访问。
+  </p>
+</body>
+</html>

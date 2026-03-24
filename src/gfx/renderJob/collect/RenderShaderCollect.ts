@@ -15,7 +15,7 @@ export class RenderShaderCollect {
 
   public collect_add(node: RenderNode) {
     let view = node.transform.view3D;
-    if (view && node.materials) {
+    if (view && node.materials && node.geometry) {
       node.materials.forEach((mat) => {
         let rDic = this.renderShaderUpdateList.get(view);
         if (!rDic) {
@@ -47,7 +47,7 @@ export class RenderShaderCollect {
 
   public collect_remove(node: RenderNode) {
     let view = node.transform.view3D;
-    if (view && node.materials) {
+    if (view && node.materials && node.geometry) {
       let rDic = this.renderShaderUpdateList.get(view);
       if (rDic) {
         node.materials.forEach((mat) => {

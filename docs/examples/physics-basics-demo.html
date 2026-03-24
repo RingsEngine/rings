@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings — 物理：世界与刚体基础</title>
+  <script type="importmap">
+    {
+      "imports": {
+        "@rings-webgpu/core": "https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js",
+        "@rings-webgpu/physics": "../../packages/physics/dist/physics.es.js"
+      }
+    }
+  </script>
+  <style>
+    html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
+    #canvas { display: block; width: 100%; height: 100%; }
+    .hud {
+      position: absolute; left: 8px; top: 8px; right: 8px; pointer-events: none;
+      font-size: 11px; line-height: 1.45; color: #e6edf3; text-shadow: 0 1px 3px #000;
+      font-family: ui-monospace, monospace;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" style="width: 100%; height: 100%;"></canvas>
+  <div class="hud" id="hud">
+    Physics.init + Engine3D.beforeRender → Physics.update；地面 mass=0，掉落体 Rigidbody + ColliderComponent。
+  </div>
+  <script type="module">
+    import {
+      Engine3D, Scene3D, Object3D, Camera3D, View3D, Color, Vector3,
+      LitMaterial, BoxGeometry, SphereGeometry, PlaneGeometry, MeshRenderer,
+      AtmosphericComponent, DirectLight, HoverCameraController,
+      ColliderComponent, BoxColliderShape,
+    } from "@rings-webgpu/core";
+    import { Physics, Rigidbody } from "@rings-webgpu/physics";
+
+    async function main() {
+      const canvas = document.getElementById("canvas");
+      if (!canvas) return;
+
+      try {
+        await Engine3D.init({
+          canvasConfig: { canvas },
+          beforeRender: () => {
+            if (Physics.isInited) Physics.update();
+          },
+        });
+      } catch (e) {
+        document.body.innerHTML =
+          "<p style=\"padding:1rem;font-family:sans-serif\">WebGPU 初始化失败，请使用 Chrome/Edge 并在 localhost 或 HTTPS 下打开。</p>";
+        console.error(e);
+        return;
+      }
+
+      await Physics.init({ useSoftBody: false, useDrag: false });
+
+      const scene = new Scene3D();
+      scene.addComponent(AtmosphericComponent);
+
+      const camObj = new Object3D();
+      const camera = camObj.addComponent(Camera3D);
+      camera.perspective(60, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 500);
+      camObj.addComponent(HoverCameraController).setCamera(50, -35, 18);
+      scene.addChild(camObj);
+
+      const lightObj = new Object3D();
+      const light = lightObj.addComponent(DirectLight);
+      light.lightColor = new Color(1, 1, 1, 1);
+      light.intensity = 1.1;
+      scene.addChild(lightObj);
+
+      function makeGround() {
+        const g = new Object3D();
+        const mr = g.addComponent(MeshRenderer);
+        mr.geometry = new PlaneGeometry(40, 40, 1, 1);
+        mr.material = new LitMaterial();
+        mr.material.baseColor = new Color(0.22, 0.24, 0.28, 1);
+        const col = g.addComponent(ColliderComponent);
+        col.shape.setFromCenterAndSize(new Vector3(0, 0, 0), new Vector3(40, 0.2, 40));
+        const rb = g.addComponent(Rigidbody);
+        rb.mass = 0;
+        scene.addChild(g);
+      }
+
+      function dropBox(x, z) {
+        const o = new Object3D();
+        o.x = x;
+        o.y = 8 + Math.random() * 4;
+        o.z = z;
+        const mr = o.addComponent(MeshRenderer);
+        mr.geometry = new BoxGeometry(0.8, 0.8, 0.8);
+        mr.material = new LitMaterial();
+        mr.material.baseColor = new Color(0.85, 0.45, 0.2, 1);
+        const col = o.addComponent(ColliderComponent);
+        col.shape = new BoxColliderShape();
+        col.shape.setFromCenterAndSize(new Vector3(0, 0, 0), new Vector3(0.8, 0.8, 0.8));
+        const rb = o.addComponent(Rigidbody);
+        rb.mass = 1;
+        scene.addChild(o);
+      }
+
+      function dropSphere(x, z) {
+        const o = new Object3D();
+        o.x = x;
+        o.y = 10;
+        o.z = z;
+        const mr = o.addComponent(MeshRenderer);
+        mr.geometry = new SphereGeometry(0.45, 24, 24);
+        mr.material = new LitMaterial();
+        mr.material.baseColor = new Color(0.3, 0.65, 0.9, 1);
+        const col = o.addComponent(ColliderComponent);
+        col.shape.setFromCenterAndSize(new Vector3(0, 0, 0), new Vector3(0.9, 0.9, 0.9));
+        const rb = o.addComponent(Rigidbody);
+        rb.mass = 0.8;
+        scene.addChild(o);
+      }
+
+      makeGround();
+      dropBox(-2, 0);
+      dropBox(0, 1);
+      dropBox(2, -1);
+      dropSphere(-1, -2);
+      dropSphere(1.5, 2);
+
+      const view = new View3D();
+      view.scene = scene;
+      view.camera = camera;
+      Engine3D.startRenderView(view);
+    }
+
+    main().catch(console.error);
+  </script>
+  <p style="position:absolute;bottom:6px;left:8px;right:8px;font-size:10px;color:#8b9cb3;margin:0">
+    需先执行 <code>npm run build:physics</code>，并在仓库根目录用 HTTP 服务打开本页（例如 <code>npx serve .</code> 后访问 <code>/docs/examples/physics-basics-demo.html</code>）。
+  </p>
+</body>
+</html>

@@ -1,4 +1,4 @@
-import { Vector3, VertexAttributeName, GeometryBase } from "@rings/core";
+import { Vector3, VertexAttributeName, GeometryBase } from "@rings-webgpu/core";
 import { SoftbodyBase } from "./SoftbodyBase";
 import { Ammo, Physics } from "../Physics";
 import { TempPhyMath } from "../utils/TempPhyMath";
