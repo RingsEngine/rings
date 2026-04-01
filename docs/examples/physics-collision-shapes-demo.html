@@ -4,14 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Rings — 物理：CollisionShapeUtil 形状</title>
-  <script type="importmap">
-    {
-      "imports": {
-        "@rings-webgpu/core": "https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js",
-        "@rings-webgpu/physics": "../../packages/physics/dist/physics.es.js"
-      }
-    }
-  </script>
   <style>
     html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
     #canvas { display: block; width: 100%; height: 100%; }
@@ -21,28 +13,79 @@
       font-family: ui-monospace, monospace;
     }
   </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "@rings-webgpu/core": "https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js",
+      "@rings-webgpu/ammo": "https://unpkg.com/@rings-webgpu/ammo@0.2.1/ammo.js"
+    }
+  }
+  </script>
 </head>
 <body>
   <canvas id="canvas" style="width: 100%; height: 100%;"></canvas>
   <div class="hud">
-    使用 <code>Rigidbody.shape = CollisionShapeUtil.create*Shape(object3D)</code>，无需与 Collider 枚举一致；演示圆柱 / 球 / 盒。
+    <code>Rigidbody.shape = CollisionShapeUtil.create*Shape(object3D)</code>；每 5 秒生成 5 球 + 5 圆柱 + 5 盒，每 20 秒清空（地面/相机/灯光保留）；计时 <code>performance.now()</code> 秒增量。
   </div>
   <script type="module">
     import {
       Engine3D, Scene3D, Object3D, Camera3D, View3D, Color, Vector3,
       LitMaterial, BoxGeometry, SphereGeometry, CylinderGeometry, MeshRenderer,
       AtmosphericComponent, DirectLight, HoverCameraController,
-    } from "@rings-webgpu/core";
-    import { Physics, Rigidbody, CollisionShapeUtil } from "@rings-webgpu/physics";
+    } from 'https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js';
+    import { Physics, Rigidbody, CollisionShapeUtil } from 'https://unpkg.com/@rings-webgpu/physics@0.0.2/dist/physics.es.js';
 
     async function main() {
       const canvas = document.getElementById("canvas");
       if (!canvas) return;
 
+      const SPAWN_INTERVAL_SEC = 5;
+      const PER_TYPE = 5;
+      const CLEAR_INTERVAL_SEC = 20;
+      const disposableBodies = [];
+      let spawnAccSec = 0;
+      let clearAccSec = 0;
+      let clockPrevMs = null;
+
+      function clearDisposableBodies() {
+        while (disposableBodies.length) {
+          const o = disposableBodies.pop();
+          if (o) {
+            o.removeFromParent();
+            o.destroy();
+          }
+        }
+      }
+
       try {
         await Engine3D.init({
           canvasConfig: { canvas },
-          beforeRender: () => { if (Physics.isInited) Physics.update(); },
+          beforeRender: () => {
+            if (Physics.isInited) Physics.update();
+            const nowMs = performance.now();
+            if (clockPrevMs === null) {
+              clockPrevMs = nowMs;
+              return;
+            }
+            const dtSec = (nowMs - clockPrevMs) / 1000;
+            clockPrevMs = nowMs;
+
+            clearAccSec += dtSec;
+            let clearedThisFrame = false;
+            while (clearAccSec >= CLEAR_INTERVAL_SEC) {
+              clearAccSec -= CLEAR_INTERVAL_SEC;
+              clearDisposableBodies();
+              clearedThisFrame = true;
+              spawnAccSec = 0;
+            }
+            spawnAccSec += dtSec;
+            if (!clearedThisFrame) {
+              while (spawnAccSec >= SPAWN_INTERVAL_SEC) {
+                spawnAccSec -= SPAWN_INTERVAL_SEC;
+                spawnWave(disposableBodies);
+              }
+            }
+          },
         });
       } catch (e) {
         document.body.innerHTML =
@@ -79,7 +122,7 @@
       function addShapeBody(geometry, color, x, z, shapeFn) {
         const o = new Object3D();
         o.x = x;
-        o.y = 6;
+        o.y = 7 + Math.random() * 4;
         o.z = z;
         const mr = o.addComponent(MeshRenderer);
         mr.geometry = geometry;
@@ -89,29 +132,53 @@
         rb.shape = shapeFn(o);
         rb.mass = 1.2;
         scene.addChild(o);
+        return o;
       }
 
-      addShapeBody(
-        new CylinderGeometry(0.5, 0.5, 1.2, 16, 4),
-        new Color(0.9, 0.35, 0.35, 1),
-        -2.5,
-        0,
-        (o) => CollisionShapeUtil.createCylinderShape(o)
-      );
-      addShapeBody(
-        new SphereGeometry(0.55, 20, 20),
-        new Color(0.35, 0.75, 0.4, 1),
-        0,
-        0,
-        (o) => CollisionShapeUtil.createSphereShape(o)
-      );
-      addShapeBody(
-        new BoxGeometry(1, 0.6, 1.4),
-        new Color(0.4, 0.45, 0.95, 1),
-        2.5,
-        0,
-        (o) => CollisionShapeUtil.createBoxShape(o)
-      );
+      function randXZ(spread) {
+        return [(Math.random() - 0.5) * spread, (Math.random() - 0.5) * spread];
+      }
+
+      /** @param {Object3D[]} pool */
+      function spawnWave(pool) {
+        const spread = 12;
+        for (let i = 0; i < PER_TYPE; i++) {
+          const [x, z] = randXZ(spread);
+          pool.push(
+            addShapeBody(
+              new SphereGeometry(0.55, 20, 20),
+              new Color(0.25 + Math.random() * 0.35, 0.55 + Math.random() * 0.35, 0.25 + Math.random() * 0.35, 1),
+              x,
+              z,
+              (o) => CollisionShapeUtil.createSphereShape(o)
+            )
+          );
+        }
+        for (let i = 0; i < PER_TYPE; i++) {
+          const [x, z] = randXZ(spread);
+          pool.push(
+            addShapeBody(
+              new CylinderGeometry(0.5, 0.5, 1.2, 16, 4),
+              new Color(0.75 + Math.random() * 0.25, 0.2 + Math.random() * 0.35, 0.2 + Math.random() * 0.35, 1),
+              x,
+              z,
+              (o) => CollisionShapeUtil.createCylinderShape(o)
+            )
+          );
+        }
+        for (let i = 0; i < PER_TYPE; i++) {
+          const [x, z] = randXZ(spread);
+          pool.push(
+            addShapeBody(
+              new BoxGeometry(1, 0.6, 1.4),
+              new Color(0.3 + Math.random() * 0.3, 0.35 + Math.random() * 0.35, 0.75 + Math.random() * 0.25, 1),
+              x,
+              z,
+              (o) => CollisionShapeUtil.createBoxShape(o)
+            )
+          );
+        }
+      }
 
       const view = new View3D();
       view.scene = scene;
@@ -122,7 +189,7 @@
     main().catch(console.error);
   </script>
   <p style="position:absolute;bottom:6px;left:8px;font-size:10px;color:#8b9cb3;margin:0">
-    需 <code>npm run build:physics</code> + 从仓库根目录 HTTP 访问。
+    脚本从 unpkg 加载；请用 HTTP 服务打开本页（localhost / HTTPS），勿用 file://。
   </p>
 </body>
 </html>

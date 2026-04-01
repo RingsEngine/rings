@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings — 物理：约束类型综合演示</title>
+  <style>
+    html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
+    body { position: relative; font-family: system-ui, "Segoe UI", sans-serif; }
+    #canvas { display: block; width: 100%; height: 100%; }
+    .legend {
+      position: absolute; left: 8px; top: 8px; bottom: 120px; width: 200px; max-height: calc(100% - 130px);
+      overflow: auto; padding: 10px 12px; font-size: 10px; line-height: 1.45;
+      color: #e6edf3; text-shadow: 0 1px 2px #000; pointer-events: none;
+      background: rgba(12, 16, 22, 0.55); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);
+    }
+    .legend h3 { margin: 0 0 8px; font-size: 11px; color: #8b9cb3; font-weight: 600; }
+    .legend ul { margin: 0; padding-left: 14px; }
+    .legend li { margin-bottom: 4px; }
+    .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "@rings-webgpu/core": "https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js",
+      "@rings-webgpu/ammo": "https://unpkg.com/@rings-webgpu/ammo@0.2.1/ammo.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="canvas" style="width: 100%; height: 100%;"></canvas>
+  <aside class="legend" aria-label="约束图例">
+    <h3>单场景 · 七类约束（Z+ 前排 / Z0 中排 / Z− 后排）</h3>
+    <ul>
+      <li><span class="sw" style="background:#c4783a"></span><strong>Hinge</strong> 门板绕底边摆动</li>
+      <li><span class="sw" style="background:#d4c84a"></span><strong>PointToPoint</strong> 双球摆</li>
+      <li><span class="sw" style="background:#4a9ecf"></span><strong>Slider</strong> 滑块 + 静态导轨</li>
+      <li><span class="sw" style="background:#7a6acf"></span><strong>Fixed</strong> 上下两盒刚体固连</li>
+      <li><span class="sw" style="background:#4acf8a"></span><strong>ConeTwist</strong> 球关节限摆角</li>
+      <li><span class="sw" style="background:#cf6a9a"></span><strong>Generic6Dof</strong> 竖直滑槽限位</li>
+      <li><span class="sw" style="background:#cfa74a"></span><strong>Generic6DofSpring</strong> 弹簧悬挂</li>
+    </ul>
+    <p style="margin:8px 0 0;color:#6b7a90">刚体均使用 <code>Rigidbody.shape = CollisionShapeUtil.create*Shape</code>。旋转 Hover 相机环视。</p>
+  </aside>
+  <script type="module">
+    import {
+      Engine3D, Scene3D, Object3D, Camera3D, View3D, Color, Vector3,
+      LitMaterial, BoxGeometry, SphereGeometry, MeshRenderer,
+      AtmosphericComponent, DirectLight, HoverCameraController,
+    } from 'https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js';
+    import {
+      Physics, Rigidbody, CollisionShapeUtil,
+      HingeConstraint, PointToPointConstraint, SliderConstraint, FixedConstraint,
+      ConeTwistConstraint, Generic6DofConstraint, Generic6DofSpringConstraint,
+    } from 'https://unpkg.com/@rings-webgpu/physics@0.0.2/dist/physics.es.js';
+
+    function addBox(scene, px, py, pz, sx, sy, sz, color, mass) {
+      const o = new Object3D();
+      o.x = px;
+      o.y = py;
+      o.z = pz;
+      const mr = o.addComponent(MeshRenderer);
+      mr.geometry = new BoxGeometry(sx, sy, sz);
+      mr.material = new LitMaterial();
+      mr.material.baseColor = color;
+      const rb = o.addComponent(Rigidbody);
+      rb.shape = CollisionShapeUtil.createBoxShape(o);
+      rb.mass = mass;
+      scene.addChild(o);
+      return { o, rb };
+    }
+
+    function addSphere(scene, px, py, pz, radius, color, mass) {
+      const o = new Object3D();
+      o.x = px;
+      o.y = py;
+      o.z = pz;
+      const mr = o.addComponent(MeshRenderer);
+      mr.geometry = new SphereGeometry(radius, 16, 16);
+      mr.material = new LitMaterial();
+      mr.material.baseColor = color;
+      const rb = o.addComponent(Rigidbody);
+      rb.shape = CollisionShapeUtil.createSphereShape(o);
+      rb.mass = mass;
+      scene.addChild(o);
+      return { o, rb };
+    }
+
+    async function main() {
+      const canvas = document.getElementById("canvas");
+      if (!canvas) return;
+
+      try {
+        await Engine3D.init({
+          canvasConfig: { canvas },
+          beforeRender: () => {
+            if (Physics.isInited) Physics.update();
+          },
+        });
+      } catch (e) {
+        document.body.innerHTML = "<p style=\"padding:1rem\">WebGPU 初始化失败。</p>";
+        console.error(e);
+        return;
+      }
+
+      await Physics.init({});
+
+      const scene = new Scene3D();
+      scene.addComponent(AtmosphericComponent);
+
+      const camObj = new Object3D();
+      const camera = camObj.addComponent(Camera3D);
+      camera.perspective(52, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 280);
+      camObj.addComponent(HoverCameraController).setCamera(52, -58, 26);
+      scene.addChild(camObj);
+
+      const lightObj = new Object3D();
+      const dl = lightObj.addComponent(DirectLight);
+      dl.intensity = 1.2;
+      dl.lightColor = new Color(1, 1, 1, 1);
+      scene.addChild(lightObj);
+
+      addBox(scene, 0, -0.2, 0, 52, 0.4, 44, new Color(0.22, 0.24, 0.28, 1), 0);
+
+      const zBack = -12;
+      const zMid = 0;
+      const zFront = 12;
+      const xL = -16;
+      const xC = 0;
+      const xR = 16;
+
+      /* —— 前排 Z+ —— */
+      const door = new Object3D();
+      door.x = xL;
+      door.y = 1.35;
+      door.z = zFront;
+      const dMr = door.addComponent(MeshRenderer);
+      dMr.geometry = new BoxGeometry(0.14, 1.85, 0.95);
+      dMr.material = new LitMaterial();
+      dMr.material.baseColor = new Color(0.76, 0.47, 0.23, 1);
+      const dRb = door.addComponent(Rigidbody);
+      dRb.shape = CollisionShapeUtil.createBoxShape(door);
+      dRb.mass = 1.8;
+      dRb.restitution = 0.08;
+      const hinge = door.addComponent(HingeConstraint);
+      hinge.pivotSelf = new Vector3(0, -0.925, 0);
+      hinge.axisSelf = new Vector3(0, 0, 1);
+      hinge.setLimit(-Math.PI * 0.5, Math.PI * 0.5, 0.12, 0.22);
+      scene.addChild(door);
+
+      const anchorP = addSphere(scene, xC, 5.2, zFront, 0.42, new Color(0.83, 0.78, 0.28, 1), 0);
+      const bobP = addSphere(scene, xC, 2.85, zFront, 0.48, new Color(0.35, 0.62, 0.92, 1), 1.2);
+      const p2p = bobP.o.addComponent(PointToPointConstraint);
+      p2p.targetRigidbody = anchorP.rb;
+      p2p.pivotSelf = new Vector3(0, 0.48, 0);
+      p2p.pivotTarget = new Vector3(0, -0.42, 0);
+
+      const rail = addBox(scene, xR, 0.55, zFront, 0.35, 0.5, 2.2, new Color(0.32, 0.34, 0.38, 1), 0);
+      const sliderBlock = addBox(scene, xR, 0.95, zFront + 0.65, 0.42, 0.42, 0.42, new Color(0.28, 0.55, 0.82, 1), 0.9);
+      const slider = sliderBlock.o.addComponent(SliderConstraint);
+      slider.targetRigidbody = rail.rb;
+      slider.pivotSelf.setTo(0, 0, 0);
+      slider.pivotTarget.setTo(0, 0, 0);
+      slider.lowerLinLimit = -0.95;
+      slider.upperLinLimit = 0.95;
+      slider.lowerAngLimit = -0.08;
+      slider.upperAngLimit = 0.08;
+
+      /* —— 中排 Z0 —— */
+      const baseF = addBox(scene, xL, 0.35, zMid, 1.3, 0.7, 1.1, new Color(0.38, 0.36, 0.42, 1), 0);
+      const topF = addBox(scene, xL, 1.25, zMid, 1.1, 0.75, 0.95, new Color(0.48, 0.42, 0.82, 1), 2.2);
+      const fixed = topF.o.addComponent(FixedConstraint);
+      fixed.targetRigidbody = baseF.rb;
+      fixed.pivotSelf.setTo(0, -0.375, 0);
+      fixed.pivotTarget.setTo(0, 0.35, 0);
+
+      const coneA = addSphere(scene, xC, 3.35, zMid, 0.38, new Color(0.32, 0.82, 0.55, 1), 0);
+      const coneB = addSphere(scene, xC, 1.55, zMid, 0.52, new Color(0.42, 0.88, 0.62, 1), 1.4);
+      const cone = coneB.o.addComponent(ConeTwistConstraint);
+      cone.targetRigidbody = coneA.rb;
+      cone.pivotSelf.setTo(0, 0.52, 0);
+      cone.pivotTarget.setTo(0, -0.38, 0);
+      cone.swingSpan1 = 0.55;
+      cone.swingSpan2 = 0.55;
+      cone.twistSpan = 0.4;
+
+      const frame6 = addBox(scene, xR, 2.05, zMid, 0.35, 2.4, 0.9, new Color(0.4, 0.38, 0.36, 1), 0);
+      const block6 = addBox(scene, xR, 1.15, zMid, 0.55, 0.55, 0.55, new Color(0.85, 0.38, 0.55, 1), 1.1);
+      const gen6 = block6.o.addComponent(Generic6DofConstraint);
+      gen6.targetRigidbody = frame6.rb;
+      gen6.pivotSelf.setTo(0, 0.3, 0);
+      gen6.pivotTarget.setTo(0, -0.95, 0);
+      gen6.linearLowerLimit = new Vector3(-0.02, -0.85, -0.02);
+      gen6.linearUpperLimit = new Vector3(0.02, 0.85, 0.02);
+      gen6.angularLowerLimit = new Vector3(-0.15, -0.15, -0.15);
+      gen6.angularUpperLimit = new Vector3(0.15, 0.15, 0.15);
+
+      /* —— 后排 Z− 弹簧 —— */
+      const ceiling = addBox(scene, xC, 4.5, zBack, 2.4, 0.25, 1.2, new Color(0.45, 0.42, 0.35, 1), 0);
+      const hang = addBox(scene, xC, 2.9, zBack, 0.65, 0.55, 0.65, new Color(0.88, 0.62, 0.28, 1), 1);
+      const spring = hang.o.addComponent(Generic6DofSpringConstraint);
+      spring.targetRigidbody = ceiling.rb;
+      spring.pivotSelf.setTo(0, 0.28, 0);
+      spring.pivotTarget.setTo(0, -0.125, 0);
+      spring.linearLowerLimit = new Vector3(-0.4, -1.8, -0.4);
+      spring.linearUpperLimit = new Vector3(0.4, 1.2, 0.4);
+      spring.enableSpring(1, true);
+      spring.setStiffness(1, 96);
+      spring.setDamping(1, 5.5);
+      spring.setEquilibriumPoint(1, 0);
+
+      const view = new View3D();
+      view.scene = scene;
+      view.camera = camera;
+      Engine3D.startRenderView(view);
+    }
+
+    main().catch(console.error);
+  </script>
+  <p style="position:absolute;bottom:6px;left:8px;right:8px;font-size:10px;color:#8b9cb3;margin:0">
+    脚本从 unpkg 加载；请用 HTTP 服务打开本页（localhost / HTTPS），勿用 file://。
+  </p>
+</body>
+</html>

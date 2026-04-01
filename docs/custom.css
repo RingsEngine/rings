@@ -106,3 +106,11 @@
   font-size: 0.95rem;
   color: var(--rings-doc-muted);
 }
+
+/* 内嵌物理/组件示例 iframe：避免父级无高度时高度为 0 导致「空白」 */
+.rings-quick-demo .rings-demo-preview iframe {
+  display: block;
+  min-height: 420px;
+  width: 100%;
+  vertical-align: top;
+}

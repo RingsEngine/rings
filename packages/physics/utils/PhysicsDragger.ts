@@ -14,6 +14,7 @@ export class PhysicsDragger {
   private _rayStart: Ammo.btVector3;
   private _rayEnd: Ammo.btVector3;
   private _raycastResult: Ammo.ClosestRayResultCallback;
+  private _allHitsResult: Ammo.AllHitsRayResultCallback;
   private _isDragging: boolean = false;
   private _hitPoint: Vector3 = new Vector3();
   private _offset: Vector3 = new Vector3();
@@ -42,6 +43,7 @@ export class PhysicsDragger {
    */
   public set collisionFilterGroup(value: number) {
     this._raycastResult?.set_m_collisionFilterGroup(value);
+    this._allHitsResult?.set_m_collisionFilterGroup(value);
   }
 
   /**
@@ -49,6 +51,7 @@ export class PhysicsDragger {
    */
   public set collisionFilterMask(value: number) {
     this._raycastResult?.set_m_collisionFilterMask(value);
+    this._allHitsResult?.set_m_collisionFilterMask(value);
   }
 
   constructor() {

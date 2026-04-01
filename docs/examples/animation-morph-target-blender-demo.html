@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings — 动画：MorphTargetBlender</title>
+  <style>
+    html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
+    body { position: relative; font-family: system-ui, "Segoe UI", sans-serif; }
+    #canvas { display: block; width: 100%; height: 100%; }
+    .hud {
+      position: absolute; left: 8px; top: 8px; right: 280px; pointer-events: none;
+      font-size: 11px; line-height: 1.45; color: #e6edf3; text-shadow: 0 1px 3px #000;
+      font-family: ui-monospace, monospace;
+    }
+    .controls {
+      position: absolute; top: 0; right: 0; bottom: 0; width: 260px; padding: 10px;
+      overflow: auto; background: rgba(15, 20, 25, 0.92); color: #e6edf3;
+      font-size: 0.72rem; border-left: 1px solid #2d3a4d;
+    }
+    .controls h3 { margin: 0 0 8px; font-size: 0.75rem; color: #8b9cb3; font-weight: 600; }
+    .controls p { margin: 0; color: #8b9cb3; line-height: 1.45; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" style="width: 100%; height: 100%;"></canvas>
+  <div class="hud" id="hud"></div>
+  <aside class="controls">
+    <h3>MorphTargetBlender</h3>
+    <p>
+      从 jsDelivr 加载 Khronos <strong>MorphPrimitivesTest.glb</strong>（含 morphTarget）。
+      挂载 <code>MorphTargetBlender</code> 后，在 <code>beforeRender</code> 中对 <code>cloneMorphRenderers()</code> 返回的渲染器调用 <code>setMorphInfluence</code> 做正弦权重。
+    </p>
+  </aside>
+  <script type="module">
+    import {
+      Engine3D, Scene3D, Object3D, Camera3D, View3D, Color,
+      LitMaterial, PlaneGeometry, MeshRenderer,
+      MorphTargetBlender,
+      AtmosphericComponent, DirectLight, HoverCameraController,
+    } from 'https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js';
+
+    /** Khronos glTF-Sample-Assets — MorphPrimitivesTest（glb） */
+    const MORPH_GLB =
+      'https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Assets@main/Models/MorphPrimitivesTest/glTF-Binary/MorphPrimitivesTest.glb';
+
+    async function main() {
+      const canvas = document.getElementById('canvas');
+      const hud = document.getElementById('hud');
+      if (!canvas) return;
+
+      let blender = null;
+      let morphTime = 0;
+
+      try {
+        await Engine3D.init({
+          canvasConfig: { canvas },
+          beforeRender: () => {
+            if (!blender) return;
+            morphTime += 0.025;
+            const w = Math.sin(morphTime) * 0.5 + 0.5;
+            const map = blender.cloneMorphRenderers();
+            for (const key of Object.keys(map)) {
+              const list = map[key];
+              for (const r of list) {
+                r.setMorphInfluence(key, w);
+              }
+            }
+          },
+        });
+      } catch (e) {
+        document.body.innerHTML =
+          '<p style="padding:1rem;font-family:sans-serif">WebGPU 初始化失败。</p>';
+        console.error(e);
+        return;
+      }
+
+      const scene = new Scene3D();
+      scene.addComponent(AtmosphericComponent);
+
+      const camObj = new Object3D();
+      const camera = camObj.addComponent(Camera3D);
+      camera.perspective(50, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.05, 500);
+      camObj.addComponent(HoverCameraController).setCamera(2.2, -3.8, 1.6);
+      scene.addChild(camObj);
+
+      const sun = new Object3D();
+      const dl = sun.addComponent(DirectLight);
+      dl.lightColor = new Color(1, 0.98, 0.95, 1);
+      dl.intensity = 1.15;
+      sun.transform.rotationX = -50;
+      sun.transform.rotationY = 30;
+      scene.addChild(sun);
+
+      const ground = new Object3D();
+      const gr = ground.addComponent(MeshRenderer);
+      gr.geometry = new PlaneGeometry(8, 8);
+      gr.material = new LitMaterial();
+      gr.material.baseColor = new Color(0.16, 0.18, 0.22, 1);
+      gr.receiveShadow = true;
+      ground.transform.rotationX = -90;
+      ground.y = -0.01;
+      scene.addChild(ground);
+
+      try {
+        const root = await Engine3D.res.loadGltf(MORPH_GLB);
+        scene.addChild(root);
+        root.traverse((child) => {
+          const mr = child.getComponent(MeshRenderer);
+          const dict = mr?.geometry?.morphTargetDictionary;
+          if (dict && Object.keys(dict).length && !blender) {
+            child.addComponent(MorphTargetBlender);
+            blender = child.getComponent(MorphTargetBlender);
+            mr.castShadow = true;
+          }
+        });
+        if (!blender) {
+          hud.textContent = '未找到带 morphTarget 的 MeshRenderer（检查 CDN / CORS）。';
+        }
+      } catch (err) {
+        console.error(err);
+        hud.textContent = 'Morph glTF 加载失败（网络/CORS）。';
+      }
+
+      const view = new View3D();
+      view.scene = scene;
+      view.camera = camera;
+      Engine3D.startRenderView(view);
+
+      window.addEventListener('resize', () => {
+        camera.perspective(50, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.05, 500);
+      });
+
+      function tick() {
+        const on = blender ? 'MorphTargetBlender OK' : '—';
+        hud.textContent = `${on} · weight≈sin(t) · MorphPrimitivesTest.glb`;
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+    main();
+  </script>
+</body>
+</html>

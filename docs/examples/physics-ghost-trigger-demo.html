@@ -4,47 +4,131 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Rings — 物理：GhostTrigger 幽灵触发体</title>
-  <script type="importmap">
-    {
-      "imports": {
-        "@rings-webgpu/core": "https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js",
-        "@rings-webgpu/physics": "../../packages/physics/dist/physics.es.js"
-      }
-    }
-  </script>
   <style>
     html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
+    body { position: relative; font-family: system-ui, "Segoe UI", sans-serif; }
     #canvas { display: block; width: 100%; height: 100%; }
     .hud {
-      position: absolute; left: 8px; top: 8px; right: 8px; pointer-events: none;
-      font-size: 11px; color: #e6edf3; text-shadow: 0 1px 3px #000;
+      position: absolute; left: 8px; top: 8px; right: 200px; pointer-events: none;
+      font-size: 11px; line-height: 1.45; color: #e6edf3; text-shadow: 0 1px 3px #000;
       font-family: ui-monospace, monospace;
     }
+    .stats {
+      position: absolute; top: 0; right: 0; bottom: 0; width: 180px; padding: 14px 12px;
+      background: rgba(15, 20, 25, 0.92); color: #e6edf3; border-left: 1px solid #2d3a4d;
+      box-sizing: border-box; pointer-events: none;
+    }
+    .stats h3 { margin: 0 0 10px; font-size: 0.72rem; color: #8b9cb3; font-weight: 600; }
+    .stats .big {
+      font-size: 2rem; font-weight: 700; color: #58a6ff; font-variant-numeric: tabular-nums;
+      line-height: 1.2; margin-bottom: 8px;
+    }
+    .stats p { margin: 0; font-size: 0.68rem; color: #8b9cb3; line-height: 1.5; }
   </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "@rings-webgpu/core": "https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js",
+      "@rings-webgpu/ammo": "https://unpkg.com/@rings-webgpu/ammo@0.2.1/ammo.js"
+    }
+  }
+  </script>
 </head>
 <body>
-  <canvas id="canvas"></canvas>
+  <canvas id="canvas" style="width: 100%; height: 100%;"></canvas>
   <div class="hud" id="hud">
-    半透明区域为 <code>GhostTrigger</code> + <code>CollisionShapeUtil.createBoxShape</code>；球体穿过时尝试通过 <code>collisionEvent</code> 计数（依赖 ContactProcessed 与幽灵对象配对）。
+    半透明立方体为 <code>GhostTrigger</code>（无碰撞响应，仍可参与接触检测）；每 <strong>2s</strong> 从左侧发射小球穿过；右侧为「完整穿过」次数（进盒后再出盒计 1 次）。判定在 <code>lateRender</code> 用与触发体一致的轴对齐范围，避免早于刚体同步。
   </div>
+  <aside class="stats" aria-live="polite">
+    <h3>穿越触发体次数</h3>
+    <div class="big" id="cross-count">0</div>
+    <p>小球自 −X 射向 +X；进入黄色区域后再离开该区域则 +1。场上小球过多时自动回收最远的。</p>
+  </aside>
   <script type="module">
     import {
       Engine3D, Scene3D, Object3D, Camera3D, View3D, Color, Vector3,
       LitMaterial, BoxGeometry, SphereGeometry, MeshRenderer,
       AtmosphericComponent, DirectLight, HoverCameraController,
-      ColliderComponent,
-    } from "@rings-webgpu/core";
-    import { Physics, Rigidbody, GhostTrigger, CollisionShapeUtil } from "@rings-webgpu/physics";
+    } from 'https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js';
+    import { Physics, Rigidbody, GhostTrigger, CollisionShapeUtil } from 'https://unpkg.com/@rings-webgpu/physics@0.0.2/dist/physics.es.js';
+
+    const ZONE_HALF = 1.25;
+    const SPAWN_INTERVAL_SEC = 2;
+    const MAX_BALLS = 24;
+    const BALL_RADIUS = 0.22;
 
     async function main() {
       const canvas = document.getElementById("canvas");
-      const hud = document.getElementById("hud");
+      const crossEl = document.getElementById("cross-count");
       if (!canvas) return;
+
+      const flyingBalls = [];
+      let crossCount = 0;
+      let spawnAccSec = 0;
+      let clockPrevMs = null;
+      let zone = null;
+
+      function pointInTriggerZone(px, py, pz, zx, zy, zz) {
+        return (
+          Math.abs(px - zx) <= ZONE_HALF &&
+          Math.abs(py - zy) <= ZONE_HALF &&
+          Math.abs(pz - zz) <= ZONE_HALF
+        );
+      }
 
       try {
         await Engine3D.init({
           canvasConfig: { canvas },
-          beforeRender: () => { if (Physics.isInited) Physics.update(); },
+          beforeRender: () => {
+            if (Physics.isInited) Physics.update();
+          },
+          lateRender: () => {
+            if (!Physics.isInited || !zone) return;
+            const nowMs = performance.now();
+            if (clockPrevMs === null) clockPrevMs = nowMs;
+            const dtSec = (nowMs - clockPrevMs) / 1000;
+            clockPrevMs = nowMs;
+
+            spawnAccSec += dtSec;
+            while (spawnAccSec >= SPAWN_INTERVAL_SEC) {
+              spawnAccSec -= SPAWN_INTERVAL_SEC;
+              spawnBall();
+            }
+
+            const zx = zone.x;
+            const zy = zone.y;
+            const zz = zone.z;
+
+            for (let i = flyingBalls.length - 1; i >= 0; i--) {
+              const ball = flyingBalls[i];
+              if (!ball || ball.dispose) {
+                flyingBalls.splice(i, 1);
+                continue;
+              }
+              const inside = pointInTriggerZone(ball.x, ball.y, ball.z, zx, zy, zz);
+              const wasIn = ball.__wasInZone === true;
+              if (inside) ball.__wasInZone = true;
+              else if (wasIn) {
+                crossCount++;
+                ball.__wasInZone = false;
+                if (crossEl) crossEl.textContent = String(crossCount);
+              }
+
+              if (ball.x > 14) {
+                ball.removeFromParent();
+                ball.destroy();
+                flyingBalls.splice(i, 1);
+              }
+            }
+
+            while (flyingBalls.length > MAX_BALLS) {
+              const old = flyingBalls.shift();
+              if (old && !old.dispose) {
+                old.removeFromParent();
+                old.destroy();
+              }
+            }
+          },
         });
       } catch (e) {
         document.body.innerHTML = "<p style=\"padding:1rem\">WebGPU 初始化失败。</p>";
@@ -60,52 +144,57 @@
       const camObj = new Object3D();
       const camera = camObj.addComponent(Camera3D);
       camera.perspective(55, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 200);
-      camObj.addComponent(HoverCameraController).setCamera(25, -35, 14);
+      camObj.addComponent(HoverCameraController).setCamera(28, -38, 12);
       scene.addChild(camObj);
 
       const lightObj = new Object3D();
-      lightObj.addComponent(DirectLight).intensity = 1.1;
+      lightObj.addComponent(DirectLight).intensity = 1.15;
       scene.addChild(lightObj);
 
       const ground = new Object3D();
       const gMr = ground.addComponent(MeshRenderer);
-      gMr.geometry = new BoxGeometry(22, 0.2, 22);
+      gMr.geometry = new BoxGeometry(28, 0.2, 16);
       gMr.material = new LitMaterial();
       gMr.material.baseColor = new Color(0.26, 0.28, 0.32, 1);
-      const gCol = ground.addComponent(ColliderComponent);
-      gCol.shape.setFromCenterAndSize(new Vector3(0, 0, 0), new Vector3(22, 0.2, 22));
       const gRb = ground.addComponent(Rigidbody);
+      gRb.shape = CollisionShapeUtil.createBoxShape(ground);
       gRb.mass = 0;
       scene.addChild(ground);
 
-      const zone = new Object3D();
-      zone.y = 1.2;
+      zone = new Object3D();
+      zone.y = 1.15;
       const zMr = zone.addComponent(MeshRenderer);
       zMr.geometry = new BoxGeometry(2.5, 2.5, 2.5);
       zMr.material = new LitMaterial();
-      zMr.material.baseColor = new Color(0.9, 0.85, 0.2, 1);
+      zMr.material.baseColor = new Color(0.95, 0.82, 0.15, 0.42);
       const ghost = zone.addComponent(GhostTrigger);
       ghost.shape = CollisionShapeUtil.createBoxShape(zone);
-      let hits = 0;
-      ghost.collisionEvent = () => {
-        hits++;
-        if (hud && hits % 3 === 1) hud.textContent = `GhostTrigger 碰撞回调累计约 ${hits} 次（节流显示）`;
-      };
-
       scene.addChild(zone);
 
-      const ball = new Object3D();
-      ball.y = 6;
-      ball.z = -4;
-      const bMr = ball.addComponent(MeshRenderer);
-      bMr.geometry = new SphereGeometry(0.4, 18, 18);
-      bMr.material = new LitMaterial();
-      bMr.material.baseColor = new Color(0.35, 0.8, 0.95, 1);
-      const bCol = ball.addComponent(ColliderComponent);
-      bCol.shape.setFromCenterAndSize(new Vector3(0, 0, 0), new Vector3(0.8, 0.8, 0.8));
-      const bRb = ball.addComponent(Rigidbody);
-      bRb.mass = 0.6;
-      scene.addChild(ball);
+      const velShoot = new Vector3(9, 0, 0);
+
+      function spawnBall() {
+        const ball = new Object3D();
+        ball.x = -10;
+        ball.y = zone.y + (Math.random() - 0.5) * 0.35;
+        ball.z = (Math.random() - 0.5) * 0.4;
+        ball.__wasInZone = false;
+        const bMr = ball.addComponent(MeshRenderer);
+        bMr.geometry = new SphereGeometry(BALL_RADIUS, 14, 14);
+        bMr.material = new LitMaterial();
+        bMr.material.baseColor = new Color(
+          0.35 + Math.random() * 0.4,
+          0.75 + Math.random() * 0.2,
+          0.92,
+          1
+        );
+        const bRb = ball.addComponent(Rigidbody);
+        bRb.shape = CollisionShapeUtil.createSphereShape(ball);
+        bRb.mass = 0.35;
+        bRb.linearVelocity = velShoot;
+        scene.addChild(ball);
+        flyingBalls.push(ball);
+      }
 
       const view = new View3D();
       view.scene = scene;
@@ -115,8 +204,8 @@
 
     main().catch(console.error);
   </script>
-  <p style="position:absolute;bottom:6px;left:8px;font-size:10px;color:#8b9cb3;margin:0">
-    需 <code>npm run build:physics</code> + 仓库根目录 HTTP 访问。
+  <p style="position:absolute;bottom:6px;left:8px;right:200px;font-size:10px;color:#8b9cb3;margin:0">
+    脚本从 unpkg 加载；请用 HTTP 服务打开本页（localhost / HTTPS），勿用 file://。
   </p>
 </body>
 </html>

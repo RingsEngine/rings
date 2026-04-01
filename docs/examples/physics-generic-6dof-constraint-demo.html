@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings — 物理：10× Generic6DofConstraint 链</title>
+  <style>
+    html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
+    body { position: relative; font-family: system-ui, "Segoe UI", sans-serif; }
+    #canvas { display: block; width: 100%; height: 100%; }
+    .hud {
+      position: absolute; left: 8px; top: 8px; right: 248px; pointer-events: none;
+      font-size: 11px; line-height: 1.45; color: #e6edf3; text-shadow: 0 1px 3px #000;
+      font-family: ui-monospace, monospace;
+    }
+    .props {
+      position: absolute; top: 0; right: 0; bottom: 0; width: 236px; padding: 10px 12px;
+      background: rgba(14, 18, 24, 0.92); border-left: 1px solid #2d3a4d;
+      font-size: 0.7rem; line-height: 1.45; color: #aeb8c8; pointer-events: none;
+      overflow: auto;
+    }
+    .props h3 { margin: 0 0 6px; font-size: 0.72rem; color: #8b9cb3; font-weight: 600; }
+    .props code { font-size: 0.66rem; color: #c8d4e8; }
+    .props ul { margin: 0; padding-left: 1.05em; }
+    .props li { margin: 0.22em 0; }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "@rings-webgpu/core": "https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js",
+      "@rings-webgpu/ammo": "https://unpkg.com/@rings-webgpu/ammo@0.2.1/ammo.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="canvas" style="width: 100%; height: 100%;"></canvas>
+  <div class="hud">
+    顶部<strong>静态横梁</strong>为锚点，下方 <strong>10 个链节</strong>（颜色由浅到深）依次用 <strong>10 个</strong>
+    <code>Generic6DofConstraint</code> 串联：第 <code>i</code> 节组件挂在<strong>下节刚体</strong>上，<code>targetRigidbody</code> 指上一节（<code>i=0</code> 时指横梁）。
+    铰接处 <code>pivotSelf</code>（链节顶面）/ <code>pivotTarget</code>（上一节底面）。<strong>左键拖拽</strong>任一节；空白转视角。
+  </div>
+  <aside class="props">
+    <h3>链参数</h3>
+    <ul>
+      <li>链节数 <code>N = 10</code> → 约束数 <code>10</code></li>
+      <li>每节 <code>Generic6DofConstraint</code> 线/角限位相同（小范围摆动 + 轻微伸缩余量）</li>
+      <li><code>disableCollisionsBetweenLinkedBodies: true</code> 避免相邻两体硬碰</li>
+    </ul>
+  </aside>
+  <script type="module">
+    import {
+      Engine3D, Scene3D, Object3D, Camera3D, View3D, Color, Vector3,
+      LitMaterial, BoxGeometry, MeshRenderer,
+      AtmosphericComponent, DirectLight, HoverCameraController,
+    } from 'https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js';
+    import { Physics, Rigidbody, Generic6DofConstraint, CollisionShapeUtil } from 'https://unpkg.com/@rings-webgpu/physics@0.0.2/dist/physics.es.js';
+
+    /** 链节数量 = 约束数量 */
+    const N = 10;
+    const LINK_H = 0.4;
+    const LINK_HALF = LINK_H * 0.5;
+    const LINK_W = 0.34;
+    const LINK_D = 0.34;
+    const GAP = 0.06;
+    const ANCHOR_Y = 6.1;
+    const ANCHOR_H = 0.22;
+    const ANCHOR_HALF = ANCHOR_H * 0.5;
+
+    function makeChainColors(n) {
+      const out = [];
+      for (let i = 0; i < n; i++) {
+        const t = i / Math.max(n - 1, 1);
+        out.push(new Color(0.55 + t * 0.35, 0.28 + t * 0.45, 0.72 - t * 0.35, 1));
+      }
+      return out;
+    }
+
+    function apply6Dof(gen6) {
+      gen6.linearLowerLimit = new Vector3(-0.06, -0.1, -0.06);
+      gen6.linearUpperLimit = new Vector3(0.06, 0.1, 0.06);
+      gen6.angularLowerLimit = new Vector3(-0.42, -0.42, -0.42);
+      gen6.angularUpperLimit = new Vector3(0.42, 0.42, 0.42);
+      gen6.disableCollisionsBetweenLinkedBodies = true;
+    }
+
+    async function main() {
+      const canvas = document.getElementById("canvas");
+      if (!canvas) return;
+
+      try {
+        await Engine3D.init({
+          canvasConfig: { canvas },
+          beforeRender: () => {
+            if (Physics.isInited) Physics.update();
+          },
+        });
+      } catch (e) {
+        document.body.innerHTML =
+          "<p style=\"padding:1rem;font-family:sans-serif\">WebGPU 初始化失败。</p>";
+        console.error(e);
+        return;
+      }
+
+      await Physics.init({ useDrag: true });
+
+      const scene = new Scene3D();
+      scene.addComponent(AtmosphericComponent);
+
+      const camObj = new Object3D();
+      const camera = camObj.addComponent(Camera3D);
+      camera.perspective(50, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 200);
+      camObj.addComponent(HoverCameraController).setCamera(22, -48, 14);
+      scene.addChild(camObj);
+
+      const key = new Object3D();
+      key.rotationX = 50;
+      key.rotationY = -32;
+      key.addComponent(DirectLight).intensity = 1.75;
+      scene.addChild(key);
+
+      const fill = new Object3D();
+      fill.rotationX = 22;
+      fill.rotationY = 140;
+      const fl = fill.addComponent(DirectLight);
+      fl.intensity = 0.48;
+      fl.lightColor = new Color(0.82, 0.9, 1, 1);
+      scene.addChild(fill);
+
+      const ground = new Object3D();
+      const gMr = ground.addComponent(MeshRenderer);
+      gMr.geometry = new BoxGeometry(24, 0.2, 16);
+      gMr.material = new LitMaterial();
+      gMr.material.baseColor = new Color(0.22, 0.24, 0.28, 1);
+      const gRb = ground.addComponent(Rigidbody);
+      gRb.shape = CollisionShapeUtil.createBoxShape(ground);
+      gRb.mass = 0;
+      scene.addChild(ground);
+
+      const anchor = new Object3D();
+      anchor.y = ANCHOR_Y;
+      const aMr = anchor.addComponent(MeshRenderer);
+      aMr.geometry = new BoxGeometry(2.8, ANCHOR_H, 0.55);
+      aMr.material = new LitMaterial();
+      aMr.material.baseColor = new Color(0.42, 0.4, 0.38, 1);
+      aMr.material.metallic = 0.4;
+      aMr.material.roughness = 0.5;
+      const aRb = anchor.addComponent(Rigidbody);
+      aRb.shape = CollisionShapeUtil.createBoxShape(anchor);
+      aRb.mass = 0;
+      scene.addChild(anchor);
+
+      const colors = makeChainColors(N);
+      const links = [];
+
+      for (let i = 0; i < N; i++) {
+        const o = new Object3D();
+        o.y = ANCHOR_Y - ANCHOR_HALF - GAP - LINK_HALF - i * (LINK_H + GAP);
+        const mr = o.addComponent(MeshRenderer);
+        mr.geometry = new BoxGeometry(LINK_W, LINK_H, LINK_D);
+        mr.material = new LitMaterial();
+        mr.material.baseColor = colors[i];
+        mr.material.metallic = 0.22;
+        mr.material.roughness = 0.48;
+        const rb = o.addComponent(Rigidbody);
+        rb.shape = CollisionShapeUtil.createBoxShape(o);
+        rb.mass = 0.38;
+        rb.restitution = 0.04;
+        rb.damping = [0.1, 0.14];
+        scene.addChild(o);
+        links.push({ o, rb });
+      }
+
+      const c0 = links[0].o.addComponent(Generic6DofConstraint);
+      c0.targetRigidbody = aRb;
+      c0.pivotSelf.setTo(0, LINK_HALF, 0);
+      c0.pivotTarget.setTo(0, -ANCHOR_HALF, 0);
+      apply6Dof(c0);
+
+      for (let i = 1; i < N; i++) {
+        const gen = links[i].o.addComponent(Generic6DofConstraint);
+        gen.targetRigidbody = links[i - 1].rb;
+        gen.pivotSelf.setTo(0, LINK_HALF, 0);
+        gen.pivotTarget.setTo(0, -LINK_HALF, 0);
+        apply6Dof(gen);
+      }
+
+      const view = new View3D();
+      view.scene = scene;
+      view.camera = camera;
+      Engine3D.startRenderView(view);
+    }
+
+    main().catch(console.error);
+  </script>
+  <p style="position:absolute;bottom:6px;left:8px;right:248px;font-size:10px;color:#8b9cb3;margin:0">
+    脚本从 unpkg 加载；请用 HTTP 服务打开本页（localhost / HTTPS），勿用 file://。
+  </p>
+</body>
+</html>

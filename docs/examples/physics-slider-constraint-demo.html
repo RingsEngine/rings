@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings — 物理：滑动约束 SliderConstraint</title>
+  <style>
+    html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
+    body { position: relative; font-family: system-ui, "Segoe UI", sans-serif; }
+    #canvas { display: block; width: 100%; height: 100%; }
+    .hud {
+      position: absolute; left: 8px; top: 8px; right: 240px; pointer-events: none;
+      font-size: 11px; line-height: 1.45; color: #e6edf3; text-shadow: 0 1px 3px #000;
+      font-family: ui-monospace, monospace;
+    }
+    .panel {
+      position: absolute; left: 8px; bottom: 36px; z-index: 2;
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+      padding: 8px 10px; background: rgba(18, 22, 30, 0.92);
+      border: 1px solid #3d4a60; border-radius: 8px; pointer-events: auto;
+      font-size: 12px; color: #c8d4e6;
+    }
+    .panel button {
+      cursor: pointer; padding: 6px 10px; border-radius: 6px;
+      border: 1px solid #4a5870; background: #2a3444; color: #e8edf5;
+      font-size: 11px;
+    }
+    .panel button:hover { background: #364050; }
+    .panel span { color: #8b9cb3; margin-right: 4px; }
+    .props {
+      position: absolute; top: 0; right: 0; bottom: 0; width: 228px; padding: 10px 12px;
+      background: rgba(14, 18, 24, 0.92); border-left: 1px solid #2d3a4d;
+      font-size: 0.7rem; line-height: 1.45; color: #aeb8c8; pointer-events: none;
+      overflow: auto;
+    }
+    .props h3 { margin: 0 0 6px; font-size: 0.72rem; color: #8b9cb3; font-weight: 600; }
+    .props code { font-size: 0.68rem; color: #c8d4e8; }
+    .props ul { margin: 0; padding-left: 1.1em; }
+    .props li { margin: 0.2em 0; }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "@rings-webgpu/core": "https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js",
+      "@rings-webgpu/ammo": "https://unpkg.com/@rings-webgpu/ammo@0.2.1/ammo.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="canvas" style="width: 100%; height: 100%;"></canvas>
+  <div class="hud">
+    静态<strong>导轨</strong> + 动态<strong>滑块</strong>（橙）。Bullet 中滑动沿约束局部 <strong>X</strong>；本示例两体无额外旋转，故为世界 <strong>X</strong>。
+    黄柱为<strong>仅渲染</strong>的行程参考；底部按钮切换<strong>线性马达</strong>。左键拖空白转视角，<strong>左键拖滑块</strong>（需命中动态体）。
+  </div>
+  <aside class="props">
+    <h3>SliderConstraint 属性（摘要）</h3>
+    <p style="margin:0 0 8px;color:#8b9cb3">对应 <code>btSliderConstraint</code>；下列除「继承」外均在滑块物体上 <code>addComponent</code> 后赋值。</p>
+    <ul>
+      <li><strong>继承 ConstraintBase</strong>：<code>targetRigidbody</code>（导轨刚体）、<code>pivotSelf</code> / <code>pivotTarget</code>（两侧局部锚点）、<code>rotationSelf</code> / <code>rotationTarget</code>（约束框朝向，未设则为单位四元数）、<code>disableCollisionsBetweenLinkedBodies</code>、<code>breakingThreshold</code></li>
+      <li><code>useLinearReferenceFrame</code>：是否使用线性参考系（默认 <code>true</code>，传入 Ammo 构造）</li>
+      <li><code>lowerLinLimit</code> / <code>upperLinLimit</code>：沿滑动轴的线位移下限 / 上限（默认近似无界）</li>
+      <li><code>lowerAngLimit</code> / <code>upperAngLimit</code>：绕约束相关轴的角度限制（弧度；本页设为 <code>0</code> 抑制扭转）</li>
+      <li><code>poweredLinMotor</code>：是否启用线性马达</li>
+      <li><code>maxLinMotorForce</code>：马达最大推力</li>
+      <li><code>targetLinMotorVelocity</code>：马达目标线速度（沿滑动轴）</li>
+    </ul>
+  </aside>
+  <div class="panel" id="motorPanel">
+    <span>线性马达</span>
+    <button type="button" id="mFwd">正向</button>
+    <button type="button" id="mRev">反向</button>
+    <button type="button" id="mStop">停止</button>
+    <span style="margin-left:8px">|</span>
+    <button type="button" id="mOff">关闭马达</button>
+  </div>
+  <script type="module">
+    import {
+      Engine3D, Scene3D, Object3D, Camera3D, View3D, Color, Vector3,
+      LitMaterial, BoxGeometry, MeshRenderer,
+      AtmosphericComponent, DirectLight, HoverCameraController,
+    } from 'https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js';
+    import { Physics, Rigidbody, SliderConstraint, CollisionShapeUtil } from 'https://unpkg.com/@rings-webgpu/physics@0.0.2/dist/physics.es.js';
+
+    async function main() {
+      const canvas = document.getElementById("canvas");
+      if (!canvas) return;
+
+      try {
+        await Engine3D.init({
+          canvasConfig: { canvas },
+          beforeRender: () => {
+            if (Physics.isInited) Physics.update();
+          },
+        });
+      } catch (e) {
+        document.body.innerHTML =
+          "<p style=\"padding:1rem;font-family:sans-serif\">WebGPU 初始化失败。</p>";
+        console.error(e);
+        return;
+      }
+
+      await Physics.init({ useDrag: true });
+
+      const scene = new Scene3D();
+      scene.addComponent(AtmosphericComponent);
+
+      const camObj = new Object3D();
+      const camera = camObj.addComponent(Camera3D);
+      camera.perspective(50, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 200);
+      camObj.addComponent(HoverCameraController).setCamera(24, -40, 11);
+      scene.addChild(camObj);
+
+      const key = new Object3D();
+      key.rotationX = 48;
+      key.rotationY = -34;
+      key.addComponent(DirectLight).intensity = 1.7;
+      scene.addChild(key);
+
+      const fill = new Object3D();
+      fill.rotationX = 20;
+      fill.rotationY = 145;
+      const fl = fill.addComponent(DirectLight);
+      fl.intensity = 0.5;
+      fl.lightColor = new Color(0.8, 0.88, 1, 1);
+      scene.addChild(fill);
+
+      const ground = new Object3D();
+      const gMr = ground.addComponent(MeshRenderer);
+      gMr.geometry = new BoxGeometry(22, 0.22, 16);
+      gMr.material = new LitMaterial();
+      gMr.material.baseColor = new Color(0.22, 0.24, 0.28, 1);
+      const gRb = ground.addComponent(Rigidbody);
+      gRb.shape = CollisionShapeUtil.createBoxShape(ground);
+      gRb.mass = 0;
+      scene.addChild(ground);
+
+      const railLen = 4.8;
+      const railH = 0.14;
+      const railD = 0.3;
+      const railY = 0.26;
+      const rail = new Object3D();
+      rail.y = railY;
+      const rMr = rail.addComponent(MeshRenderer);
+      rMr.geometry = new BoxGeometry(railLen, railH, railD);
+      rMr.material = new LitMaterial();
+      rMr.material.baseColor = new Color(0.45, 0.47, 0.5, 1);
+      rMr.material.metallic = 0.5;
+      rMr.material.roughness = 0.48;
+      const rRb = rail.addComponent(Rigidbody);
+      rRb.shape = CollisionShapeUtil.createBoxShape(rail);
+      rRb.mass = 0;
+      scene.addChild(rail);
+
+      const lim = 2.2;
+      const postH = 0.5;
+      const postY = railY + railH * 0.5 + postH * 0.5;
+      for (const sx of [-lim, lim]) {
+        const post = new Object3D();
+        post.x = sx;
+        post.y = postY;
+        const pMr = post.addComponent(MeshRenderer);
+        pMr.geometry = new BoxGeometry(0.07, postH, 0.07);
+        pMr.material = new LitMaterial();
+        pMr.material.baseColor = new Color(0.92, 0.75, 0.18, 1);
+        scene.addChild(post);
+      }
+
+      const cx = -0.9;
+      const cy = railY + railH * 0.5 + 0.12;
+      const cart = new Object3D();
+      cart.x = cx;
+      cart.y = cy;
+      const cMr = cart.addComponent(MeshRenderer);
+      cMr.geometry = new BoxGeometry(0.48, 0.24, 0.28);
+      cMr.material = new LitMaterial();
+      cMr.material.baseColor = new Color(0.95, 0.45, 0.12, 1);
+      cMr.material.metallic = 0.3;
+      cMr.material.roughness = 0.4;
+      const cRb = cart.addComponent(Rigidbody);
+      cRb.shape = CollisionShapeUtil.createBoxShape(cart);
+      cRb.mass = 1.5;
+      cRb.damping = [0.2, 0.28];
+
+      const pivotRail = new Vector3(cx, cy - railY, 0);
+      /* SliderConstraint：约束框 X 为滑动轴；pivot 对齐导轨上与滑块中心重合的世界点 */
+      const slider = cart.addComponent(SliderConstraint);
+      slider.targetRigidbody = rRb;
+      slider.pivotSelf = new Vector3(0, 0, 0);
+      slider.pivotTarget = pivotRail;
+      /* rotationSelf / rotationTarget 默认 identity，可改为 Quaternion 以改变滑动轴向 */
+      slider.lowerLinLimit = -lim;
+      slider.upperLinLimit = lim;
+      slider.lowerAngLimit = 0;
+      slider.upperAngLimit = 0;
+      slider.useLinearReferenceFrame = true;
+      slider.maxLinMotorForce = 140;
+      slider.targetLinMotorVelocity = 0;
+      slider.poweredLinMotor = false;
+
+      scene.addChild(cart);
+
+      const view = new View3D();
+      view.scene = scene;
+      view.camera = camera;
+      Engine3D.startRenderView(view);
+
+      document.getElementById("mFwd").addEventListener("click", () => {
+        slider.poweredLinMotor = true;
+        slider.targetLinMotorVelocity = 3.2;
+      });
+      document.getElementById("mRev").addEventListener("click", () => {
+        slider.poweredLinMotor = true;
+        slider.targetLinMotorVelocity = -3.2;
+      });
+      document.getElementById("mStop").addEventListener("click", () => {
+        slider.targetLinMotorVelocity = 0;
+      });
+      document.getElementById("mOff").addEventListener("click", () => {
+        slider.poweredLinMotor = false;
+        slider.targetLinMotorVelocity = 0;
+      });
+    }
+
+    main().catch(console.error);
+  </script>
+  <p style="position:absolute;bottom:6px;left:8px;right:236px;font-size:10px;color:#8b9cb3;margin:0">
+    与文档一致：unpkg + <code>importmap</code>；请用 HTTP 服务打开本页。
+  </p>
+</body>
+</html>

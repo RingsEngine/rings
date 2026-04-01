@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings — 物理：固定约束 FixedConstraint</title>
+  <style>
+    html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
+    body { position: relative; font-family: system-ui, "Segoe UI", sans-serif; }
+    #canvas { display: block; width: 100%; height: 100%; }
+    .hud {
+      position: absolute; left: 8px; top: 8px; right: 8px; pointer-events: none;
+      font-size: 11px; line-height: 1.45; color: #e6edf3; text-shadow: 0 1px 3px #000;
+      font-family: ui-monospace, monospace;
+    }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "@rings-webgpu/core": "https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js",
+      "@rings-webgpu/ammo": "https://unpkg.com/@rings-webgpu/ammo@0.2.1/ammo.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="canvas" style="width: 100%; height: 100%;"></canvas>
+  <div class="hud">
+    青灰块（下）与紫块（上）均为<strong>动态刚体</strong>，通过 <code>FixedConstraint</code> 将上表面与下表面<strong>焊接</strong>；
+    <code>pivotSelf</code>/<code>pivotTarget</code> 对齐接缝；落地后两体<strong>无相对运动</strong>。可选左键拖拽（命中任一块）。
+  </div>
+  <script type="module">
+    import {
+      Engine3D, Scene3D, Object3D, Camera3D, View3D, Color, Vector3,
+      LitMaterial, BoxGeometry, MeshRenderer,
+      AtmosphericComponent, DirectLight, HoverCameraController,
+    } from 'https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js';
+    import { Physics, Rigidbody, FixedConstraint, CollisionShapeUtil } from 'https://unpkg.com/@rings-webgpu/physics@0.0.2/dist/physics.es.js';
+
+    async function main() {
+      const canvas = document.getElementById("canvas");
+      if (!canvas) return;
+
+      try {
+        await Engine3D.init({
+          canvasConfig: { canvas },
+          beforeRender: () => {
+            if (Physics.isInited) Physics.update();
+          },
+        });
+      } catch (e) {
+        document.body.innerHTML =
+          "<p style=\"padding:1rem;font-family:sans-serif\">WebGPU 初始化失败。</p>";
+        console.error(e);
+        return;
+      }
+
+      await Physics.init({ useDrag: true });
+
+      const scene = new Scene3D();
+      scene.addComponent(AtmosphericComponent);
+
+      const camObj = new Object3D();
+      const camera = camObj.addComponent(Camera3D);
+      camera.perspective(52, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 200);
+      camObj.addComponent(HoverCameraController).setCamera(26, -35, 12);
+      scene.addChild(camObj);
+
+      const key = new Object3D();
+      key.rotationX = 50;
+      key.rotationY = -32;
+      const kl = key.addComponent(DirectLight);
+      kl.intensity = 1.55;
+      kl.lightColor = new Color(1, 0.97, 0.93, 1);
+      scene.addChild(key);
+
+      const fill = new Object3D();
+      fill.rotationX = 22;
+      fill.rotationY = 150;
+      const fl = fill.addComponent(DirectLight);
+      fl.intensity = 0.45;
+      fl.lightColor = new Color(0.82, 0.88, 1, 1);
+      scene.addChild(fill);
+
+      const ground = new Object3D();
+      const gMr = ground.addComponent(MeshRenderer);
+      gMr.geometry = new BoxGeometry(20, 0.24, 16);
+      gMr.material = new LitMaterial();
+      gMr.material.baseColor = new Color(0.24, 0.26, 0.3, 1);
+      const gRb = ground.addComponent(Rigidbody);
+      gRb.shape = CollisionShapeUtil.createBoxShape(ground);
+      gRb.mass = 0;
+      scene.addChild(ground);
+
+      const gh = 0.24;
+      const gy = gh * 0.5;
+
+      /* 下块 A：半高 0.25，顶面 y = gy + 0.25 = 0.37 */
+      const ha = 0.5;
+      const lower = new Object3D();
+      lower.y = gy + ha * 0.5;
+      const lMr = lower.addComponent(MeshRenderer);
+      lMr.geometry = new BoxGeometry(0.85, ha, 0.65);
+      lMr.material = new LitMaterial();
+      lMr.material.baseColor = new Color(0.35, 0.55, 0.52, 1);
+      lMr.material.metallic = 0.25;
+      lMr.material.roughness = 0.55;
+      const lRb = lower.addComponent(Rigidbody);
+      lRb.shape = CollisionShapeUtil.createBoxShape(lower);
+      lRb.mass = 1.6;
+      lRb.damping = [0.12, 0.2];
+      scene.addChild(lower);
+
+      /* 上块 B：半高 0.2，底面与 A 顶面齐：center y = gy + ha + 0.2 = 0.57 */
+      const hb = 0.4;
+      const upper = new Object3D();
+      upper.y = gy + ha + hb * 0.5;
+      const uMr = upper.addComponent(MeshRenderer);
+      uMr.geometry = new BoxGeometry(0.7, hb, 0.55);
+      uMr.material = new LitMaterial();
+      uMr.material.baseColor = new Color(0.62, 0.42, 0.78, 1);
+      uMr.material.metallic = 0.3;
+      uMr.material.roughness = 0.45;
+      const uRb = upper.addComponent(Rigidbody);
+      uRb.shape = CollisionShapeUtil.createBoxShape(upper);
+      uRb.mass = 1.1;
+      uRb.damping = [0.12, 0.2];
+
+      const fixed = upper.addComponent(FixedConstraint);
+      fixed.targetRigidbody = lRb;
+      fixed.pivotSelf = new Vector3(0, -hb * 0.5, 0);
+      fixed.pivotTarget = new Vector3(0, ha * 0.5, 0);
+
+      scene.addChild(upper);
+
+      const view = new View3D();
+      view.scene = scene;
+      view.camera = camera;
+      Engine3D.startRenderView(view);
+    }
+
+    main().catch(console.error);
+  </script>
+  <p style="position:absolute;bottom:6px;left:8px;right:8px;font-size:10px;color:#8b9cb3;margin:0">
+    与文档一致：unpkg + <code>importmap</code>；请用 HTTP 服务打开（localhost / HTTPS），勿用 <code>file://</code>。
+  </p>
+</body>
+</html>

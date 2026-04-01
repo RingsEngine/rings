@@ -35,6 +35,21 @@
           noData: "No Results!",
           depth: 6,
         },
+        plugins: [
+          function iframeResolvePlugin(hook) {
+            hook.doneEach(function () {
+              document
+                .querySelectorAll(".markdown-section iframe[src]")
+                .forEach(function (el) {
+                  var s = el.getAttribute("src");
+                  if (!s || /^(https?:|\/\/|data:|blob:)/i.test(s)) return;
+                  try {
+                    el.src = new URL(s, window.location.href).href;
+                  } catch (e) {}
+                });
+            });
+          },
+        ],
       };
     </script>
     <!-- Docsify v4 -->

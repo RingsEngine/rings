@@ -1,6 +1,5 @@
 import { Color, Matrix4, Quaternion, Vector2, Vector3, Vector4 } from "..";
-
-/* eslint-disable */export class BytesArray extends DataView<ArrayBufferLike> {
+export class BytesArray extends DataView {
   public get buffer() { return super.buffer; }
   public get byteOffset() { return super.byteOffset; }
   public get byteLength() { return super.byteLength; }

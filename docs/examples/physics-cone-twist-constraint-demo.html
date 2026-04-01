@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings — 物理：锥形扭曲约束 ConeTwistConstraint</title>
+  <style>
+    html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
+    body { position: relative; font-family: system-ui, "Segoe UI", sans-serif; }
+    #canvas { display: block; width: 100%; height: 100%; }
+    .hud {
+      position: absolute; left: 8px; top: 8px; right: 220px; pointer-events: none;
+      font-size: 11px; line-height: 1.45; color: #e6edf3; text-shadow: 0 1px 3px #000;
+      font-family: ui-monospace, monospace;
+    }
+    .hint {
+      position: absolute; top: 0; right: 0; bottom: 0; width: 208px; padding: 12px;
+      background: rgba(14, 18, 24, 0.9); color: #c8d4e6; font-size: 0.7rem;
+      line-height: 1.45; border-left: 1px solid #2d3a4d; pointer-events: none;
+    }
+    .hint h3 { margin: 0 0 8px; font-size: 0.72rem; color: #8b9cb3; font-weight: 600; }
+    .hint code { font-size: 0.68rem; color: #b8c8e0; }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "@rings-webgpu/core": "https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js",
+      "@rings-webgpu/ammo": "https://unpkg.com/@rings-webgpu/ammo@0.2.1/ammo.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="canvas" style="width: 100%; height: 100%;"></canvas>
+  <div class="hud">
+    上球为<strong>静态锚点</strong>，下球为<strong>动态</strong>，<code>ConeTwistConstraint</code> 在枢轴处限制<strong>锥摆</strong>（<code>swingSpan1/2</code>）与<strong>绕锥轴扭转</strong>（<code>twistSpan</code>），比点对点约束多限制旋转自由度。
+  </div>
+  <aside class="hint">
+    <h3>属性（弧度）</h3>
+    <p><code>swingSpan1</code> — Y 向摆动半角</p>
+    <p><code>swingSpan2</code> — Z 向摆动半角</p>
+    <p><code>twistSpan</code> — 绕 X 扭转半角</p>
+    <p><code>pivotSelf</code> / <code>pivotTarget</code> + <code>rotationSelf</code> / <code>rotationTarget</code> 定义两侧约束框。</p>
+  </aside>
+  <script type="module">
+    import {
+      Engine3D, Scene3D, Object3D, Camera3D, View3D, Color, Vector3,
+      LitMaterial, SphereGeometry, BoxGeometry, MeshRenderer,
+      AtmosphericComponent, DirectLight, HoverCameraController,
+    } from 'https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js';
+    import { Physics, Rigidbody, ConeTwistConstraint, CollisionShapeUtil } from 'https://unpkg.com/@rings-webgpu/physics@0.0.2/dist/physics.es.js';
+
+    async function main() {
+      const canvas = document.getElementById("canvas");
+      if (!canvas) return;
+
+      try {
+        await Engine3D.init({
+          canvasConfig: { canvas },
+          beforeRender: () => {
+            if (Physics.isInited) Physics.update();
+          },
+        });
+      } catch (e) {
+        document.body.innerHTML =
+          "<p style=\"padding:1rem;font-family:sans-serif\">WebGPU 初始化失败。</p>";
+        console.error(e);
+        return;
+      }
+
+      await Physics.init({ useDrag: true });
+
+      const scene = new Scene3D();
+      const atm = scene.addComponent(AtmosphericComponent);
+      atm.sunBrightness = 1.45;
+      atm.sunRadiance = 16;
+
+      const camObj = new Object3D();
+      const camera = camObj.addComponent(Camera3D);
+      camera.perspective(52, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 200);
+      camObj.addComponent(HoverCameraController).setCamera(24, -34, 12);
+      scene.addChild(camObj);
+
+      const key = new Object3D();
+      key.rotationX = 46;
+      key.rotationY = -30;
+      const kl = key.addComponent(DirectLight);
+      kl.intensity = 1.65;
+      kl.lightColor = new Color(1, 0.97, 0.92, 1);
+      scene.addChild(key);
+
+      const fill = new Object3D();
+      fill.rotationX = 18;
+      fill.rotationY = 150;
+      const fl = fill.addComponent(DirectLight);
+      fl.intensity = 0.48;
+      fl.lightColor = new Color(0.8, 0.88, 1, 1);
+      scene.addChild(fill);
+
+      const ground = new Object3D();
+      const gMr = ground.addComponent(MeshRenderer);
+      gMr.geometry = new BoxGeometry(20, 0.22, 16);
+      gMr.material = new LitMaterial();
+      gMr.material.baseColor = new Color(0.22, 0.24, 0.28, 1);
+      const gRb = ground.addComponent(Rigidbody);
+      gRb.shape = CollisionShapeUtil.createBoxShape(ground);
+      gRb.mass = 0;
+      scene.addChild(ground);
+
+      const rA = 0.38;
+      const anchor = new Object3D();
+      anchor.y = 4.2;
+      const aMr = anchor.addComponent(MeshRenderer);
+      aMr.geometry = new SphereGeometry(rA, 24, 24);
+      aMr.material = new LitMaterial();
+      aMr.material.baseColor = new Color(0.28, 0.78, 0.55, 1);
+      aMr.material.metallic = 0.15;
+      aMr.material.roughness = 0.42;
+      const aRb = anchor.addComponent(Rigidbody);
+      aRb.shape = CollisionShapeUtil.createSphereShape(anchor, rA);
+      aRb.mass = 0;
+      scene.addChild(anchor);
+
+      const rB = 0.48;
+      const bob = new Object3D();
+      bob.y = 2.1;
+      const bMr = bob.addComponent(MeshRenderer);
+      bMr.geometry = new SphereGeometry(rB, 24, 24);
+      bMr.material = new LitMaterial();
+      bMr.material.baseColor = new Color(0.45, 0.88, 0.68, 1);
+      bMr.material.metallic = 0.18;
+      bMr.material.roughness = 0.4;
+      const bRb = bob.addComponent(Rigidbody);
+      bRb.shape = CollisionShapeUtil.createSphereShape(bob, rB);
+      bRb.mass = 1.35;
+      bRb.damping = [0.1, 0.16];
+
+      const cone = bob.addComponent(ConeTwistConstraint);
+      cone.targetRigidbody = aRb;
+      cone.pivotSelf = new Vector3(0, rB, 0);
+      cone.pivotTarget = new Vector3(0, -rA, 0);
+      cone.swingSpan1 = 0.62;
+      cone.swingSpan2 = 0.62;
+      cone.twistSpan = 0.45;
+
+      scene.addChild(bob);
+
+      const view = new View3D();
+      view.scene = scene;
+      view.camera = camera;
+      Engine3D.startRenderView(view);
+    }
+
+    main().catch(console.error);
+  </script>
+  <p style="position:absolute;bottom:6px;left:8px;right:220px;font-size:10px;color:#8b9cb3;margin:0">
+    核心与物理自 <strong>unpkg</strong>；<code>CollisionShapeUtil</code>。请用 HTTP 服务打开。
+  </p>
+</body>
+</html>

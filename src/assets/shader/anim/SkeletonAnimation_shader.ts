@@ -18,9 +18,9 @@ export class SkeletonAnimation_shader {
             var<storage, read> jointsIndexMapingTable: array<f32>;
 
             const MAX_JOINT_NUM = 8;
-            fn getSkeletonWorldMatrix(joints: array<f32, MAX_JOINT_NUM>, weight: array<f32, MAX_JOINT_NUM>, num: u32) -> mat4x4<f32> {
+            fn getSkeletonWorldMatrix(joints: array<f32, MAX_JOINT_NUM>, weights: array<f32, MAX_JOINT_NUM>, num: u32) -> mat4x4<f32> {
                 var result: mat4x4<f32>;
-                for(var i: u32 = 0; i < num; i=i+1){
+                for(var i: u32 = 0; i < num; i = i + 1) {
                     let jointId = i32(joints[i]);
                     let jointIndex = u32(jointsIndexMapingTable[jointId]);
                     let jointMatrixIndex = u32(jointsMatrixIndexTable[jointIndex]);

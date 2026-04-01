@@ -7,6 +7,7 @@
 - [快速入门](/quick-start)
 - [核心概念](/core)
 - [组件系统](/components)
+- [物理引擎系统](/物理引擎系统/README)
 - [扩展功能](/extensions)
 - [工具集](/tools)
 - [Shader 开发](/shaders)

@@ -4,14 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Rings — 物理：ClothSoftbody 布料</title>
-  <script type="importmap">
-    {
-      "imports": {
-        "@rings-webgpu/core": "https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js",
-        "@rings-webgpu/physics": "../../packages/physics/dist/physics.es.js"
-      }
-    }
-  </script>
   <style>
     html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
     #canvas { display: block; width: 100%; height: 100%; }
@@ -21,9 +13,17 @@
       font-family: ui-monospace, monospace;
     }
   </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "@rings-webgpu/core": "https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js",
+      "@rings-webgpu/ammo": "https://unpkg.com/@rings-webgpu/ammo@0.2.1/ammo.js"
+    }
+  }
+  </script>
 </head>
 <body>
-  <canvas id="canvas"></canvas>
+  <canvas id="canvas" style="width: 100%; height: 100%;"></canvas>
   <div class="hud">
     <code>Physics.init({ useSoftBody: true })</code> + <code>ClothSoftbody</code>，<code>PlaneGeometry</code> 分段，<code>fixNodeIndices</code> 固定上沿两角。
   </div>
@@ -33,8 +33,8 @@
       LitMaterial, PlaneGeometry, BoxGeometry, MeshRenderer,
       AtmosphericComponent, DirectLight, HoverCameraController,
       ColliderComponent,
-    } from "@rings-webgpu/core";
-    import { Physics, Rigidbody, ClothSoftbody } from "@rings-webgpu/physics";
+    } from 'https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js';
+    import { Physics, Rigidbody, ClothSoftbody } from 'https://unpkg.com/@rings-webgpu/physics@0.0.2/dist/physics.es.js';
 
     async function main() {
       const canvas = document.getElementById("canvas");
@@ -99,7 +99,7 @@
     main().catch(console.error);
   </script>
   <p style="position:absolute;bottom:6px;left:8px;font-size:10px;color:#8b9cb3;margin:0">
-    需 <code>npm run build:physics</code> + 仓库根目录 HTTP 访问；软体与刚体地面碰撞依赖 Ammo 软体世界。
+    脚本从 unpkg 加载；请用 HTTP 服务打开本页（localhost / HTTPS）。软体与刚体地面碰撞依赖 Ammo 软体世界。
   </p>
 </body>
 </html>

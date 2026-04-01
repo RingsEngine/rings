@@ -3,109 +3,328 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Rings — 物理：铰链约束 HingeConstraint</title>
-  <script type="importmap">
-    {
-      "imports": {
-        "@rings-webgpu/core": "https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js",
-        "@rings-webgpu/physics": "../../packages/physics/dist/physics.es.js"
-      }
-    }
-  </script>
+  <title>Rings — 物理：机械臂 + 机械手（HingeConstraint + 拖拽）</title>
   <style>
     html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
+    body { position: relative; font-family: system-ui, "Segoe UI", sans-serif; }
     #canvas { display: block; width: 100%; height: 100%; }
     .hud {
-      position: absolute; left: 8px; top: 8px; right: 8px; pointer-events: none;
-      font-size: 11px; color: #e6edf3; text-shadow: 0 1px 3px #000;
+      position: absolute; left: 8px; top: 8px; right: 220px; pointer-events: none;
+      font-size: 11px; line-height: 1.45; color: #e6edf3; text-shadow: 0 1px 3px #000;
       font-family: ui-monospace, monospace;
     }
+    .hint {
+      position: absolute; top: 0; right: 0; bottom: 0; width: 200px; padding: 12px;
+      background: rgba(15, 20, 25, 0.88); color: #c8d4e6; font-size: 0.72rem;
+      line-height: 1.5; border-left: 1px solid #2d3a4d; pointer-events: none;
+    }
+    .hint h3 { margin: 0 0 8px; font-size: 0.75rem; color: #8b9cb3; font-weight: 600; }
+    .playbar {
+      position: absolute; left: 50%; bottom: 42px; transform: translateX(-50%); z-index: 5;
+      display: flex; align-items: center; gap: 10px; pointer-events: auto;
+      padding: 8px 14px; background: rgba(16, 20, 28, 0.92);
+      border: 1px solid #3d4d64; border-radius: 999px; box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+    }
+    .playbar button {
+      cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 18px; border: none; border-radius: 999px;
+      font-size: 13px; font-weight: 600; color: #0f1419;
+      background: linear-gradient(180deg, #7dd3a8, #4ade80);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.35);
+    }
+    .playbar button:hover { filter: brightness(1.06); }
+    .playbar button.stop-mode {
+      background: linear-gradient(180deg, #f0b090, #ea8f6a);
+      color: #1a0f0a;
+    }
+    .playbar span { font-size: 11px; color: #8b9cb3; max-width: 200px; line-height: 1.35; }
   </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "@rings-webgpu/core": "https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js",
+      "@rings-webgpu/ammo": "https://unpkg.com/@rings-webgpu/ammo@0.2.1/ammo.js"
+    }
+  }
+  </script>
 </head>
 <body>
-  <canvas id="canvas"></canvas>
+  <canvas id="canvas" style="width: 100%; height: 100%;"></canvas>
   <div class="hud">
-    单刚体铰链（无 targetRigidbody）：门板绕底部枢轴摆动，<code>setLimit</code> 限制角度。
+    肩 / 肘 / 腕 + <strong>五指</strong> 均为 <code>HingeConstraint</code>；底部<strong>播放</strong>用 <code>enableAngularMotor</code> 做拟人摆动；<strong>左键拖拽</strong>可手动摆姿态。
   </div>
+  <div class="playbar" id="playBar">
+    <button type="button" id="btnSwing" disabled aria-label="播放拟人摆动">▶ 播放摆动</button>
+    <span id="swingHint">加载约束后可点按；肩/肘/腕相位错开，模拟挥手与屈伸。</span>
+  </div>
+  <aside class="hint">
+    <h3>操作</h3>
+    <p>拖拽使用 <code>Physics.init({ useDrag: true })</code>（与核心、物理均从 unpkg 加载）。</p>
+    <p><strong>播放</strong>：对肩、肘、腕铰链施加正弦式目标角速度（<code>enableAngularMotor</code>），再点一次停止。</p>
+    <p><strong>左键空白</strong> 旋转视角；<strong>右键</strong>平移；滚轮缩放。</p>
+  </aside>
   <script type="module">
     import {
       Engine3D, Scene3D, Object3D, Camera3D, View3D, Color, Vector3,
       LitMaterial, BoxGeometry, MeshRenderer,
       AtmosphericComponent, DirectLight, HoverCameraController,
-      ColliderComponent, BoxColliderShape,
-    } from "@rings-webgpu/core";
-    import { Physics, Rigidbody, HingeConstraint } from "@rings-webgpu/physics";
+    } from 'https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js';
+    import { Physics, Rigidbody, HingeConstraint, CollisionShapeUtil } from 'https://unpkg.com/@rings-webgpu/physics@0.0.2/dist/physics.es.js';
 
     async function main() {
       const canvas = document.getElementById("canvas");
       if (!canvas) return;
 
+      let armSwingOn = false;
+      let shoulderHc = null;
+      let elbowHc = null;
+      let wristHc = null;
+
       try {
         await Engine3D.init({
           canvasConfig: { canvas },
-          beforeRender: () => { if (Physics.isInited) Physics.update(); },
+          beforeRender: () => {
+            if (Physics.isInited) Physics.update();
+            if (!armSwingOn || !shoulderHc || !elbowHc || !wristHc) return;
+            const t = performance.now() * 0.001;
+            const w = 1.05;
+            /* 拟人化：肩水平慢摆；肘相位滞后并叠一小高频，屈伸更自然；腕轻跟 */
+            const sh = 2.05 * Math.sin(w * t);
+            const el =
+              1.05 * Math.sin(w * t + 0.95) + 0.42 * Math.sin(w * 2.15 * t + 0.3);
+            const wr = 0.58 * Math.sin(w * t + 0.4) + 0.22 * Math.sin(w * 1.7 * t);
+            shoulderHc.enableAngularMotor(true, sh, 26);
+            elbowHc.enableAngularMotor(true, el, 18);
+            wristHc.enableAngularMotor(true, wr, 10);
+          },
         });
       } catch (e) {
-        document.body.innerHTML = "<p style=\"padding:1rem\">WebGPU 初始化失败。</p>";
+        document.body.innerHTML =
+          "<p style=\"padding:1rem;font-family:sans-serif\">WebGPU 初始化失败，请使用 Chrome/Edge 并在 localhost 或 HTTPS 下打开。</p>";
         console.error(e);
         return;
       }
 
-      await Physics.init({});
+      await Physics.init({ useDrag: true });
 
       const scene = new Scene3D();
-      scene.addComponent(AtmosphericComponent);
+      const atm = scene.addComponent(AtmosphericComponent);
+      atm.sunBrightness = 1.65;
+      atm.sunRadiance = 22;
 
       const camObj = new Object3D();
       const camera = camObj.addComponent(Camera3D);
-      camera.perspective(55, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 200);
-      camObj.addComponent(HoverCameraController).setCamera(35, -25, 12);
+      camera.perspective(50, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 200);
+      camObj.addComponent(HoverCameraController).setCamera(20, -46, 15);
       scene.addChild(camObj);
 
-      const lightObj = new Object3D();
-      lightObj.addComponent(DirectLight).intensity = 1.2;
-      scene.addChild(lightObj);
+      /* —— 主光 + 补光 + 轮廓光 —— */
+      const key = new Object3D();
+      key.rotationX = 52;
+      key.rotationY = -38;
+      const keyL = key.addComponent(DirectLight);
+      keyL.intensity = 2.35;
+      keyL.lightColor = new Color(1, 0.97, 0.92, 1);
+      scene.addChild(key);
+
+      const fill = new Object3D();
+      fill.rotationX = 18;
+      fill.rotationY = 140;
+      const fillL = fill.addComponent(DirectLight);
+      fillL.intensity = 0.72;
+      fillL.lightColor = new Color(0.78, 0.86, 1, 1);
+      scene.addChild(fill);
+
+      const rim = new Object3D();
+      rim.rotationX = 12;
+      rim.rotationY = 200;
+      const rimL = rim.addComponent(DirectLight);
+      rimL.intensity = 0.55;
+      rimL.lightColor = new Color(0.95, 0.82, 1, 1);
+      scene.addChild(rim);
+
+      const bounce = new Object3D();
+      bounce.rotationX = -40;
+      bounce.rotationY = 0;
+      const bounceL = bounce.addComponent(DirectLight);
+      bounceL.intensity = 0.28;
+      bounceL.lightColor = new Color(0.55, 0.58, 0.62, 1);
+      scene.addChild(bounce);
 
       const ground = new Object3D();
       const gMr = ground.addComponent(MeshRenderer);
-      gMr.geometry = new BoxGeometry(20, 0.25, 20);
+      gMr.geometry = new BoxGeometry(24, 0.26, 20);
       gMr.material = new LitMaterial();
-      gMr.material.baseColor = new Color(0.28, 0.3, 0.34, 1);
-      const gCol = ground.addComponent(ColliderComponent);
-      gCol.shape.setFromCenterAndSize(new Vector3(0, 0, 0), new Vector3(20, 0.25, 20));
+      gMr.material.baseColor = new Color(0.22, 0.24, 0.28, 1);
       const gRb = ground.addComponent(Rigidbody);
+      gRb.shape = CollisionShapeUtil.createBoxShape(ground);
       gRb.mass = 0;
       scene.addChild(ground);
 
-      const door = new Object3D();
-      door.y = 1;
-      const dMr = door.addComponent(MeshRenderer);
-      dMr.geometry = new BoxGeometry(0.15, 2, 1);
-      dMr.material = new LitMaterial();
-      dMr.material.baseColor = new Color(0.75, 0.55, 0.3, 1);
-      const dCol = door.addComponent(ColliderComponent);
-      dCol.shape.setFromCenterAndSize(new Vector3(0, 0, 0), new Vector3(0.15, 2, 1));
-      const dRb = door.addComponent(Rigidbody);
-      dRb.mass = 2;
-      dRb.restitution = 0.05;
+      const base = new Object3D();
+      base.y = 0.25;
+      const bMr = base.addComponent(MeshRenderer);
+      bMr.geometry = new BoxGeometry(0.55, 0.5, 0.55);
+      bMr.material = new LitMaterial();
+      bMr.material.baseColor = new Color(0.38, 0.4, 0.44, 1);
+      const bRb = base.addComponent(Rigidbody);
+      bRb.shape = CollisionShapeUtil.createBoxShape(base);
+      bRb.mass = 0;
+      scene.addChild(base);
 
-      const hinge = door.addComponent(HingeConstraint);
-      hinge.pivotSelf = new Vector3(0, -1, 0);
-      hinge.axisSelf = new Vector3(0, 0, 1);
-      hinge.setLimit(-Math.PI * 0.55, Math.PI * 0.55, 0.15, 0.25);
+      const upperLen = 0.72;
+      const foreLen = 0.52;
+      const palmX = 0.1;
+      const palmY = 0.046;
+      const palmZ = 0.2;
+      const palmCx = upperLen + foreLen + palmX * 0.5;
 
-      scene.addChild(door);
+      /* 上臂 */
+      const upper = new Object3D();
+      upper.x = upperLen * 0.5;
+      upper.y = 0.5;
+      const uMr = upper.addComponent(MeshRenderer);
+      uMr.geometry = new BoxGeometry(upperLen, 0.14, 0.14);
+      uMr.material = new LitMaterial();
+      uMr.material.baseColor = new Color(0.9, 0.5, 0.2, 1);
+      uMr.material.metallic = 0.35;
+      uMr.material.roughness = 0.42;
+      const uRb = upper.addComponent(Rigidbody);
+      uRb.shape = CollisionShapeUtil.createBoxShape(upper);
+      uRb.mass = 2.2;
+      uRb.damping = [0.26, 0.36];
+
+      const shoulder = upper.addComponent(HingeConstraint);
+      shoulderHc = shoulder;
+      shoulder.targetRigidbody = bRb;
+      shoulder.pivotSelf = new Vector3(-upperLen * 0.5, 0, 0);
+      shoulder.pivotTarget = new Vector3(0, 0.25, 0);
+      shoulder.axisSelf = new Vector3(0, 1, 0);
+      shoulder.axisTarget = new Vector3(0, 1, 0);
+      shoulder.setLimit(-2.45, 2.45, 0.11, 0.2);
+
+      scene.addChild(upper);
+
+      /* 前臂 */
+      const fore = new Object3D();
+      fore.x = upperLen + foreLen * 0.5;
+      fore.y = 0.5;
+      const fMr = fore.addComponent(MeshRenderer);
+      fMr.geometry = new BoxGeometry(foreLen, 0.12, 0.12);
+      fMr.material = new LitMaterial();
+      fMr.material.baseColor = new Color(0.22, 0.62, 0.82, 1);
+      fMr.material.metallic = 0.4;
+      fMr.material.roughness = 0.38;
+      const fRb = fore.addComponent(Rigidbody);
+      fRb.shape = CollisionShapeUtil.createBoxShape(fore);
+      fRb.mass = 1.45;
+      fRb.damping = [0.22, 0.32];
+
+      const elbow = fore.addComponent(HingeConstraint);
+      elbowHc = elbow;
+      elbow.targetRigidbody = uRb;
+      elbow.pivotSelf = new Vector3(-foreLen * 0.5, 0, 0);
+      elbow.pivotTarget = new Vector3(upperLen * 0.5, 0, 0);
+      elbow.axisSelf = new Vector3(0, 0, 1);
+      elbow.axisTarget = new Vector3(0, 0, 1);
+      elbow.setLimit(-0.1, 2.5, 0.1, 0.18);
+
+      scene.addChild(fore);
+
+      /* 手掌（腕） */
+      const palm = new Object3D();
+      palm.x = palmCx;
+      palm.y = 0.5;
+      const pMr = palm.addComponent(MeshRenderer);
+      pMr.geometry = new BoxGeometry(palmX, palmY, palmZ);
+      pMr.material = new LitMaterial();
+      pMr.material.baseColor = new Color(0.32, 0.33, 0.36, 1);
+      pMr.material.metallic = 0.72;
+      pMr.material.roughness = 0.28;
+      const pRb = palm.addComponent(Rigidbody);
+      pRb.shape = CollisionShapeUtil.createBoxShape(palm);
+      pRb.mass = 0.38;
+      pRb.damping = [0.35, 0.45];
+
+      const wrist = palm.addComponent(HingeConstraint);
+      wristHc = wrist;
+      wrist.targetRigidbody = fRb;
+      wrist.pivotSelf = new Vector3(-palmX * 0.5, 0, 0);
+      wrist.pivotTarget = new Vector3(foreLen * 0.5, 0, 0);
+      wrist.axisSelf = new Vector3(0, 1, 0);
+      wrist.axisTarget = new Vector3(0, 1, 0);
+      wrist.setLimit(-1.55, 1.55, 0.12, 0.2);
+
+      scene.addChild(palm);
+
+      /* 五根细长手指：沿掌宽（Z）均布，绕 Y 轴向掌内弯折 */
+      const fThinX = 0.018;
+      const fLenY = 0.082;
+      const fThinZ = 0.02;
+      const fingerZLocal = [-0.078, -0.039, 0, 0.039, 0.078];
+      const fingerGray = [
+        new Color(0.58, 0.59, 0.62, 1),
+        new Color(0.54, 0.55, 0.58, 1),
+        new Color(0.5, 0.51, 0.54, 1),
+        new Color(0.54, 0.55, 0.58, 1),
+        new Color(0.58, 0.59, 0.62, 1),
+      ];
+      for (let fi = 0; fi < 5; fi++) {
+        const zl = fingerZLocal[fi];
+        const finger = new Object3D();
+        finger.x = palmCx + palmX * 0.5 + fThinX * 0.5;
+        finger.y = 0.5;
+        finger.z = zl;
+        const fMr = finger.addComponent(MeshRenderer);
+        fMr.geometry = new BoxGeometry(fThinX, fLenY, fThinZ);
+        fMr.material = new LitMaterial();
+        fMr.material.baseColor = fingerGray[fi];
+        fMr.material.metallic = 0.78;
+        fMr.material.roughness = 0.2;
+        const fRb = finger.addComponent(Rigidbody);
+        fRb.shape = CollisionShapeUtil.createBoxShape(finger);
+        fRb.mass = 0.042;
+        fRb.damping = [0.44, 0.52];
+        const h = finger.addComponent(HingeConstraint);
+        h.targetRigidbody = pRb;
+        h.pivotSelf = new Vector3(-fThinX * 0.5, 0, 0);
+        h.pivotTarget = new Vector3(palmX * 0.5 - 0.01, 0, zl);
+        h.axisSelf = new Vector3(0, 1, 0);
+        h.axisTarget = new Vector3(0, 1, 0);
+        h.setLimit(0.02, 1.05, 0.13, 0.2);
+        scene.addChild(finger);
+      }
 
       const view = new View3D();
       view.scene = scene;
       view.camera = camera;
       Engine3D.startRenderView(view);
+
+      await Promise.all([shoulder.wait(), elbow.wait(), wrist.wait()]);
+      const btn = document.getElementById("btnSwing");
+      const hint = document.getElementById("swingHint");
+      btn.disabled = false;
+      hint.textContent = "就绪：点击播放拟人摆动（肩/肘/腕马达），再点停止。";
+
+      btn.addEventListener("click", () => {
+        armSwingOn = !armSwingOn;
+        if (armSwingOn) {
+          btn.textContent = "■ 停止";
+          btn.classList.add("stop-mode");
+        } else {
+          btn.textContent = "▶ 播放摆动";
+          btn.classList.remove("stop-mode");
+          shoulderHc.enableAngularMotor(false, 0, 0);
+          elbowHc.enableAngularMotor(false, 0, 0);
+          wristHc.enableAngularMotor(false, 0, 0);
+        }
+      });
     }
 
     main().catch(console.error);
   </script>
-  <p style="position:absolute;bottom:6px;left:8px;font-size:10px;color:#8b9cb3;margin:0">
-    需 <code>npm run build:physics</code> + 仓库根目录 HTTP 访问。
+  <p style="position:absolute;bottom:6px;left:8px;right:220px;font-size:10px;color:#8b9cb3;margin:0">
+    核心与物理均自 <strong>unpkg</strong> 加载。请用 HTTP 服务打开（localhost / HTTPS），勿用 <code>file://</code>。
   </p>
 </body>
 </html>

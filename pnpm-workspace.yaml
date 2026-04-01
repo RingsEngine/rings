@@ -1,0 +1,4 @@
+# 与 package.json 中 npm workspaces 对齐，避免 pnpm 将 @rings-webgpu/ammo 误解析为 git 依赖
+packages:
+  - "packages/ammo"
+  - "packages/physics"

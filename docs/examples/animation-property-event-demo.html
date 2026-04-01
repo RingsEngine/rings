@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings — 动画：PropertyAnimationEvent（COMPLETE）</title>
+  <style>
+    html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
+    body { position: relative; font-family: system-ui, "Segoe UI", sans-serif; }
+    #canvas { display: block; width: 100%; height: 100%; }
+    .hud {
+      position: absolute; left: 8px; top: 8px; right: 280px; pointer-events: none;
+      font-size: 11px; line-height: 1.45; color: #e6edf3; text-shadow: 0 1px 3px #000;
+      font-family: ui-monospace, monospace;
+    }
+    .controls {
+      position: absolute; top: 0; right: 0; bottom: 0; width: 260px; padding: 10px;
+      overflow: auto; background: rgba(15, 20, 25, 0.92); color: #e6edf3;
+      font-size: 0.72rem; border-left: 1px solid #2d3a4d;
+    }
+    .controls p { margin: 0; color: #8b9cb3; line-height: 1.45; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" style="width: 100%; height: 100%;"></canvas>
+  <div class="hud" id="hud"></div>
+  <aside class="controls">
+    <p>
+      单段 <strong>Clamp</strong> 剪辑（不循环），播完后触发 <code>PropertyAnimationEvent.COMPLETE</code>。打开开发者工具查看控制台。
+    </p>
+  </aside>
+  <script type="module">
+    import {
+      Engine3D, Scene3D, Object3D, Camera3D, View3D, Color,
+      LitMaterial, BoxGeometry, MeshRenderer,
+      PropertyAnimation, PropertyAnimClip, WrapMode,
+      PropertyAnimationEvent,
+      AtmosphericComponent, DirectLight, HoverCameraController,
+    } from 'https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js';
+
+    function makeClampOnceJson() {
+      return {
+        AnimationClip: {
+          m_Name: 'OnceMove',
+          m_AnimationClipSettings: { m_LoopTime: false },
+          m_WrapMode: WrapMode.Clamp,
+          m_SampleRate: 60,
+          m_EditorCurves: {
+            '0': {
+              attribute: 'm_LocalPosition.x',
+              path: '',
+              curve: {
+                m_PreInfinity: 2,
+                m_PostInfinity: 2,
+                m_RotationOrder: 0,
+                m_Curve: {
+                  '0': { serializedVersion: '2', time: 0, value: 0, inSlope: 0, outSlope: 0, tangentMode: 0 },
+                  '1': { serializedVersion: '2', time: 1.2, value: 0.8, inSlope: 0, outSlope: 0, tangentMode: 0 },
+                },
+              },
+            },
+          },
+        },
+      };
+    }
+
+    async function main() {
+      const canvas = document.getElementById('canvas');
+      const hud = document.getElementById('hud');
+      if (!canvas) return;
+      try {
+        await Engine3D.init({ canvasConfig: { canvas } });
+      } catch (e) {
+        document.body.innerHTML =
+          '<p style="padding:1rem;font-family:sans-serif">WebGPU 初始化失败。</p>';
+        console.error(e);
+        return;
+      }
+
+      const scene = new Scene3D();
+      scene.addComponent(AtmosphericComponent);
+
+      const camObj = new Object3D();
+      const camera = camObj.addComponent(Camera3D);
+      camera.perspective(55, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 200);
+      camObj.addComponent(HoverCameraController).setCamera(4, -6, 3);
+      scene.addChild(camObj);
+
+      const sun = new Object3D();
+      const dl = sun.addComponent(DirectLight);
+      dl.lightColor = new Color(1, 1, 1, 1);
+      dl.intensity = 1.1;
+      scene.addChild(sun);
+
+      const box = new Object3D();
+      box.y = 0.5;
+      const mr = box.addComponent(MeshRenderer);
+      mr.geometry = new BoxGeometry(0.5, 0.5, 0.5);
+      mr.material = new LitMaterial();
+      mr.material.baseColor = new Color(0.35, 0.85, 0.45, 1);
+      scene.addChild(box);
+
+      const prop = box.addComponent(PropertyAnimation);
+      let completeFired = false;
+      prop.eventDispatcher.addEventListener(PropertyAnimationEvent.COMPLETE, (e) => {
+        console.log('[PropertyAnimation] COMPLETE', e.animation?.currentClip?.name);
+        completeFired = true;
+        hud.textContent = 'COMPLETE 已触发（见控制台）';
+      });
+
+      const clip = new PropertyAnimClip();
+      clip.parse(makeClampOnceJson());
+      prop.appendClip(clip);
+      prop.autoPlay = true;
+
+      const view = new View3D();
+      view.scene = scene;
+      view.camera = camera;
+      Engine3D.startRenderView(view);
+
+      window.addEventListener('resize', () => {
+        camera.perspective(55, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 200);
+      });
+
+      function tick() {
+        if (!completeFired) hud.textContent = '播放 OnceMove（Clamp）…';
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+    main();
+  </script>
+</body>
+</html>
