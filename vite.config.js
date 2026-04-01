@@ -3,6 +3,9 @@ import { defineConfig } from "vite";
 import { readFile, writeFile, readdir, lstat } from "fs/promises";
 import { resolve, parse } from "path";
 export default defineConfig((option) => ({
+  // 库产物内 Worker 等资源必须用相对路径；默认 base "/" 会生成 "/assets/xxx.js"，
+  // 使用方打包时会误解析成其项目的 public/assets，导致 Rollup 报找不到入口。
+  base: option.command === "build" ? "./" : "/",
   server: {
     host: "0.0.0.0",
     port: 8000,

@@ -593,6 +593,10 @@
       蒙皮网格由 &lt;code&gt;SkinnedMeshRenderer2&lt;/code&gt; 读取骨骼矩阵。程序化 &lt;code&gt;SkeletonAnimationClip&lt;/code&gt; +
       &lt;code&gt;SkeletonAnimationComponent&lt;/code&gt; 的写法见本仓库其它示例（手写 buffer 管线）。
     &lt;/p&gt;
+    &lt;p style="margin-top:8px"&gt;
+      若 glTF 单位很小，示例会对根节点放大并对 &lt;code&gt;BoundUtil.genMeshBounds&lt;/code&gt; 结果做 &lt;code&gt;focusByBounds&lt;/code&gt;，
+      避免相机仍在原点附近、视距过近而「在模型内部」或模型只占亚像素。
+    &lt;/p&gt;
     &lt;button type="button" id="btnPlay" disabled&gt;播放骨骼动画&lt;/button&gt;
   &lt;/aside&gt;
   &lt;script type="module"&gt;
@@ -601,7 +605,28 @@
       LitMaterial, PlaneGeometry, MeshRenderer,
       SkinnedMeshRenderer2, AnimatorComponent,
       AtmosphericComponent, DirectLight, HoverCameraController,
-    } from 'https://unpkg.com/@rings-webgpu/core@1.0.52/dist/rings.es.js';
+      BoundUtil,
+    } from 'https://unpkg.com/@rings-webgpu/core@1.0.55/dist/rings.es.js';
+
+    /** glTF 常为真实比例，整体偏小；放大后需按包围盒拉远相机，否则会「在模型肚子里」看不到。 */
+    const MODEL_ROOT_SCALE = 100;
+
+    function frameSkinnedModel(hover, root) {
+      const bound = BoundUtil.genMeshBounds(root);
+      const sx = bound.size.x;
+      const sy = bound.size.y;
+      const sz = bound.size.z;
+      if (sx &lt; 1e-8 &amp;&amp; sy &lt; 1e-8 &amp;&amp; sz &lt; 1e-8) return;
+
+      hover.focusByBounds(root);
+      const ex = bound.extents.x;
+      const ey = bound.extents.y;
+      const ez = bound.extents.z;
+      const radius = Math.sqrt(ex * ex + ey * ey + ez * ez);
+      const dist = Math.max(radius * 2.75, 4);
+      hover.distance = dist;
+      hover.maxDistance = Math.max(dist * 6, 800);
+    }
 
     const GLB_URL =
       'https://cdn.jsdelivr.net/gh/RingsEngine/rings-resource@resources-0.0.2/glb/eva_unit_01_rigged.glb';
@@ -621,26 +646,54 @@
       }
 
       const scene = new Scene3D();
-      scene.addComponent(AtmosphericComponent);
+      const atm = scene.addComponent(AtmosphericComponent);
+      atm.sunBrightness = 1.65;
+      atm.sunRadiance = 22;
 
       const camObj = new Object3D();
       const camera = camObj.addComponent(Camera3D);
-      camera.perspective(50, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.05, 500);
-      camObj.addComponent(HoverCameraController).setCamera(4.2, -6.5, 2.2);
+      camera.perspective(50, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.05, 5000);
+      const hover = camObj.addComponent(HoverCameraController);
+      hover.setCamera(22, -12, 80);
       scene.addChild(camObj);
 
       const sun = new Object3D();
       const dl = sun.addComponent(DirectLight);
       dl.lightColor = new Color(1, 0.98, 0.95, 1);
-      dl.intensity = 2.0;
+      dl.intensity = 14.8;
       dl.castShadow = true;
       sun.transform.rotationX = -50;
       sun.transform.rotationY = 40;
       scene.addChild(sun);
 
+      /* —— 主光 + 补光 + 轮廓光 —— */
+      const key = new Object3D();
+      key.rotationX = 52;
+      key.rotationY = -38;
+      const keyL = key.addComponent(DirectLight);
+      keyL.intensity = 2.35;
+      keyL.lightColor = new Color(1, 0.97, 0.92, 1);
+      scene.addChild(key);
+
+      const fill = new Object3D();
+      fill.rotationX = 18;
+      fill.rotationY = 140;
+      const fillL = fill.addComponent(DirectLight);
+      fillL.intensity = 0.72;
+      fillL.lightColor = new Color(0.78, 0.86, 1, 1);
+      scene.addChild(fill);
+
+      const rim = new Object3D();
+      rim.rotationX = 12;
+      rim.rotationY = 200;
+      const rimL = rim.addComponent(DirectLight);
+      rimL.intensity = 0.55;
+      rimL.lightColor = new Color(0.95, 0.82, 1, 1);
+      scene.addChild(rim);
+
       const ground = new Object3D();
       const gr = ground.addComponent(MeshRenderer);
-      gr.geometry = new PlaneGeometry(24, 24);
+      gr.geometry = new PlaneGeometry(400, 400);
       gr.material = new LitMaterial();
       gr.material.baseColor = new Color(0.16, 0.18, 0.22, 1);
       gr.receiveShadow = true;
@@ -656,7 +709,11 @@
 
       try {
         const root = await Engine3D.res.loadGltf(GLB_URL);
+        root.transform.scaleX = MODEL_ROOT_SCALE;
+        root.transform.scaleY = MODEL_ROOT_SCALE;
+        root.transform.scaleZ = MODEL_ROOT_SCALE;
         scene.addChild(root);
+        frameSkinnedModel(hover, root);
 
         root.traverse((child) =&gt; {
           const sm = child.getComponent(SkinnedMeshRenderer2);
@@ -667,7 +724,6 @@
         });
 
         const animators = root.getComponentsInChild(AnimatorComponent);
-        console.log(animators,6666666)
         const ac = animators.find((a) =&gt; a.clips &amp;&amp; a.clips.length);
         if (ac) {
           animator = ac;
@@ -697,7 +753,7 @@
       Engine3D.startRenderView(view);
 
       window.addEventListener('resize', () =&gt; {
-        camera.perspective(50, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.05, 500);
+        camera.perspective(50, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.05, 5000);
       });
 
       function tick() {

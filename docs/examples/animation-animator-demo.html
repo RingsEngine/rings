@@ -93,21 +93,15 @@
 
       try {
         const root = await Engine3D.res.loadGltf(GLB);
-        console.log(root,1111111)
-        console.log(GLB,5555555)
         scene.addChild(root);
         let animator = root.getComponentsInChild(AnimatorComponent);
-        console.log(animator,4444444)
-
         root.traverse((child) => {
-          console.log(child,3333333)
           const sm = child.getComponent(SkinnedMeshRenderer2);
           if (sm) {
             sm.castShadow = true;
             sm.receiveShadow = true;
           }
           const ac = child.getComponent(AnimatorComponent);
-          console.log(ac,2222222)
           if (ac && ac.clips && ac.clips.length && !animator) {
             animator = ac;
             clipNames = ac.clips.map((c) => c.clipName);
