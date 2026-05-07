@@ -119,21 +119,15 @@
 
       try {
         const root = await Engine3D.res.loadGltf(GLB);
-        console.log(root,1111111)
-        console.log(GLB,5555555)
         scene.addChild(root);
         let animator = root.getComponentsInChild(AnimatorComponent);
-        console.log(animator,4444444)
-
         root.traverse((child) =&gt; {
-          console.log(child,3333333)
           const sm = child.getComponent(SkinnedMeshRenderer2);
           if (sm) {
             sm.castShadow = true;
             sm.receiveShadow = true;
           }
           const ac = child.getComponent(AnimatorComponent);
-          console.log(ac,2222222)
           if (ac &amp;&amp; ac.clips &amp;&amp; ac.clips.length &amp;&amp; !animator) {
             animator = ac;
             clipNames = ac.clips.map((c) =&gt; c.clipName);
@@ -215,7 +209,7 @@
     <iframe src="examples/animation-property-demo.html" title="Rings 动画：PropertyAnimation / PropertyAnimClip" style="width: 100%; min-height: 420px; border: none; display: block;"></iframe>
   </div>
   <div class="rings-demo-code" style="background: #1e293b;">
-    <pre style="margin: 0; padding: 14px; font-size: 11px; line-height: 1.5; color: #e2e8f0; white-space: pre-wrap; word-break: break-all;"><code>&lt;!DOCTYPE html&gt;
+    <pre style="margin: 0; padding: 14px; font-size: 11px; line-height: 1.5; color: #e2e8f0; white-space: pre-wrap; word-break: break-all;"><code>&lt;!-- &lt;!DOCTYPE html&gt;
 &lt;html lang="zh-CN"&gt;
 &lt;head&gt;
   &lt;meta charset="UTF-8" /&gt;
@@ -360,7 +354,7 @@
     main();
   &lt;/script&gt;
 &lt;/body&gt;
-&lt;/html&gt;
+&lt;/html&gt; --&gt;
 </code></pre>
   </div>
 </div>
@@ -389,7 +383,7 @@
     <iframe src="examples/animation-property-event-demo.html" title="Rings 动画：PropertyAnimationEvent（COMPLETE）" style="width: 100%; min-height: 420px; border: none; display: block;"></iframe>
   </div>
   <div class="rings-demo-code" style="background: #1e293b;">
-    <pre style="margin: 0; padding: 14px; font-size: 11px; line-height: 1.5; color: #e2e8f0; white-space: pre-wrap; word-break: break-all;"><code>&lt;!DOCTYPE html&gt;
+    <pre style="margin: 0; padding: 14px; font-size: 11px; line-height: 1.5; color: #e2e8f0; white-space: pre-wrap; word-break: break-all;"><code>&lt;!-- &lt;!DOCTYPE html&gt;
 &lt;html lang="zh-CN"&gt;
 &lt;head&gt;
   &lt;meta charset="UTF-8" /&gt;
@@ -522,7 +516,7 @@
     main();
   &lt;/script&gt;
 &lt;/body&gt;
-&lt;/html&gt;
+&lt;/html&gt; --&gt;
 </code></pre>
   </div>
 </div>
@@ -557,6 +551,22 @@
   &lt;meta charset="UTF-8" /&gt;
   &lt;meta name="viewport" content="width=device-width, initial-scale=1.0" /&gt;
   &lt;title&gt;Rings — 动画：glTF 骨骼动画（eva_unit_01_rigged.glb）&lt;/title&gt;
+  &lt;!--
+    引擎入口说明（排查「本地源码不显示、CDN 能显示」时必看）：
+
+    1) @orillusion/core 与本仓库 Rings（npm 包名 @rings-webgpu/core）是不同项目，API 名字可能相似但实现不一致。
+       若要用 CDN 对比 Rings，请使用：
+       https://unpkg.com/@rings-webgpu/core@1.0.56/dist/rings.es.js
+       不要用 Orillusion 包来推断 Rings 行为。
+
+    2) 使用 Rings 源码时，浏览器无法直接执行 TypeScript，必须通过 Vite 编译依赖链：
+       在仓库根目录执行 npm run dev，用例如 http://localhost:8000/docs/examples/animation-skeleton-demo.html 打开。
+       下面 import 使用「站点根绝对路径」/src/index.ts，避免 iframe / 相对路径算错。
+       切勿用 file:// 打开本 HTML，也不要用不经过 Vite 的纯静态服务器，否则会加载失败或引擎不完整。
+
+    3) Rings 蒙皮依赖 AnimatorComponent 内部骨骼节点挂在挂 Animator 的 Object3D 下（见源码 AnimatorComponent.buildSkeletonPose）；
+       若使用未含该修复的旧 dist，可能出现缩放根节点后模型不可见。
+  --&gt;
   &lt;style&gt;
     html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
     body { position: relative; font-family: system-ui, "Segoe UI", sans-serif; }
@@ -588,14 +598,11 @@
   &lt;aside class="controls"&gt;
     &lt;h3&gt;glTF 骨骼动画&lt;/h3&gt;
     &lt;p&gt;
-      使用 CDN 上的 &lt;code&gt;eva_unit_01_rigged.glb&lt;/code&gt;（&lt;code&gt;resources-0.0.2&lt;/code&gt;）。&lt;code&gt;loadGltf&lt;/code&gt; 会为带蒙皮的节点挂上
-      &lt;code&gt;AnimatorComponent&lt;/code&gt;，并将 glTF 动画解析为 &lt;code&gt;PropertyAnimationClip&lt;/code&gt;；
-      蒙皮网格由 &lt;code&gt;SkinnedMeshRenderer2&lt;/code&gt; 读取骨骼矩阵。程序化 &lt;code&gt;SkeletonAnimationClip&lt;/code&gt; +
-      &lt;code&gt;SkeletonAnimationComponent&lt;/code&gt; 的写法见本仓库其它示例（手写 buffer 管线）。
+      CDN &lt;code&gt;eva_unit_01_rigged.glb&lt;/code&gt;。&lt;strong&gt;本地联调 Rings 源码&lt;/strong&gt;须 &lt;code&gt;npm run dev&lt;/code&gt; 且用 Vite 地址打开本页（见 HTML 注释）。
+      &lt;code&gt;@orillusion/core&lt;/code&gt; 与 Rings 不是同一引擎；对比请用 &lt;code&gt;@rings-webgpu/core&lt;/code&gt;。
     &lt;/p&gt;
     &lt;p style="margin-top:8px"&gt;
-      若 glTF 单位很小，示例会对根节点放大并对 &lt;code&gt;BoundUtil.genMeshBounds&lt;/code&gt; 结果做 &lt;code&gt;focusByBounds&lt;/code&gt;，
-      避免相机仍在原点附近、视距过近而「在模型内部」或模型只占亚像素。
+      &lt;code&gt;BoundUtil.genMeshBounds&lt;/code&gt; + &lt;code&gt;focusByBounds&lt;/code&gt; 用于取景；根节点缩放后骨骼须随挂点变换（见 &lt;code&gt;AnimatorComponent&lt;/code&gt;）。
     &lt;/p&gt;
     &lt;button type="button" id="btnPlay" disabled&gt;播放骨骼动画&lt;/button&gt;
   &lt;/aside&gt;
@@ -606,9 +613,10 @@
       SkinnedMeshRenderer2, AnimatorComponent,
       AtmosphericComponent, DirectLight, HoverCameraController,
       BoundUtil,
-    } from 'https://unpkg.com/@rings-webgpu/core@1.0.55/dist/rings.es.js';
+    } from '/src/index.ts';
+    // 无 Vite 时改用（例如文档站纯静态托管）：
+    // } from 'https://unpkg.com/@rings-webgpu/core@1.0.56/dist/rings.es.js';
 
-    /** glTF 常为真实比例，整体偏小；放大后需按包围盒拉远相机，否则会「在模型肚子里」看不到。 */
     const MODEL_ROOT_SCALE = 100;
 
     function frameSkinnedModel(hover, root) {
@@ -647,8 +655,8 @@
 
       const scene = new Scene3D();
       const atm = scene.addComponent(AtmosphericComponent);
-      atm.sunBrightness = 1.65;
-      atm.sunRadiance = 22;
+      atm.sunBrightness = 1.22;
+      atm.sunRadiance = 14;
 
       const camObj = new Object3D();
       const camera = camObj.addComponent(Camera3D);
@@ -660,36 +668,11 @@
       const sun = new Object3D();
       const dl = sun.addComponent(DirectLight);
       dl.lightColor = new Color(1, 0.98, 0.95, 1);
-      dl.intensity = 14.8;
+      dl.intensity = 4.8;
       dl.castShadow = true;
       sun.transform.rotationX = -50;
       sun.transform.rotationY = 40;
       scene.addChild(sun);
-
-      /* —— 主光 + 补光 + 轮廓光 —— */
-      const key = new Object3D();
-      key.rotationX = 52;
-      key.rotationY = -38;
-      const keyL = key.addComponent(DirectLight);
-      keyL.intensity = 2.35;
-      keyL.lightColor = new Color(1, 0.97, 0.92, 1);
-      scene.addChild(key);
-
-      const fill = new Object3D();
-      fill.rotationX = 18;
-      fill.rotationY = 140;
-      const fillL = fill.addComponent(DirectLight);
-      fillL.intensity = 0.72;
-      fillL.lightColor = new Color(0.78, 0.86, 1, 1);
-      scene.addChild(fill);
-
-      const rim = new Object3D();
-      rim.rotationX = 12;
-      rim.rotationY = 200;
-      const rimL = rim.addComponent(DirectLight);
-      rimL.intensity = 0.55;
-      rimL.lightColor = new Color(0.95, 0.82, 1, 1);
-      scene.addChild(rim);
 
       const ground = new Object3D();
       const gr = ground.addComponent(MeshRenderer);
@@ -795,7 +778,7 @@
     <iframe src="examples/animation-morph-target-blender-demo.html" title="Rings 动画：MorphTargetBlender" style="width: 100%; min-height: 420px; border: none; display: block;"></iframe>
   </div>
   <div class="rings-demo-code" style="background: #1e293b;">
-    <pre style="margin: 0; padding: 14px; font-size: 11px; line-height: 1.5; color: #e2e8f0; white-space: pre-wrap; word-break: break-all;"><code>&lt;!DOCTYPE html&gt;
+    <pre style="margin: 0; padding: 14px; font-size: 11px; line-height: 1.5; color: #e2e8f0; white-space: pre-wrap; word-break: break-all;"><code>&lt;!-- &lt;!DOCTYPE html&gt;
 &lt;html lang="zh-CN"&gt;
 &lt;head&gt;
   &lt;meta charset="UTF-8" /&gt;
@@ -938,7 +921,7 @@
     main();
   &lt;/script&gt;
 &lt;/body&gt;
-&lt;/html&gt;
+&lt;/html&gt; --&gt;
 </code></pre>
   </div>
 </div>

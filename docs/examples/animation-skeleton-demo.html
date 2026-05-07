@@ -48,15 +48,18 @@
   </aside>
   <script type="module">
     import {
-      Engine3D, Scene3D, Object3D, Camera3D, View3D, Color,
-      LitMaterial, PlaneGeometry, MeshRenderer,
-      SkinnedMeshRenderer2, AnimatorComponent,
-      AtmosphericComponent, DirectLight, HoverCameraController,
-      BoundUtil,
-    } from 'https://unpkg.com/@rings-webgpu/core@1.0.55/dist/rings.es.js';
-
+      AnimatorComponent,BoundUtil,Color,
+      Scene3D, Object3D, Engine3D, Camera3D, View3D, MeshRenderer, AtmosphericComponent, DirectLight, HoverCameraController,
+      
+      LitMaterial,PlaneGeometry,
+    } from '../../src/index.ts';
+  //   import {Color,
+  //     Scene3D, Object3D, Engine3D, Camera3D, View3D, MeshRenderer, AtmosphericComponent, DirectLight, HoverCameraController,
+      
+  //     LitMaterial,PlaneGeometry,
+  // } from 'https://unpkg.com/@orillusion/core/dist/orillusion.es.js'
     /** glTF 常为真实比例，整体偏小；放大后需按包围盒拉远相机，否则会「在模型肚子里」看不到。 */
-    const MODEL_ROOT_SCALE = 1000000;
+    const MODEL_ROOT_SCALE = 10;
 
     function frameSkinnedModel(hover, root) {
       const bound = BoundUtil.genMeshBounds(root);
@@ -76,7 +79,7 @@
     }
 
     const GLB_URL =
-      'https://cdn.jsdelivr.net/gh/RingsEngine/rings-resource@resources-0.0.3/glb/white_tiger_rigged_animated.glb';
+      'https://cdn.orillusion.com/gltfs/glb/Soldier.glb';
 
     async function main() {
       const canvas = document.getElementById('canvas');
@@ -159,40 +162,42 @@
         root.transform.scaleX = MODEL_ROOT_SCALE;
         root.transform.scaleY = MODEL_ROOT_SCALE;
         root.transform.scaleZ = MODEL_ROOT_SCALE;
+
         scene.addChild(root);
-        frameSkinnedModel(hover, root);
+        // scene.addChild(root1);
+        // frameSkinnedModel(hover, root);
 
-        root.traverse((child) => {
-          const sm = child.getComponent(SkinnedMeshRenderer2);
-          if (sm) {
-            sm.castShadow = true;
-            sm.receiveShadow = true;
-          }
-        });
+        // root.traverse((child) => {
+        //   const sm = child.getComponent(SkinnedMeshRenderer2);
+        //   if (sm) {
+        //     sm.castShadow = true;
+        //     sm.receiveShadow = true;
+        //   }
+        // });
 
-        const animators = root.getComponentsInChild(AnimatorComponent);
-        const ac = animators.find((a) => a.clips && a.clips.length);
-        if (ac) {
-          animator = ac;
-          clipNames = ac.clips.map((c) => c.clipName);
-          if (btnPlay) btnPlay.disabled = clipNames.length === 0;
-        }
+        // const animators = root.getComponentsInChild(AnimatorComponent);
+        // const ac = animators.find((a) => a.clips && a.clips.length);
+        // if (ac) {
+        //   animator = ac;
+        //   clipNames = ac.clips.map((c) => c.clipName);
+        //   if (btnPlay) btnPlay.disabled = clipNames.length === 0;
+        // }
       } catch (err) {
         console.error(err);
         hud.textContent =
           'GLB 加载失败（网络/CORS）。请联网并在 localhost 或 HTTPS 下打开。';
       }
 
-      function playSkeletonAnim() {
-        if (!animator || !clipNames.length) return;
-        const name = clipNames[0];
-        playingName = name;
-        animator.playAnim(name, 0, 1);
-      }
+      // function playSkeletonAnim() {
+      //   if (!animator || !clipNames.length) return;
+      //   const name = clipNames[0];
+      //   playingName = name;
+      //   animator.playAnim(name, 0, 1);
+      // }
 
-      btnPlay?.addEventListener('click', () => {
-        playSkeletonAnim();
-      });
+      // btnPlay?.addEventListener('click', () => {
+      //   playSkeletonAnim();
+      // });
 
       const view = new View3D();
       view.scene = scene;

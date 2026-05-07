@@ -20,7 +20,7 @@ import { PropertyAnimationClip } from "../../math/AnimationCurveClip";
 import { RegisterComponent } from "../../util/SerializeDecoration";
 import { ComponentBase } from "../ComponentBase";
 /* eslint-disable */
-@RegisterComponent(AnimatorComponent, "AnimatorComponent")
+@RegisterComponent(AnimatorComponent, 'AnimatorComponent')
 export class AnimatorComponent extends ComponentBase {
   public timeScale: number = 1.0;
   public jointMatrixIndexTableBuffer: StorageGPUBuffer;
@@ -28,7 +28,7 @@ export class AnimatorComponent extends ComponentBase {
   protected inverseBindMatrices: FloatArray[];
   protected _avatar: PrefabAvatarData;
   protected _rendererList: SkinnedMeshRenderer2[];
-  protected propertyCache: Map<RenderNode, { [name: string]: any }>;
+  protected propertyCache: Map<RenderNode, { [name: string]: any }>
 
   protected _clips: PropertyAnimationClip[];
   protected _clipsState: PropertyAnimationClipState[];
@@ -56,8 +56,7 @@ export class AnimatorComponent extends ComponentBase {
     this._clips = [];
     this._clipsState = [];
 
-    this._rendererList =
-      this.object3D.getComponentsInChild(SkinnedMeshRenderer2);
+    this._rendererList = this.object3D.getComponentsInChild(SkinnedMeshRenderer2);
     let mrs = this.object3D.getComponentsInChild(MeshRenderer);
     for (let mr of mrs) {
       let o = mr as any;
@@ -65,19 +64,18 @@ export class AnimatorComponent extends ComponentBase {
       this._rendererList.push(o);
     }
     for (const renderer of this._rendererList) {
-      let hasMorphTarget = RendererMaskUtil.hasMask(
-        renderer.rendererMask,
-        RendererMask.MorphTarget
-      );
+      let hasMorphTarget = RendererMaskUtil.hasMask(renderer.rendererMask, RendererMask.MorphTarget);
       if (hasMorphTarget) {
-        renderer.selfCloneMaterials("MORPH_TARGET_UUID");
+        renderer.selfCloneMaterials('MORPH_TARGET_UUID');
       }
     }
   }
 
-  public start(): void {}
+  public start(): void {
+  }
 
-  private debug() {}
+  private debug() {
+  }
 
   public playAnim(anim: string, time: number = 0, speed: number = 1) {
     let clipState = this.getAnimationClipState(anim);
@@ -107,10 +105,7 @@ export class AnimatorComponent extends ComponentBase {
       return;
     }
 
-    if (
-      this._currentSkeletonClip &&
-      this._currentSkeletonClip.clip.clipName === anim
-    ) {
+    if (this._currentSkeletonClip && this._currentSkeletonClip.clip.clipName === anim) {
       return;
     }
 
@@ -119,28 +114,20 @@ export class AnimatorComponent extends ComponentBase {
 
     if (this._crossFadeState) {
       if (this._crossFadeState.inClip) {
-        this._crossFadeState.inClip.weight = 0;
+        this._crossFadeState.inClip.weight = 0
       }
       if (this._crossFadeState.outClip) {
-        this._crossFadeState.outClip.weight = 0;
+        this._crossFadeState.outClip.weight = 0
       }
       this._crossFadeState.reset(inClip, outClip, crossTime);
     } else {
-      this._crossFadeState = new SkeletonAnimCrossFadeState(
-        inClip,
-        outClip,
-        crossTime
-      );
+      this._crossFadeState = new SkeletonAnimCrossFadeState(inClip, outClip, crossTime);
     }
 
     this._currentSkeletonClip = inClip;
   }
 
-  public playBlendShape(
-    shapeName: string,
-    time: number = 0,
-    speed: number = 1
-  ) {
+  public playBlendShape(shapeName: string, time: number = 0, speed: number = 1) {
     if (this._clipsMap.has(shapeName)) {
       this._currentBlendAnimClip = this._clipsMap.get(shapeName);
       this._blendShapeTime = time;
@@ -159,11 +146,7 @@ export class AnimatorComponent extends ComponentBase {
 
     let jointMapping = this.buildSkeletonPose();
     const jointMatrixIndexTable = new Float32Array(jointMapping);
-    this.jointMatrixIndexTableBuffer = new StorageGPUBuffer(
-      this._avatar.count,
-      0,
-      jointMatrixIndexTable
-    );
+    this.jointMatrixIndexTableBuffer = new StorageGPUBuffer(this._avatar.count, 0, jointMatrixIndexTable);
   }
 
   public get numJoint(): number {
@@ -186,11 +169,10 @@ export class AnimatorComponent extends ComponentBase {
     for (const joint of this._avatar.boneData) {
       let obj = new Object3D();
 
-      Matrix4.getEuler(Vector3.HELP_6, joint.q, true, "ZYX");
+      Matrix4.getEuler(Vector3.HELP_6, joint.q, true, 'ZYX');
       obj.localPosition = joint.t.clone();
       obj.localRotation = Vector3.HELP_6.clone();
-      obj.localScale = Vector3.ONE;
-      joint.s.clone();
+      obj.localScale = Vector3.ONE; joint.s.clone();
 
       this.skeltonPoseObject3D[joint.boneName] = obj;
       this.skeltonTPoseObject3D[joint.bonePath] = obj.clone();
@@ -198,6 +180,7 @@ export class AnimatorComponent extends ComponentBase {
       if (joint.parentBoneName && joint.parentBoneName != "") {
         this.skeltonPoseObject3D[joint.parentBoneName].addChild(obj);
       } else {
+        // this.object3D.addChild(obj);
         if (this.object3D.transform.scene3D) {
           this.object3D.transform.scene3D.addChild(obj);
         }
@@ -247,12 +230,8 @@ export class AnimatorComponent extends ComponentBase {
 
     if (this._skeletonStart) {
       this._skeletonTime += delta * this._skeletonSpeed * this.timeScale;
-      if (
-        this._currentSkeletonClip &&
-        this._currentSkeletonClip.clip.loopTime
-      ) {
-        this._skeletonTime =
-          this._skeletonTime % this._currentSkeletonClip.clip.stopTime;
+      if (this._currentSkeletonClip && this._currentSkeletonClip.clip.loopTime) {
+        this._skeletonTime = this._skeletonTime % this._currentSkeletonClip.clip.stopTime;
       }
     }
 
@@ -260,14 +239,9 @@ export class AnimatorComponent extends ComponentBase {
       this._blendShapeTime += delta * this._blendShapeSpeed;
       if (this._currentBlendAnimClip) {
         if (this._currentBlendAnimClip.loopTime && this.playBlendShapeLoop) {
-          this._blendShapeTime =
-            this._blendShapeTime % this._currentBlendAnimClip.stopTime;
+          this._blendShapeTime = this._blendShapeTime % this._currentBlendAnimClip.stopTime;
         } else {
-          this._blendShapeTime =
-            Math.min(
-              this._blendShapeTime,
-              this._currentBlendAnimClip.stopTime
-            ) - 0.0001;
+          this._blendShapeTime = Math.min(this._blendShapeTime, this._currentBlendAnimClip.stopTime) - 0.0001;
         }
       }
     }
@@ -323,18 +297,13 @@ export class AnimatorComponent extends ComponentBase {
 
   private updateMorphAnim() {
     if (this._currentBlendAnimClip && this._currentBlendAnimClip.floatCurves) {
-      if (
-        this._currentBlendAnimClip.floatCurves.size > 0 &&
-        this._rendererList
-      ) {
+      if (this._currentBlendAnimClip.floatCurves.size > 0 && this._rendererList) {
         for (const iterator of this._currentBlendAnimClip.floatCurves) {
           let key = iterator[0];
           let curve = iterator[1];
           let attributes = curve.propertys;
 
-          let x = this._currentBlendAnimClip.floatCurves
-            .get(key)
-            .getValue(this._blendShapeTime) as number;
+          let x = this._currentBlendAnimClip.floatCurves.get(key).getValue(this._blendShapeTime) as number;
           let value = x / 100;
           this.updateBlendShape(attributes, key, value);
         }
@@ -357,10 +326,11 @@ export class AnimatorComponent extends ComponentBase {
             }
             property = property[att];
           }
-          if (!property || property == renderer) continue;
+          if (!property || property == renderer)
+            continue;
 
           if (!this.propertyCache.get(renderer))
-            this.propertyCache.set(renderer, {});
+            this.propertyCache.set(renderer, {})
           this.propertyCache.get(renderer)[key] = property;
           property(value);
         }
@@ -382,68 +352,34 @@ export class AnimatorComponent extends ComponentBase {
         let obj = this.skeltonPoseObject3D[joint.boneName];
 
         if (mixClip[0].clip.useSkeletonPos) {
-          this._bonePos.copyFrom(
-            this.getPosition(
-              joint.bonePath,
-              this._skeletonTime,
-              mixClip[0].clip
-            )
-          );
+          this._bonePos.copyFrom(this.getPosition(joint.bonePath, this._skeletonTime, mixClip[0].clip));
           for (let i = 1; i < mixClip.length; i++) {
             const clipState = mixClip[i];
             if (clipState.clip.useSkeletonPos) {
-              let pos = this.getPosition(
-                joint.bonePath,
-                this._skeletonTime,
-                clipState.clip
-              );
-              Vector3.HELP_0.lerp(
-                this._bonePos,
-                pos,
-                clipState.weight / totalWeight
-              );
+              let pos = this.getPosition(joint.bonePath, this._skeletonTime, clipState.clip);
+              Vector3.HELP_0.lerp(this._bonePos, pos, clipState.weight / totalWeight);
               this._bonePos.copyFrom(Vector3.HELP_0);
             }
           }
           obj.transform.localPosition = this._bonePos;
         }
 
-        this._boneRot.copyFrom(
-          this.getRotation(joint.bonePath, this._skeletonTime, mixClip[0].clip)
-        );
+        this._boneRot.copyFrom(this.getRotation(joint.bonePath, this._skeletonTime, mixClip[0].clip));
         for (let i = 1; i < mixClip.length; i++) {
           const clipState = mixClip[i];
-          let rot = this.getRotation(
-            joint.bonePath,
-            this._skeletonTime,
-            clipState.clip
-          );
-          Quaternion.HELP_2.slerp(
-            this._boneRot,
-            rot,
-            clipState.weight / totalWeight
-          );
+          let rot = this.getRotation(joint.bonePath, this._skeletonTime, clipState.clip);
+          Quaternion.HELP_2.slerp(this._boneRot, rot, clipState.weight / totalWeight);
           this._boneRot.copyFrom(Quaternion.HELP_2);
         }
         obj.transform.localRotQuat = this._boneRot;
 
         if (mixClip[0].clip.useSkeletonScale) {
-          this._boneScale.copyFrom(
-            this.getScale(joint.bonePath, this._skeletonTime, mixClip[0].clip)
-          );
+          this._boneScale.copyFrom(this.getScale(joint.bonePath, this._skeletonTime, mixClip[0].clip));
           for (let i = 1; i < mixClip.length; i++) {
             const clipState = mixClip[i];
             if (clipState.clip.useSkeletonScale) {
-              let scale = this.getScale(
-                joint.bonePath,
-                this._skeletonTime,
-                clipState.clip
-              );
-              Vector3.HELP_0.lerp(
-                this._boneScale,
-                scale,
-                clipState.weight / totalWeight
-              );
+              let scale = this.getScale(joint.bonePath, this._skeletonTime, clipState.clip);
+              Vector3.HELP_0.lerp(this._boneScale, scale, clipState.weight / totalWeight);
               this._boneScale.copyFrom(Vector3.HELP_0);
             }
           }
@@ -453,11 +389,7 @@ export class AnimatorComponent extends ComponentBase {
     }
   }
 
-  private getPosition(
-    boneName: string,
-    time: number,
-    clip: PropertyAnimationClip = this._currentSkeletonClip.clip
-  ) {
+  private getPosition(boneName: string, time: number, clip: PropertyAnimationClip = this._currentSkeletonClip.clip) {
     if (clip.positionCurves.has(boneName)) {
       let t = clip.positionCurves.get(boneName).getValue(time) as Vector3;
       return t;
@@ -465,11 +397,7 @@ export class AnimatorComponent extends ComponentBase {
     return this.skeltonTPoseObject3D[boneName].localPosition;
   }
 
-  private getRotation(
-    boneName: string,
-    time: number,
-    clip: PropertyAnimationClip = this._currentSkeletonClip.clip
-  ) {
+  private getRotation(boneName: string, time: number, clip: PropertyAnimationClip = this._currentSkeletonClip.clip) {
     if (clip.rotationCurves.has(boneName)) {
       let v4 = clip.rotationCurves.get(boneName).getValue(time) as Vector4;
       Quaternion.HELP_0.set(v4.x, v4.y, v4.z, v4.w);
@@ -478,11 +406,7 @@ export class AnimatorComponent extends ComponentBase {
     return this.skeltonTPoseObject3D[boneName].localQuaternion;
   }
 
-  private getScale(
-    boneName: string,
-    time: number,
-    clip: PropertyAnimationClip = this._currentSkeletonClip.clip
-  ) {
+  private getScale(boneName: string, time: number, clip: PropertyAnimationClip = this._currentSkeletonClip.clip) {
     if (clip.scaleCurves.has(boneName)) {
       let x = clip.scaleCurves.get(boneName).getValue(time) as Vector3;
       return x;
@@ -490,6 +414,11 @@ export class AnimatorComponent extends ComponentBase {
     return this.skeltonTPoseObject3D[boneName].localScale;
   }
 
+  /**
+   * Gets the animation clip data object with the specified name
+   * @param name Name of animation
+   * @returns Animation clip data object
+   */
   public getAnimationClipState(name: string): PropertyAnimationClipState {
     for (let clipState of this._clipsState) {
       if (clipState.clip.clipName === name) {
@@ -530,18 +459,10 @@ class SkeletonAnimCrossFadeState {
   public outClip: PropertyAnimationClipState;
   public currentTime: number;
   public crossFadeTime: number;
-  constructor(
-    inClip: PropertyAnimationClipState,
-    outClip: PropertyAnimationClipState,
-    time: number
-  ) {
+  constructor(inClip: PropertyAnimationClipState, outClip: PropertyAnimationClipState, time: number) {
     this.reset(inClip, outClip, time);
   }
-  public reset(
-    inClip: PropertyAnimationClipState,
-    outClip: PropertyAnimationClipState,
-    time: number
-  ) {
+  public reset(inClip: PropertyAnimationClipState, outClip: PropertyAnimationClipState, time: number) {
     this.inClip = inClip;
     this.outClip = outClip;
     this.currentTime = 0;
@@ -552,10 +473,7 @@ class SkeletonAnimCrossFadeState {
       return;
     }
     this.currentTime += delta;
-    this.inClip.weight = Math.min(
-      Math.abs(this.currentTime % this.crossFadeTime) / this.crossFadeTime,
-      1.0
-    );
+    this.inClip.weight = Math.min(Math.abs(this.currentTime % this.crossFadeTime) / this.crossFadeTime, 1.0);
     this.outClip.weight = 1.0 - this.inClip.weight;
     if (Math.abs(this.currentTime) >= this.crossFadeTime) {
       this.inClip.weight = 1.0;

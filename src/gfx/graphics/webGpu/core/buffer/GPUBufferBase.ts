@@ -528,8 +528,7 @@ export class GPUBufferBase {
     this.memory.allocation(this.byteSize);
     if (data) {
       let m = this.memory.allocation_node(data.length * 4);
-      const buffer = data.buffer instanceof ArrayBuffer ? data.buffer : new Uint8Array(data.buffer).buffer;
-    m.setArrayBuffer(0, buffer as ArrayBuffer);
+      m.setArrayBuffer(0, data);
       this.apply();
     }
   }

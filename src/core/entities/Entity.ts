@@ -188,25 +188,25 @@ export class Entity extends CEventDispatcher {
 
   public waitUpdate(): void {
     if (this._dispose) {
-      if (this.transform.parent) {
-        this.transform.parent.object3D.removeChild(this);
-      }
-      this.components.forEach((v, k) => {
-        v.enable = false;
-        v.beforeDestroy();
-        v.destroy();
-      });
-      this.components.clear();
-    } else {
-      ComponentCollect.waitStartComponent.forEach((v, k) => {
-        while (v.length > 0) {
-          const element = v.shift();
-          element[`__start`]();
-          ComponentCollect.waitStartComponent.delete(element.object3D);
+        if (this.transform.parent) {
+            this.transform.parent.object3D.removeChild(this);
         }
-      });
+        this.components.forEach((v, k) => {
+            v.enable = false;
+            v.beforeDestroy();
+            v.destroy();
+        });
+        this.components.clear();
+    } else {
+        ComponentCollect.waitStartComponent.forEach((v, k) => {
+            while (v.length > 0) {
+                const element = v.shift();
+                element[`__start`]();
+                ComponentCollect.waitStartComponent.delete(element.object3D);
+            }
+        });
     }
-  }
+}
 
   public noticeComponents(key: keyof IComponent, data: any) {
     for (let item of this.components.values()) {
