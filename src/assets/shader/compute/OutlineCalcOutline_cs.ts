@@ -51,7 +51,7 @@ fn CsMain(@builtin(workgroup_id) workgroup_id: vec3<u32>, @builtin(global_invoca
     texSize = textureDimensions(gBufferTexture).xy;
     fragUV = vec2<f32>(fragCoordLow) / vec2<f32>(texSize);
 
-    lowSize = vec2<i32>(i32(outlineSetting.lowTexWidth), i32(outlineSetting,lowTexHeight));
+    lowSize = vec2<i32>(i32(outlineSetting.lowTexWidth), i32(outlineSetting.lowTexHeight));
     let scaleValue = f32(texSize.x) / f32(lowSize.x);
     fragCoord.x = i32(f32(fragCoordLow.x) * scaleValue);
     fragCoord.y = i32(f32(fragCoordLow.y) * scaleValue);

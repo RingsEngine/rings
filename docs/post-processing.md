@@ -1,5 +1,15 @@
 # 后处理效果
 
+下文共用 **一个** 可运行示例：在右侧面板用 **「效果配置」** 切换 Bloom、SSR、雾化等，并在 **「参数调节」** 中用滑条、下拉框或复选框实时改 `Engine3D.setting.render.postProcessing` 对应字段。
+
+#### 可运行示例
+
+<div class="rings-quick-demo" style="margin: 1em 0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+  <div class="rings-demo-preview" style="height: 480px; background: #0f1419;">
+    <iframe loading="lazy" src="examples/post-processing-demo.html" title="Rings 后处理演示" style="width: 100%; height: 100%; border: none; min-height: 480px; display: block;"></iframe>
+  </div>
+</div>
+
 ## 后处理基础
 
 后处理是在场景渲染完成后对图像进行的额外处理。Rings 使用多 Pass 渲染实现后处理：

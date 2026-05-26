@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings — 后处理演示</title>
+  <style>
+    html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
+    body { position: relative; font-family: system-ui, "Segoe UI", sans-serif; }
+    #canvas { display: block; width: 100% !important; height: 100% !important; }
+    .hud {
+      position: absolute; left: 8px; top: 8px; right: 300px; pointer-events: none;
+      font-size: 11px; line-height: 1.45; color: #e6edf3; text-shadow: 0 1px 3px #000;
+      font-family: ui-monospace, monospace; white-space: pre-wrap;
+    }
+    .controls {
+      position: absolute; top: 0; right: 0; bottom: 0; width: 288px; padding: 10px;
+      overflow: auto; background: rgba(15, 20, 25, 0.92); color: #e6edf3;
+      font-size: 0.72rem; border-left: 1px solid #2d3a4d;
+    }
+    .controls h3 { margin: 12px 0 8px; font-size: 0.75rem; color: #8b9cb3; font-weight: 600; }
+    .controls h3:first-child { margin-top: 0; }
+    .controls h4 { margin: 10px 0 6px; font-size: 0.7rem; color: #6e7f96; font-weight: 600; }
+    .row { margin-bottom: 8px; }
+    .row label { display: block; margin-bottom: 4px; color: #8b9cb3; }
+    .row label.chk { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+    .row select { width: 100%; padding: 6px 8px; border-radius: 4px; border: 1px solid #2d3a4d; background: #1a2332; color: #e6edf3; font-size: 0.72rem; }
+    .row input[type="range"] { width: 100%; }
+    .row .val { float: right; color: #58a6ff; }
+    .hint { margin-top: 8px; color: #8b9cb3; line-height: 1.45; font-size: 0.7rem; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div id="hud" class="hud"></div>
+  <aside class="controls" id="panel"></aside>
+
+  <script type="module">
+    import {
+      Engine3D,
+      Scene3D,
+      Object3D,
+      Camera3D,
+      View3D,
+      Color,
+      LitMaterial,
+      SphereGeometry,
+      BoxGeometry,
+      PlaneGeometry,
+      MeshRenderer,
+      AtmosphericComponent,
+      DirectLight,
+      HoverCameraController,
+      PostProcessingComponent,
+      BloomPost,
+      SSRPost,
+      OutlinePost,
+      GlobalFog,
+      GTAOPost,
+      GodRayPost,
+      TAAPost,
+      DepthOfFieldPost,
+      FXAAPost,
+      outlinePostManager,
+    } from "../../src/index.ts";
+
+    const POST_CTORS = [
+      BloomPost,
+      SSRPost,
+      OutlinePost,
+      GlobalFog,
+      GTAOPost,
+      GodRayPost,
+      TAAPost,
+      DepthOfFieldPost,
+    ];
+
+    /** @param {number} lo @param {number} hi @param {number} step */
+    function sliderVal(lo, hi, step, pct) {
+      const t = pct / 100;
+      const v = lo + (hi - lo) * t;
+      return Math.round(v / step) * step;
+    }
+    function pctFrom(lo, hi, v) {
+      if (hi === lo) return 0;
+      return Math.round(((v - lo) / (hi - lo)) * 100);
+    }
+
+    function bloomControls() {
+      const B = () => Engine3D.setting.render.postProcessing.bloom;
+      return [
+        {
+          type: "range",
+          label: "downSampleStep",
+          min: 2,
+          max: 8,
+          step: 1,
+          get: () => B().downSampleStep,
+          set: (v) => {
+            B().downSampleStep = v;
+          },
+          format: (v) => String(v),
+        },
+        {
+          type: "range",
+          label: "luminanceThreshole",
+          min: 0,
+          max: 100,
+          step: 1,
+          get: () => B().luminanceThreshole,
+          set: (v) => {
+            B().luminanceThreshole = v;
+          },
+          format: (v) => v.toFixed(2),
+          parse: (pct) => sliderVal(0, 2, 0.01, pct),
+        },
+        {
+          type: "range",
+          label: "bloomIntensity",
+          min: 0,
+          max: 100,
+          step: 1,
+          get: () => B().bloomIntensity,
+          set: (v) => {
+            B().bloomIntensity = v;
+          },
+          format: (v) => v.toFixed(2),
+          parse: (pct) => sliderVal(0, 2, 0.01, pct),
+        },
+        {
+          type: "range",
+          label: "hdr",
+          min: 0,
+          max: 100,
+          step: 1,
+          get: () => B().hdr,
+          set: (v) => {
+            B().hdr = v;
+          },
+          format: (v) => v.toFixed(2),
+          parse: (pct) => sliderVal(0, 2, 0.01, pct),
+        },
+      ];
+    }
+
+    function ssrControls() {
+      const S = () => Engine3D.setting.render.postProcessing.ssr;
+      return [
+        {
+          type: "range",
+          label: "pixelRatio",
+          min: 25,
+          max: 100,
+          step: 1,
+          get: () => S().pixelRatio,
+          set: (v) => {
+            S().pixelRatio = v;
+          },
+          format: (v) => v.toFixed(2),
+          parse: (pct) => sliderVal(0.25, 1, 0.05, pct),
+        },
+        {
+          type: "range",
+          label: "fadeEdgeRatio",
+          min: 0,
+          max: 100,
+          step: 1,
+          get: () => S().fadeEdgeRatio,
+          set: (v) => {
+            S().fadeEdgeRatio = v;
+          },
+          format: (v) => v.toFixed(2),
+          parse: (pct) => sliderVal(0, 1, 0.01, pct),
+        },
+        {
+          type: "range",
+          label: "rayMarchRatio",
+          min: 0,
+          max: 100,
+          step: 1,
+          get: () => S().rayMarchRatio,
+          set: (v) => {
+            S().rayMarchRatio = v;
+          },
+          format: (v) => v.toFixed(3),
+          parse: (pct) => sliderVal(0.01, 1, 0.01, pct),
+        },
+        {
+          type: "range",
+          label: "roughnessThreshold",
+          min: 0,
+          max: 100,
+          step: 1,
+          get: () => S().roughnessThreshold,
+          set: (v) => {
+            S().roughnessThreshold = v;
+          },
+          format: (v) => v.toFixed(2),
+          parse: (pct) => sliderVal(0, 1, 0.01, pct),
+        },
+        {
+          type: "range",
+          label: "powDotRN",
+          min: 0,
+          max: 100,
+          step: 1,
+          get: () => S().powDotRN,
+          set: (v) => {
+            S().powDotRN = v;
+          },
+          format: (v) => v.toFixed(2),
+          parse: (pct) => sliderVal(0, 1, 0.01, pct),
+        },
+        {
+          type: "checkbox",
+          label: "debug",
+          get: () => S().debug,
+          set: (v) => {
+            S().debug = v;
+          },
+        },
+      ];
+    }
+
+    const PRESETS = {
+      base: {
+        label: "后处理基础（FXAA）",
+        posts: [],
+        fxaa: true,
+        hint: "仅 FXAA；强度可在下方调节。",
+        apply() {},
+        controls(ctx) {
+          return [
+            {
+              type: "range",
+              label: "FXAA strength",
+              min: 1,
+              max: 16,
+              step: 1,
+              get: () => ctx.fxaaStrength ?? 4,
+              set: (v) => {
+                ctx.fxaaStrength = v;
+                if (ctx.fxaaPost?.postQuad?.quadShader) {
+                  ctx.fxaaPost.postQuad.quadShader.setUniform("u_strength", v);
+                }
+              },
+              format: (v) => v.toFixed(1),
+            },
+          ];
+        },
+      },
+      bloom: {
+        label: "1. 泛光 Bloom",
+        posts: [BloomPost],
+        fxaa: false,
+        hint: "高 emissive 小球；调低 luminanceThreshole 更易出泛光。",
+        apply() {
+          const B = Engine3D.setting.render.postProcessing.bloom;
+          B.downSampleStep = 5;
+          B.luminanceThreshole = 0.35;
+          B.bloomIntensity = 0.65;
+          B.hdr = 1;
+        },
+        controls(ctx) {
+          return [
+            ...bloomControls(),
+            {
+              type: "range",
+              label: "emissiveIntensity（小球）",
+              min: 0,
+              max: 100,
+              step: 1,
+              get: () => ctx.glowMat?.emissiveIntensity ?? 12,
+              set: (v) => {
+                if (ctx.glowMat) ctx.glowMat.emissiveIntensity = v;
+              },
+              format: (v) => v.toFixed(1),
+              parse: (pct) => sliderVal(0, 30, 0.5, pct),
+            },
+          ];
+        },
+      },
+      ssr: {
+        label: "2. 屏幕空间反射 SSR",
+        posts: [SSRPost, BloomPost],
+        fxaa: false,
+        hint: "SSR 后接 Bloom；地面金属度高便于观察反射。",
+        apply() {
+          const S = Engine3D.setting.render.postProcessing.ssr;
+          S.pixelRatio = 1;
+          S.fadeEdgeRatio = 0.5;
+          S.rayMarchRatio = 0.05;
+          S.fadeDistanceMin = 1;
+          S.fadeDistanceMax = 1000;
+          S.roughnessThreshold = 0.92;
+          S.powDotRN = 0.5;
+          S.mixThreshold = 0.5;
+          S.debug = false;
+        },
+        controls: () => ssrControls(),
+      },
+      outline: {
+        label: "3. 描边 Outline",
+        posts: [OutlinePost],
+        fxaa: false,
+        hint: "描边目标为场景中的立方体。",
+        apply() {
+          const O = Engine3D.setting.render.postProcessing.outline;
+          O.outlinePixel = 2.5;
+          O.strength = 1.4;
+          O.useAddMode = true;
+        },
+        afterAttach(ctx) {
+          ctx.refreshOutline = () => {
+            outlinePostManager.setOutline([ctx.boxObj], new Color(0.2, 1, 0.85, 1));
+          };
+          requestAnimationFrame(ctx.refreshOutline);
+        },
+        controls() {
+          const O = () => Engine3D.setting.render.postProcessing.outline;
+          return [
+            {
+              type: "range",
+              label: "outlinePixel",
+              min: 1,
+              max: 8,
+              step: 0.5,
+              get: () => O().outlinePixel,
+              set: (v) => {
+                O().outlinePixel = v;
+              },
+              format: (v) => v.toFixed(1),
+            },
+            {
+              type: "range",
+              label: "strength",
+              min: 0,
+              max: 100,
+              step: 1,
+              get: () => O().strength,
+              set: (v) => {
+                O().strength = v;
+              },
+              format: (v) => v.toFixed(2),
+              parse: (pct) => sliderVal(0, 3, 0.05, pct),
+            },
+            {
+              type: "checkbox",
+              label: "useAddMode",
+              get: () => O().useAddMode,
+              set: (v) => {
+                O().useAddMode = v;
+              },
+            },
+          ];
+        },
+      },
+      fog: {
+        label: "4. 全局雾 GlobalFog",
+        posts: [GlobalFog],
+        fxaa: false,
+        hint: "fogType：线性 / 指数 / 高度雾。",
+        apply() {
+          const F = Engine3D.setting.render.postProcessing.globalFog;
+          F.fogType = 2;
+          F.density = 0.045;
+          F.ins = 0.55;
+          F.fogColor = new Color(0.75, 0.82, 0.92, 1);
+        },
+        controls() {
+          const F = () => Engine3D.setting.render.postProcessing.globalFog;
+          return [
+            {
+              type: "select",
+              label: "fogType",
+              options: [
+                { value: "0", text: "0 — 线性" },
+                { value: "1", text: "1 — 指数" },
+                { value: "2", text: "2 — 高度" },
+              ],
+              get: () => String(F().fogType),
+              set: (v) => {
+                F().fogType = Number(v);
+              },
+            },
+            {
+              type: "range",
+              label: "density",
+              min: 0,
+              max: 100,
+              step: 1,
+              get: () => F().density,
+              set: (v) => {
+                F().density = v;
+              },
+              format: (v) => v.toFixed(3),
+              parse: (pct) => sliderVal(0, 0.15, 0.001, pct),
+            },
+            {
+              type: "range",
+              label: "ins",
+              min: 0,
+              max: 100,
+              step: 1,
+              get: () => F().ins,
+              set: (v) => {
+                F().ins = v;
+              },
+              format: (v) => v.toFixed(2),
+              parse: (pct) => sliderVal(0, 1, 0.01, pct),
+            },
+          ];
+        },
+      },
+      gtao: {
+        label: "5. 环境光遮蔽 GTAO",
+        posts: [GTAOPost],
+        fxaa: false,
+        hint: "角落与接触面 AO。",
+        apply() {
+          const G = Engine3D.setting.render.postProcessing.gtao;
+          G.maxDistance = 18;
+          G.darkFactor = 0.45;
+          G.rayMarchSegment = 8;
+          G.multiBounce = true;
+          G.debug = false;
+        },
+        controls() {
+          const G = () => Engine3D.setting.render.postProcessing.gtao;
+          return [
+            {
+              type: "range",
+              label: "maxDistance",
+              min: 0,
+              max: 100,
+              step: 1,
+              get: () => G().maxDistance,
+              set: (v) => {
+                G().maxDistance = v;
+              },
+              format: (v) => v.toFixed(1),
+              parse: (pct) => sliderVal(1, 30, 0.5, pct),
+            },
+            {
+              type: "range",
+              label: "darkFactor",
+              min: 0,
+              max: 100,
+              step: 1,
+              get: () => G().darkFactor,
+              set: (v) => {
+                G().darkFactor = v;
+              },
+              format: (v) => v.toFixed(2),
+              parse: (pct) => sliderVal(0, 1, 0.01, pct),
+            },
+            {
+              type: "range",
+              label: "rayMarchSegment",
+              min: 2,
+              max: 16,
+              step: 1,
+              get: () => G().rayMarchSegment,
+              set: (v) => {
+                G().rayMarchSegment = v;
+              },
+              format: (v) => String(Math.round(v)),
+              parse: (pct) => Math.round(sliderVal(2, 16, 1, pct)),
+            },
+            {
+              type: "checkbox",
+              label: "multiBounce",
+              get: () => G().multiBounce,
+              set: (v) => {
+                G().multiBounce = v;
+              },
+            },
+            {
+              type: "checkbox",
+              label: "debug",
+              get: () => G().debug,
+              set: (v) => {
+                G().debug = v;
+              },
+            },
+          ];
+        },
+      },
+      godray: {
+        label: "6. 丁达尔 GodRay",
+        posts: [GodRayPost],
+        fxaa: false,
+        hint: "朝向太阳方向观察体积光。",
+        apply() {
+          const R = Engine3D.setting.render.postProcessing.godRay;
+          R.rayMarchCount = 18;
+          R.scatteringExponent = 12;
+          R.intensity = 1.35;
+        },
+        controls() {
+          const R = () => Engine3D.setting.render.postProcessing.godRay;
+          return [
+            {
+              type: "range",
+              label: "rayMarchCount",
+              min: 8,
+              max: 24,
+              step: 1,
+              get: () => R().rayMarchCount,
+              set: (v) => {
+                R().rayMarchCount = v;
+              },
+              format: (v) => String(Math.round(v)),
+              parse: (pct) => Math.round(sliderVal(8, 24, 1, pct)),
+            },
+            {
+              type: "range",
+              label: "scatteringExponent",
+              min: 0,
+              max: 100,
+              step: 1,
+              get: () => R().scatteringExponent,
+              set: (v) => {
+                R().scatteringExponent = v;
+              },
+              format: (v) => v.toFixed(1),
+              parse: (pct) => sliderVal(1, 40, 0.5, pct),
+            },
+            {
+              type: "range",
+              label: "intensity",
+              min: 0,
+              max: 100,
+              step: 1,
+              get: () => R().intensity,
+              set: (v) => {
+                R().intensity = v;
+              },
+              format: (v) => v.toFixed(2),
+              parse: (pct) => sliderVal(0.1, 3, 0.05, pct),
+            },
+          ];
+        },
+      },
+      taa: {
+        label: "7. 时间抗锯齿 TAA",
+        posts: [TAAPost],
+        fxaa: false,
+        hint: "移动相机观察抗锯齿与拖影平衡。",
+        apply() {
+          const T = Engine3D.setting.render.postProcessing.taa;
+          T.jitterSeedCount = 8;
+          T.blendFactor = 0.12;
+          T.sharpFactor = 0.5;
+        },
+        controls() {
+          const T = () => Engine3D.setting.render.postProcessing.taa;
+          return [
+            {
+              type: "range",
+              label: "jitterSeedCount",
+              min: 2,
+              max: 16,
+              step: 1,
+              get: () => T().jitterSeedCount,
+              set: (v) => {
+                T().jitterSeedCount = v;
+              },
+              format: (v) => String(Math.round(v)),
+              parse: (pct) => Math.round(sliderVal(2, 16, 1, pct)),
+            },
+            {
+              type: "range",
+              label: "blendFactor",
+              min: 0,
+              max: 100,
+              step: 1,
+              get: () => T().blendFactor,
+              set: (v) => {
+                T().blendFactor = v;
+              },
+              format: (v) => v.toFixed(3),
+              parse: (pct) => sliderVal(0.02, 0.3, 0.01, pct),
+            },
+            {
+              type: "range",
+              label: "sharpFactor",
+              min: 0,
+              max: 100,
+              step: 1,
+              get: () => T().sharpFactor,
+              set: (v) => {
+                T().sharpFactor = v;
+              },
+              format: (v) => v.toFixed(2),
+              parse: (pct) => sliderVal(0, 1, 0.01, pct),
+            },
+          ];
+        },
+      },
+      dof: {
+        label: "8. 景深 DepthOfField",
+        posts: [DepthOfFieldPost],
+        fxaa: false,
+        hint: "near / far 控制清晰区间。",
+        apply() {
+          const D = Engine3D.setting.render.postProcessing.depthOfView;
+          D.iterationCount = 12;
+          D.pixelOffset = 1.2;
+          D.near = 8;
+          D.far = 22;
+        },
+        controls() {
+          const D = () => Engine3D.setting.render.postProcessing.depthOfView;
+          return [
+            {
+              type: "range",
+              label: "iterationCount",
+              min: 4,
+              max: 16,
+              step: 1,
+              get: () => D().iterationCount,
+              set: (v) => {
+                D().iterationCount = v;
+              },
+              format: (v) => String(Math.round(v)),
+              parse: (pct) => Math.round(sliderVal(4, 16, 1, pct)),
+            },
+            {
+              type: "range",
+              label: "near",
+              min: 0,
+              max: 100,
+              step: 1,
+              get: () => D().near,
+              set: (v) => {
+                D().near = v;
+              },
+              format: (v) => v.toFixed(1),
+              parse: (pct) => sliderVal(1, 50, 0.5, pct),
+            },
+            {
+              type: "range",
+              label: "far",
+              min: 0,
+              max: 100,
+              step: 1,
+              get: () => D().far,
+              set: (v) => {
+                D().far = v;
+              },
+              format: (v) => v.toFixed(1),
+              parse: (pct) => sliderVal(5, 80, 0.5, pct),
+            },
+          ];
+        },
+      },
+      full: {
+        label: "完整配置（Bloom+SSR+GTAO）",
+        posts: [BloomPost, SSRPost, GTAOPost],
+        fxaa: false,
+        hint: "组合效果；各块参数可独立调节。",
+        apply() {
+          const B = Engine3D.setting.render.postProcessing.bloom;
+          B.enable = true;
+          B.downSampleStep = 5;
+          B.luminanceThreshole = 0.8;
+          B.bloomIntensity = 0.5;
+          const S = Engine3D.setting.render.postProcessing.ssr;
+          S.enable = true;
+          S.pixelRatio = 1;
+          S.fadeEdgeRatio = 0.5;
+          S.roughnessThreshold = 0.9;
+          S.debug = false;
+          const G = Engine3D.setting.render.postProcessing.gtao;
+          G.enable = true;
+          G.maxDistance = 15;
+          G.rayMarchSegment = 6;
+          G.multiBounce = true;
+          G.debug = false;
+        },
+        controls(ctx) {
+          return [
+            { type: "group", title: "Bloom", items: bloomControls() },
+            { type: "group", title: "SSR", items: ssrControls().slice(0, 4) },
+            {
+              type: "group",
+              title: "GTAO",
+              items: [
+                {
+                  type: "range",
+                  label: "maxDistance",
+                  min: 0,
+                  max: 100,
+                  step: 1,
+                  get: () => Engine3D.setting.render.postProcessing.gtao.maxDistance,
+                  set: (v) => {
+                    Engine3D.setting.render.postProcessing.gtao.maxDistance = v;
+                  },
+                  format: (v) => v.toFixed(1),
+                  parse: (pct) => sliderVal(1, 30, 0.5, pct),
+                },
+                {
+                  type: "range",
+                  label: "darkFactor",
+                  min: 0,
+                  max: 100,
+                  step: 1,
+                  get: () => Engine3D.setting.render.postProcessing.gtao.darkFactor,
+                  set: (v) => {
+                    Engine3D.setting.render.postProcessing.gtao.darkFactor = v;
+                  },
+                  format: (v) => v.toFixed(2),
+                  parse: (pct) => sliderVal(0, 1, 0.01, pct),
+                },
+              ],
+            },
+          ];
+        },
+      },
+      perf: {
+        label: "性能优化（Bloom）",
+        posts: [BloomPost],
+        fxaa: false,
+        hint: "优先调低 downSampleStep / bloomIntensity 以换性能。",
+        apply() {
+          const B = Engine3D.setting.render.postProcessing.bloom;
+          B.downSampleStep = 5;
+          B.luminanceThreshole = 0.55;
+          B.bloomIntensity = 0.5;
+        },
+        controls: () => bloomControls(),
+      },
+      debug: {
+        label: "调试模式",
+        posts: [SSRPost, GTAOPost],
+        fxaa: false,
+        hint: "勾选 debug 查看 SSR / GTAO 调试视图。",
+        apply() {
+          Engine3D.setting.render.postProcessing.ssr.debug = false;
+          Engine3D.setting.render.postProcessing.gtao.debug = false;
+        },
+        controls() {
+          const pp = () => Engine3D.setting.render.postProcessing;
+          return [
+            {
+              type: "checkbox",
+              label: "ssr.debug",
+              get: () => pp().ssr.debug,
+              set: (v) => {
+                pp().ssr.debug = v;
+              },
+            },
+            {
+              type: "checkbox",
+              label: "gtao.debug",
+              get: () => pp().gtao.debug,
+              set: (v) => {
+                pp().gtao.debug = v;
+              },
+            },
+          ];
+        },
+      },
+    };
+
+    const PRESET_ALIASES = {
+      basic: "base",
+      "1": "bloom",
+      "2": "ssr",
+      "3": "outline",
+      "4": "fog",
+      globalfog: "fog",
+      "5": "gtao",
+      god: "godray",
+      "6": "godray",
+      "7": "taa",
+      depth: "dof",
+      "8": "dof",
+      complete: "full",
+      performance: "perf",
+    };
+
+    function resolvePresetId(raw) {
+      const key = String(raw || "bloom").toLowerCase();
+      return PRESET_ALIASES[key] || (PRESETS[key] ? key : "bloom");
+    }
+
+    function readInitialPreset() {
+      return resolvePresetId(new URLSearchParams(location.search).get("preset"));
+    }
+
+    function syncUrl(presetId) {
+      const url = new URL(location.href);
+      url.searchParams.set("preset", presetId);
+      history.replaceState(null, "", url);
+    }
+
+    let ctx = null;
+    let currentPresetId = "bloom";
+    let fxaaPostInstance = null;
+
+    function clearAllPosts() {
+      const ppc = ctx.scene.getOrAddComponent(PostProcessingComponent);
+      const job = Engine3D.getRenderJob(ctx.view);
+      for (const C of POST_CTORS) {
+        if (ppc.getPost(C)) ppc.removePost(C);
+      }
+      outlinePostManager.clearOutline();
+      if (fxaaPostInstance) {
+        job.removePost(fxaaPostInstance);
+        fxaaPostInstance = null;
+        ctx.fxaaPost = null;
+      }
+      const pp = Engine3D.setting.render.postProcessing;
+      if (pp.ssr) pp.ssr.debug = false;
+      if (pp.gtao) pp.gtao.debug = false;
+    }
+
+    function renderControl(ctrl, id) {
+      if (ctrl.type === "range") {
+        const v = ctrl.get();
+        const pct =
+          ctrl.parse && ctrl.min !== undefined
+            ? pctFrom(
+                ctrl.parse(0),
+                ctrl.parse(100),
+                v
+              )
+            : pctFrom(ctrl.min, ctrl.max, v);
+        const safePct = Number.isFinite(pct) ? Math.min(100, Math.max(0, pct)) : 50;
+        return `
+          <div class="row">
+            <label>${ctrl.label} <span class="val" id="${id}-v"></span></label>
+            <input type="range" id="${id}" min="${ctrl.min}" max="${ctrl.max}" step="${ctrl.step}" value="${safePct}" />
+          </div>`;
+      }
+      if (ctrl.type === "select") {
+        const cur = ctrl.get();
+        const opts = ctrl.options
+          .map((o) => `<option value="${o.value}"${o.value === cur ? " selected" : ""}>${o.text}</option>`)
+          .join("");
+        return `
+          <div class="row">
+            <label for="${id}">${ctrl.label}</label>
+            <select id="${id}">${opts}</select>
+          </div>`;
+      }
+      if (ctrl.type === "checkbox") {
+        const checked = ctrl.get() ? " checked" : "";
+        return `
+          <div class="row">
+            <label class="chk"><input type="checkbox" id="${id}"${checked} /> ${ctrl.label}</label>
+          </div>`;
+      }
+      return "";
+    }
+
+    function bindControl(ctrl, id) {
+      if (ctrl.type === "range") {
+        const el = document.getElementById(id);
+        const valEl = document.getElementById(`${id}-v`);
+        if (!el) return;
+        const sync = () => {
+          const raw = Number(el.value);
+          const v = ctrl.parse ? ctrl.parse(raw) : raw;
+          ctrl.set(v);
+          if (valEl) valEl.textContent = ctrl.format(ctrl.get());
+        };
+        el.addEventListener("input", sync);
+        sync();
+        return;
+      }
+      if (ctrl.type === "select") {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener("change", () => ctrl.set(el.value));
+        return;
+      }
+      if (ctrl.type === "checkbox") {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener("change", () => ctrl.set(el.checked));
+      }
+    }
+
+    function buildPanel(presetId) {
+      const panel = document.getElementById("panel");
+      const cfg = PRESETS[presetId];
+      if (!panel || !cfg) return;
+
+      let options = "";
+      for (const [id, p] of Object.entries(PRESETS)) {
+        options += `<option value="${id}"${id === presetId ? " selected" : ""}>${p.label}</option>`;
+      }
+
+      let controlsHtml = "";
+      let ctrlIndex = 0;
+      if (cfg.controls) {
+        const raw = cfg.controls(ctx);
+        controlsHtml = '<h3>参数调节</h3>';
+        for (const item of raw) {
+          if (item.type === "group") {
+            controlsHtml += `<h4>${item.title}</h4>`;
+            for (const sub of item.items) {
+              const cid = `pp-ctrl-${ctrlIndex++}`;
+              controlsHtml += renderControl(sub, cid);
+            }
+          } else {
+            const cid = `pp-ctrl-${ctrlIndex++}`;
+            controlsHtml += renderControl(item, cid);
+          }
+        }
+      }
+
+      panel.innerHTML = `
+        <h3>效果配置</h3>
+        <div class="row">
+          <label for="preset-select">切换后处理</label>
+          <select id="preset-select">${options}</select>
+        </div>
+        <p class="hint">${cfg.hint}</p>
+        ${controlsHtml}
+      `;
+
+      document.getElementById("preset-select").addEventListener("change", (e) => {
+        applyPreset(e.target.value);
+      });
+
+      ctrlIndex = 0;
+      if (cfg.controls) {
+        for (const item of cfg.controls(ctx)) {
+          if (item.type === "group") {
+            for (const sub of item.items) {
+              bindControl(sub, `pp-ctrl-${ctrlIndex++}`);
+            }
+          } else {
+            bindControl(item, `pp-ctrl-${ctrlIndex++}`);
+          }
+        }
+      }
+    }
+
+    function applyPreset(presetId) {
+      const cfg = PRESETS[presetId];
+      if (!cfg || !ctx) return;
+      currentPresetId = presetId;
+      clearAllPosts();
+
+      Engine3D.setting.render.postProcessing.fxaa.enable = !!cfg.fxaa;
+
+      if (cfg.fxaa) {
+        const job = Engine3D.getRenderJob(ctx.view);
+        fxaaPostInstance = new FXAAPost();
+        ctx.fxaaPost = fxaaPostInstance;
+        ctx.fxaaStrength = 4;
+        job.addPost(fxaaPostInstance);
+      } else {
+        const ppc = ctx.scene.getOrAddComponent(PostProcessingComponent);
+        for (const C of cfg.posts) {
+          ppc.addPost(C);
+        }
+        cfg.apply();
+        cfg.afterAttach?.(ctx);
+      }
+
+      syncUrl(presetId);
+      buildPanel(presetId);
+    }
+
+    async function main() {
+      const canvas = document.getElementById("canvas");
+      const hud = document.getElementById("hud");
+      if (!canvas || !hud) return;
+
+      const initialPreset = readInitialPreset();
+
+      try {
+        await Engine3D.init({ canvasConfig: { canvas } });
+      } catch (e) {
+        document.body.innerHTML =
+          '<p style="padding:1rem;font-family:sans-serif">WebGPU 初始化失败，请使用 Chrome/Edge 最新版并在 localhost 或 HTTPS 下打开。</p>';
+        console.error(e);
+        return;
+      }
+
+      Engine3D.setting.render.postProcessing.fxaa.enable = false;
+
+      const scene = new Scene3D();
+      scene.addComponent(AtmosphericComponent);
+
+      const camObj = new Object3D();
+      const camera = camObj.addComponent(Camera3D);
+      camera.perspective(55, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 200);
+      const hover = camObj.addComponent(HoverCameraController);
+      hover.setCamera(28, -32, 14);
+      scene.addChild(camObj);
+
+      const sun = new Object3D();
+      const dl = sun.addComponent(DirectLight);
+      dl.lightColor = new Color(1, 0.98, 0.95, 1);
+      dl.intensity = 1.2;
+      dl.castShadow = true;
+      sun.transform.rotationX = -50;
+      sun.transform.rotationY = 35;
+      scene.addChild(sun);
+
+      const ground = new Object3D();
+      const gr = ground.addComponent(MeshRenderer);
+      gr.geometry = new PlaneGeometry(24, 24);
+      const groundMat = new LitMaterial();
+      groundMat.baseColor = new Color(0.12, 0.13, 0.15, 1);
+      groundMat.metallic = 0.92;
+      groundMat.roughness = 0.06;
+      gr.material = groundMat;
+      gr.receiveShadow = true;
+      ground.transform.rotationX = -90;
+      scene.addChild(ground);
+
+      const boxObj = new Object3D();
+      const mr = boxObj.addComponent(MeshRenderer);
+      mr.geometry = new BoxGeometry(1.1, 1.6, 1.1);
+      const boxMat = new LitMaterial();
+      boxMat.baseColor = new Color(0.45, 0.55, 0.75, 1);
+      boxMat.metallic = 0.2;
+      boxMat.roughness = 0.55;
+      mr.material = boxMat;
+      mr.castShadow = true;
+      boxObj.y = 0.8;
+      scene.addChild(boxObj);
+
+      const glowObj = new Object3D();
+      const gm = glowObj.addComponent(MeshRenderer);
+      gm.geometry = new SphereGeometry(0.45, 32, 32);
+      const glowMat = new LitMaterial();
+      glowMat.baseColor = new Color(0.05, 0.05, 0.08, 1);
+      glowMat.emissiveMap = Engine3D.res.whiteTexture;
+      glowMat.emissiveColor = new Color(1, 0.75, 0.2, 1);
+      glowMat.emissiveIntensity = 12;
+      gm.material = glowMat;
+      gm.castShadow = true;
+      glowObj.x = -1.8;
+      glowObj.y = 0.55;
+      glowObj.z = 1.2;
+      scene.addChild(glowObj);
+
+      const view = new View3D();
+      view.scene = scene;
+      view.camera = camera;
+
+      ctx = {
+        scene,
+        view,
+        camera,
+        canvas,
+        hud,
+        boxObj,
+        glowMat,
+        fxaaPost: null,
+        fxaaStrength: 4,
+      };
+
+      Engine3D.startRenderView(view);
+      requestAnimationFrame(() => applyPreset(initialPreset));
+
+      window.addEventListener("resize", () => {
+        camera.perspective(55, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 200);
+      });
+
+      function tick() {
+        const cfg = PRESETS[currentPresetId];
+        hud.textContent = `${cfg?.label || currentPresetId}\n${cfg?.hint || ""}`.trim();
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+
+    main();
+  </script>
+</body>
+</html>

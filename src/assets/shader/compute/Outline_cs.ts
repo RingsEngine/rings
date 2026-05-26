@@ -84,7 +84,7 @@ export let Outline_cs: string = /*wgsl */ `
                 coordTemp_f32.y = y;
                 let distanceToOuter = length(coordTemp_f32-coordCurrent_f32);
                 if(distanceToOuter < pixelRadius){
-                    var coord_i32 = vec<i32>(coordTemp_f32);
+                    var coord_i32 = vec2<i32>(coordTemp_f32);
                     tempCoordIndex = coord_i32.x + coord_i32.y * i32(texSize.x);
                     tempWeightData = weightBuffer[tempCoordIndex];
                     let outlineGap = abs(tempWeightData.slotIndex - fragOutline.slotIndex);

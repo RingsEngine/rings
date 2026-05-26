@@ -24,7 +24,7 @@ export class GUIPassRenderer extends RendererBase {
     let dest = GBufferFrame.getGUIBufferFrame().getColorTexture();
     GPUContext.copyTexture(command, src, dest);
     GPUContext.endCommandEncoder(command);
-  }
+}
 
   public render(
     view: View3D,

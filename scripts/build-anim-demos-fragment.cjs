@@ -14,24 +14,14 @@ const demos = [
     file: "animation-animator-demo.html",
   },
   {
-    id: "property",
-    title: "PropertyAnimation / PropertyAnimClip",
-    file: "animation-property-demo.html",
-  },
-  {
-    id: "event",
-    title: "PropertyAnimationEvent（COMPLETE）",
-    file: "animation-property-event-demo.html",
+    id: "animator-car",
+    title: "AnimatorComponent（car.glb · 五段剪辑）",
+    file: "animation-animator-car-demo.html",
   },
   {
     id: "skeleton",
     title: "glTF 骨骼动画（eva_unit_01_rigged.glb + AnimatorComponent）",
     file: "animation-skeleton-demo.html",
-  },
-  {
-    id: "morph",
-    title: "MorphTargetBlender",
-    file: "animation-morph-target-blender-demo.html",
   },
 ];
 
@@ -79,7 +69,7 @@ function block(d) {
 }
 
 const intro =
-  "文档站需以 **HTTP(S)** 打开；`iframe` 与示例页依赖 **unpkg**、**WebGPU** 与网络。**Animator** 示例从 jsDelivr 加载 **`camcopter_s_100.glb`**（RingsEngine/rings-resource）；**Morph** 示例从 CDN 拉取 glTF。每个块顶栏 **示例** / **代码** 为 **Tab 切换**。运行说明见 [`animation-demos-README.md`](../examples/animation-demos-README.md)。更新 `docs/examples/animation-*.html` 后执行 `node scripts/build-anim-demos-fragment.cjs` 与 `node scripts/merge-anim-readme.cjs`。\n\n";
+  "文档站需以 **HTTP(S)** 打开；`iframe` 与示例页依赖 **unpkg**、**WebGPU** 与网络。**Animator** 示例从 jsDelivr 加载 **`camcopter_s_100.glb`**、**`car.glb`**（RingsEngine/rings-resource）；**骨骼** 示例从 CDN 拉取 glTF。每个块顶栏 **示例** / **代码** 为 **Tab 切换**。运行说明见 [`animation-demos-README.md`](../examples/animation-demos-README.md)。更新 `docs/examples/animation-*.html` 后执行 `node scripts/build-anim-demos-fragment.cjs` 与 `node scripts/merge-anim-readme.cjs`。\n\n";
 
 const out = path.join(__dirname, "../docs/动画组件系统/_anim-demos-fragment.md");
 fs.writeFileSync(out, intro + demos.map(block).join(""), "utf8");

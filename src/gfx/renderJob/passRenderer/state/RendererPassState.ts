@@ -6,6 +6,7 @@ import { RTDescriptor } from "../../../graphics/webGpu/descriptor/RTDescriptor";
 import { RTFrame } from "../../frame/RTFrame";
 
 export class RendererPassState {
+
   public label: string = "";
   public customSize: boolean = false;
   public zPreTexture: RenderTexture = null;
@@ -27,12 +28,10 @@ export class RendererPassState {
   public depthLoadOp: GPULoadOp;
 
   getLastRenderTexture() {
-    if (this.renderTargets) {
-      return this.renderTargets.length > 0
-        ? this.renderTargets[0]
-        : Engine3D.res.redTexture;
-    } else {
-      return Engine3D.res.redTexture;
-    }
+      if (this.renderTargets) {
+          return this.renderTargets.length > 0 ? this.renderTargets[0] : Engine3D.res.redTexture;
+      } else {
+          return Engine3D.res.redTexture
+      }
   }
 }

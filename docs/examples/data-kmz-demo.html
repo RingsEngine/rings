@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings — 数据处理：KMZ</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; }
+    #canvas { display: block; width: 100% !important; height: 100% !important; }
+    .hud { position: absolute; left: 8px; top: 8px; right: 8px; font: 11px ui-monospace, monospace; color: #e6edf3; text-shadow: 0 1px 3px #000; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <p id="hud" class="hud">loading KMZ...</p>
+  <script type="module">
+    import {
+      Engine3D, Scene3D, Object3D, Camera3D, View3D,
+      AtmosphericComponent, DirectLight, HoverCameraController,
+      PlaneGeometry, MeshRenderer, LitMaterial, Color,
+      PointCloudRenderer,
+    } from '../../src/index.ts';
+
+    const KMZ_URL = 'https://gis.ncdc.noaa.gov/kml/ghcnd.kmz';
+
+    /** 经纬度 → 场景（lon→X，lat→Z） */
+    const GEO_SCALE = 0.05;
+
+    /** 标准 KML/KMZ：解压后解析 coordinates（NOAA ghcnd 等） */
+    async function loadKmlPointsFromKmz(url) {
+      const { unzipSync, strFromU8 } = await import(
+        'https://cdn.jsdelivr.net/npm/fflate@0.8.2/esm/browser.js'
+      );
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('KMZ fetch failed: ' + res.status);
+      const zip = unzipSync(new Uint8Array(await res.arrayBuffer()));
+      const pos = [];
+      const col = [];
+      for (const path in zip) {
+        if (!/\.kml$/i.test(path)) continue;
+        const doc = new DOMParser().parseFromString(strFromU8(zip[path]), 'application/xml');
+        doc.querySelectorAll('coordinates').forEach((el) => {
+          const tuples = el.textContent.trim().split(/\s+/).filter(Boolean);
+          for (const t of tuples) {
+            const nums = t.split(',').map(Number);
+            const lon = nums[0];
+            const lat = nums[1];
+            if (!Number.isFinite(lon) || !Number.isFinite(lat)) continue;
+            pos.push(lon * GEO_SCALE, 0.15, lat * GEO_SCALE);
+            col.push(90, 180, 255, 255);
+          }
+        });
+      }
+      const count = pos.length / 3;
+      if (count === 0) throw new Error('No coordinates in KMZ/KML');
+      return {
+        positions: new Float32Array(pos),
+        colors: new Uint8Array(col),
+        count,
+      };
+    }
+
+    function addPointCloud(scene, positions, colors, count) {
+      const root = new Object3D();
+      root.name = 'KmzKmlPoints';
+      const inner = new Object3D();
+      root.addChild(inner);
+      const renderer = inner.addComponent(PointCloudRenderer);
+      renderer.initFromData(positions, colors, count);
+      renderer.setPointShape('circle');
+      renderer.setPointSize(4);
+      scene.addChild(root);
+    }
+
+    async function main() {
+      const canvas = document.getElementById('canvas');
+      const hud = document.getElementById('hud');
+      await Engine3D.init({ canvasConfig: { canvas } });
+      const scene = new Scene3D();
+      scene.addComponent(AtmosphericComponent);
+      const camObj = new Object3D();
+      const camera = camObj.addComponent(Camera3D);
+      camera.perspective(55, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0, 9999);
+      camObj.addComponent(HoverCameraController).setCamera(-35, -55, 22);
+      scene.addChild(camObj);
+      const sun = new Object3D();
+      sun.addComponent(DirectLight).intensity = 2;
+      sun.transform.rotationX = -50;
+      scene.addChild(sun);
+      const ground = new Object3D();
+      const gr = ground.addComponent(MeshRenderer);
+      gr.geometry = new PlaneGeometry(360 * GEO_SCALE, 180 * GEO_SCALE);
+      gr.material = new LitMaterial();
+      gr.material.baseColor = new Color(0.12, 0.14, 0.18, 1);
+      ground.transform.rotationX = -90;
+      scene.addChild(ground);
+
+      hud.textContent = 'loading ghcnd.kmz...';
+      let hudMsg = '';
+
+      try {
+        const waylines = await Engine3D.res.loadKMZ(KMZ_URL);
+        if (waylines && waylines.numChildren > 0) {
+          scene.addChild(waylines);
+          hudMsg = 'Res.loadKMZ | WayLines3D | wpml waylines';
+        } else {
+          throw new Error('WayLines3D empty');
+        }
+      } catch (wpmlErr) {
+        console.warn('loadKMZ (DJI wpml) skipped:', wpmlErr);
+        const { positions, colors, count } = await loadKmlPointsFromKmz(KMZ_URL);
+        addPointCloud(scene, positions, colors, count);
+        hudMsg = 'KMZ/KML | ghcnd.kmz | points ' + count;
+      }
+
+      hud.textContent = hudMsg;
+      const view = new View3D();
+      view.scene = scene;
+      view.camera = camera;
+      Engine3D.startRenderView(view);
+    }
+    main().catch((e) => {
+      document.body.innerHTML = '<p style="padding:1rem">' + e.message + '</p>';
+      console.error(e);
+    });
+  </script>
+</body>
+</html>

@@ -15,11 +15,9 @@
 | 文件 | 对应能力 |
 |------|----------|
 | [animation-animator-demo.html](./animation-animator-demo.html) | **`AnimatorComponent`** + jsDelivr **`camcopter_s_100.glb`**（`playAnim` / `crossFade`） |
-| [animation-property-demo.html](./animation-property-demo.html) | **`PropertyAnimation`** + **`PropertyAnimClip.parse`**（循环位移 + **`SEEK`** 关键帧） |
-| [animation-property-event-demo.html](./animation-property-event-demo.html) | **`PropertyAnimationEvent.COMPLETE`**（Clamp 单段剪辑） |
+| [animation-animator-car-demo.html](./animation-animator-car-demo.html) | **`AnimatorComponent`** + jsDelivr **`car.glb`**（resources-0.0.4，五段剪辑按钮依次 `playAnim`） |
 | [animation-skeleton-demo.html](./animation-skeleton-demo.html) | **glTF 骨骼动画**：CDN `eva_unit_01_rigged.glb`（resources-0.0.2），`AnimatorComponent` + `SkinnedMeshRenderer2` |
-| [animation-morph-target-blender-demo.html](./animation-morph-target-blender-demo.html) | **`MorphTargetBlender`** + CDN **MorphPrimitivesTest.glb**（`setMorphInfluence` 正弦权重） |
 
-**剪辑类型说明**：`PropertyAnimationClip`（`AnimatorComponent` / glTF）与 `PropertyAnimClip`（`PropertyAnimation`）已分别体现在 **Animator** 与 **Property** 示例中；**`SkeletonAnimationClip`** 见 **Skeleton** 示例。
+**剪辑类型说明**：**`PropertyAnimationClip`**（`AnimatorComponent` / glTF 蒙皮）已体现在 **Animator** 与 **Skeleton** 可运行示例中；**`SkeletonAnimationClip`** 见本仓库其它示例或手写管线。属性动画（`PropertyAnimation` / `PropertyAnimClip` / `PropertyAnimationEvent`）与 **`MorphTargetBlender`** 暂无对应可运行 HTML 示例。
 
 **合并脚本**：`scripts/build-anim-demos-fragment.cjs`（生成转义片段）、`scripts/merge-anim-readme.cjs`（写入 `docs/动画组件系统/README.md`）。

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings — 数据处理：FileLoader</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #0f172a; color: #e2e8f0; font-family: system-ui, sans-serif; }
+    #panel { padding: 16px; }
+    pre { background: #1e293b; padding: 12px; border-radius: 8px; font-size: 12px; overflow: auto; }
+  </style>
+</head>
+<body>
+  <section id="panel">
+    <h2 style="margin:0 0 8px;font-size:1rem">FileLoader + ParserBase</h2>
+    <pre id="out">loading...</pre>
+  </section>
+  <script type="module">
+    import { FileLoader, GeoJsonParser, ParserFormat } from 'https://unpkg.com/@rings-webgpu/core@1.0.56/dist/rings.es.js';
+
+    const json = JSON.stringify({
+      type: 'FeatureCollection',
+      features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [1, 2] }, properties: {} }],
+    });
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    async function main() {
+      const loader = new FileLoader();
+      const parser = await loader.load(url, GeoJsonParser);
+      URL.revokeObjectURL(url);
+      document.getElementById('out').textContent = JSON.stringify({
+        parserFormat: ParserFormat[GeoJsonParser.format],
+        featureCount: parser.data.features.length,
+        firstType: parser.data.features[0].geometry.type,
+      }, null, 2);
+    }
+    main().catch((e) => { document.getElementById('out').textContent = e.message; });
+  </script>
+</body>
+</html>

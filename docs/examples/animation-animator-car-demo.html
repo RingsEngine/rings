@@ -3,18 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Rings — 动画：glTF 骨骼动画（eva_unit_01_rigged.glb）</title>
+  <title>Rings — 动画：AnimatorComponent（car.glb · 多剪辑）</title>
   <style>
     html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
     body { position: relative; font-family: system-ui, "Segoe UI", sans-serif; }
     #canvas { display: block; width: 100%; height: 100%; }
     .hud {
-      position: absolute; left: 8px; top: 8px; right: 280px; pointer-events: none;
+      position: absolute; left: 8px; top: 8px; right: 300px; pointer-events: none;
       font-size: 11px; line-height: 1.45; color: #e6edf3; text-shadow: 0 1px 3px #000;
       font-family: ui-monospace, monospace;
     }
     .controls {
-      position: absolute; top: 0; right: 0; bottom: 0; width: 260px; padding: 10px;
+      position: absolute; top: 0; right: 0; bottom: 0; width: 280px; padding: 10px;
       overflow: auto; background: rgba(15, 20, 25, 0.92); color: #e6edf3;
       font-size: 0.72rem; border-left: 1px solid #2d3a4d;
     }
@@ -23,29 +23,28 @@
     .controls button {
       pointer-events: auto; cursor: pointer; margin-top: 10px; padding: 8px 10px; width: 100%;
       background: #2d3f5c; color: #e6edf3; border: 1px solid #4a6a8c; border-radius: 4px;
-      font-size: 0.75rem;
+      font-size: 0.72rem;
     }
     .controls button:hover { background: #354a66; }
     .controls button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .clip-buttons { margin-top: 6px; }
+    .clip-buttons button { margin-top: 8px; }
   </style>
 </head>
 <body>
   <canvas id="canvas" style="width: 100%; height: 100%;"></canvas>
   <div class="hud" id="hud"></div>
   <aside class="controls">
-    <h3>glTF 骨骼动画</h3>
+    <h3>AnimatorComponent · car.glb</h3>
     <p>
-      使用 CDN 上的 <code>eva_unit_01_rigged.glb</code>（<code>resources-0.0.2</code>）。<code>loadGltf</code> 会为带蒙皮的节点挂上
-      <code>AnimatorComponent</code>，并将 glTF 动画解析为 <code>PropertyAnimationClip</code>；
-      蒙皮网格由 <code>SkinnedMeshRenderer2</code> 读取骨骼矩阵。程序化 <code>SkeletonAnimationClip</code> +
-      <code>SkeletonAnimationComponent</code> 的写法见本仓库其它示例（手写 buffer 管线）。
+      资源：<code>rings-resource@resources-0.0.4/glb/car.glb</code>。加载后由 glTF 解析挂接
+      <code>AnimatorComponent</code>；本示例<strong>仅列出第 1、第 4 条</strong>剪辑（按 glTF 解析顺序），
+      对每个名称调用 <code>playAnim(name, 0, 1)</code>。
     </p>
     <p style="margin-top:8px">
-      若 glTF 单位很小，示例会对根节点放大并对 <code>BoundUtil.genMeshBounds</code> 结果做 <code>focusByBounds</code>，
-      避免相机仍在原点附近、视距过近而「在模型内部」或模型只占亚像素。
+      流程：<code>startRenderView</code> → <code>loadGltf</code> → <code>BoundUtil.genMeshBounds</code> 对焦。
     </p>
-    <button type="button" id="btnPlay" disabled>播放骨骼动画</button>
-    <button type="button" id="btnPause" disabled>静止</button>
+    <div id="clipButtons" class="clip-buttons" aria-live="polite"></div>
   </aside>
   <script type="module">
     import {
@@ -65,8 +64,25 @@
       PlaneGeometry,
       SkinnedMeshRenderer2,
     } from '../../src/index.ts';
-    /** glTF 常为真实比例，整体偏小；放大后需按包围盒拉远相机，否则会「在模型肚子里」看不到。 */
-    const MODEL_ROOT_SCALE = 0.1;
+
+    const GLB_URL =
+      'https://cdn.jsdelivr.net/gh/RingsEngine/rings-resource@resources-0.0.4/glb/car.glb';
+
+    /** 若车体在世界坐标里过小/过大，可改此系数再对焦 */
+    const MODEL_ROOT_SCALE = 0.02;
+    /** 绕世界 Y 轴旋转（度），校正 glTF 朝向前可用 */
+    const MODEL_ROOT_ROT_Y_DEG = 180;
+
+    /** 只暴露/播放的剪辑下标（0 起）：第 1、第 4 条 */
+    const PLAY_CLIP_INDICES = [0, 3];
+
+    function pickClipsByIndex(allNames) {
+      const out = [];
+      for (const i of PLAY_CLIP_INDICES) {
+        if (i >= 0 && i < allNames.length) out.push(allNames[i]);
+      }
+      return out;
+    }
 
     function frameSkinnedModel(hover, root) {
       const bound = BoundUtil.genMeshBounds(root);
@@ -85,13 +101,11 @@
       hover.maxDistance = Math.max(dist * 6, 800);
     }
 
-    const GLB_URL =
-      'https://cdn.jsdelivr.net/gh/RingsEngine/rings-resource@resources-0.0.3/glb/eva_unit_01_rigged.glb';
-
     async function main() {
       const canvas = document.getElementById('canvas');
       const hud = document.getElementById('hud');
-      if (!canvas) return;
+      const clipButtons = document.getElementById('clipButtons');
+      if (!canvas || !clipButtons) return;
 
       try {
         await Engine3D.init({ canvasConfig: { canvas } });
@@ -123,7 +137,7 @@
       sun.transform.rotationY = 40;
       scene.addChild(sun);
 
-      /* —— 主光 + 补光 + 轮廓光 —— */
+      /* —— 主光 + 补光 + 轮廓光（与 animation-skeleton-demo 一致） —— */
       const key = new Object3D();
       key.rotationX = 52;
       key.rotationY = -38;
@@ -158,12 +172,9 @@
       ground.y = 0;
       scene.addChild(ground);
 
-      let playingName = '';
-      let clipNames = [];
       let animator = null;
-
-      const btnPlay = document.getElementById('btnPlay');
-      const btnPause = document.getElementById('btnPause');
+      let clipNames = [];
+      let playingName = '';
 
       const view = new View3D();
       view.scene = scene;
@@ -174,21 +185,21 @@
         camera.perspective(50, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.05, 5000);
       });
 
-      function setSkeletonPlaybackButtonsEnabled(ok) {
-        if (btnPlay) btnPlay.disabled = !ok;
-        if (btnPause) btnPause.disabled = !ok;
+      function mountClipButtons(names) {
+        clipButtons.textContent = '';
+        names.forEach((name) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = `播放：${name}`;
+          btn.addEventListener('click', () => {
+            if (!animator) return;
+            playingName = name;
+            animator.playAnim(name, 0, 1);
+            animator.timeScale = 1;
+          });
+          clipButtons.appendChild(btn);
+        });
       }
-
-      btnPlay?.addEventListener('click', () => {
-        if (!animator || clipNames.length === 0) return;
-        animator.timeScale = 1;
-        playingName = clipNames[0] || playingName;
-      });
-
-      btnPause?.addEventListener('click', () => {
-        if (!animator || clipNames.length === 0) return;
-        animator.timeScale = 0;
-      });
 
       try {
         const root = await Engine3D.res.loadGltf(GLB_URL);
@@ -211,26 +222,40 @@
         const ac = animators.find((a) => a.clips && a.clips.length > 0);
         if (ac) {
           animator = ac;
-          clipNames = ac.clips.map((c) => c.clipName);
-          playingName = clipNames[0];
-          animator.timeScale = 1;
-          animator.playAnim(playingName, 0, 1);
-          setSkeletonPlaybackButtonsEnabled(true);
+          const allNames = ac.clips.map((c) => c.clipName);
+          clipNames = pickClipsByIndex(allNames);
+          if (clipNames.length === 0) {
+            clipButtons.innerHTML =
+              '<p style="margin-top:8px;color:#c98">剪辑数量不足，无法取第 1 / 第 4 条。</p>';
+          } else {
+            mountClipButtons(clipNames);
+          }
+          playingName = clipNames[0] ?? '';
+          if (playingName) {
+            ac.playAnim(playingName, 0, 1);
+            ac.timeScale = 1;
+          }
+          if (allNames.length !== 5) {
+            console.warn(
+              `[animation-animator-car-demo] 期望 5 条剪辑，实际 ${allNames.length}：`,
+              allNames
+            );
+          }
         } else {
-          setSkeletonPlaybackButtonsEnabled(false);
+          clipButtons.innerHTML =
+            '<p style="margin-top:8px;color:#c98">未找到带 clips 的 AnimatorComponent。</p>';
         }
       } catch (err) {
         console.error(err);
         hud.textContent =
           'GLB 加载失败（网络/CORS）。请联网并在 localhost 或 HTTPS 下打开。';
-        setSkeletonPlaybackButtonsEnabled(false);
+        clipButtons.innerHTML =
+          '<p style="margin-top:8px;color:#c98">加载失败，无法生成剪辑按钮。</p>';
       }
 
       function tick() {
         const list = clipNames.length ? clipNames.join(', ') : '—';
-        const motion =
-          animator && animator.timeScale !== 0 ? '播放中' : '静止';
-        hud.textContent = `AnimatorComponent · ${motion} ·「${playingName || '—'}」 · clips=[${list}]`;
+        hud.textContent = `AnimatorComponent · 当前「${playingName || '—'}」 · clips=[${list}]`;
         requestAnimationFrame(tick);
       }
       requestAnimationFrame(tick);

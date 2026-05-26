@@ -26,10 +26,6 @@ export class GTAOPost extends PostBase {
   /**
    * @internal
    */
-  rendererPassState: RendererPassState;
-  /**
-   * @internal
-   */
   gtaoCompute: ComputeShader;
   /**
    * @internal
@@ -51,202 +47,187 @@ export class GTAOPost extends PostBase {
   rtFrame: RTFrame;
 
   constructor() {
-    super();
+      super();
   }
 
   /**
    * @internal
    */
-  onAttach(view: View3D) {
-    Engine3D.setting.render.postProcessing.gtao.enable = true;
+  onAttach(view: View3D,) {
+      Engine3D.setting.render.postProcessing.gtao.enable = true;
   }
   /**
    * @internal
-   */ Render;
-  onDetach(view: View3D) {
-    Engine3D.setting.render.postProcessing.gtao.enable = false;
+   */Render
+  onDetach(view: View3D,) {
+      Engine3D.setting.render.postProcessing.gtao.enable = false;
   }
 
   public get maxDistance() {
-    let setting = Engine3D.setting.render.postProcessing.gtao;
-    return setting.maxDistance;
+      let setting = Engine3D.setting.render.postProcessing.gtao;
+      return setting.maxDistance;
   }
 
   public set maxDistance(value: number) {
-    value = clamp(value, 0.1, 50);
-    let setting = Engine3D.setting.render.postProcessing.gtao;
-    setting.maxDistance = value;
+      value = clamp(value, 0.1, 50);
+      let setting = Engine3D.setting.render.postProcessing.gtao;
+      setting.maxDistance = value;
   }
 
   public get maxPixel() {
-    let setting = Engine3D.setting.render.postProcessing.gtao;
-    return setting.maxPixel;
+      let setting = Engine3D.setting.render.postProcessing.gtao;
+      return setting.maxPixel;
   }
 
   public set maxPixel(value: number) {
-    value = clamp(value, 5, 100);
-    let setting = Engine3D.setting.render.postProcessing.gtao;
-    setting.maxPixel = value;
+      value = clamp(value, 5, 100);
+      let setting = Engine3D.setting.render.postProcessing.gtao;
+      setting.maxPixel = value;
   }
 
   public get darkFactor() {
-    let setting = Engine3D.setting.render.postProcessing.gtao;
-    return setting.darkFactor;
+      let setting = Engine3D.setting.render.postProcessing.gtao;
+      return setting.darkFactor;
   }
 
   public set darkFactor(value: number) {
-    value = clamp(value, 0.01, 1);
-    let setting = Engine3D.setting.render.postProcessing.gtao;
-    setting.darkFactor = value;
+      value = clamp(value, 0.01, 1);
+      let setting = Engine3D.setting.render.postProcessing.gtao;
+      setting.darkFactor = value;
   }
 
+
   public get rayMarchSegment() {
-    let setting = Engine3D.setting.render.postProcessing.gtao;
-    return setting.rayMarchSegment;
+      let setting = Engine3D.setting.render.postProcessing.gtao;
+      return setting.rayMarchSegment;
   }
 
   public set rayMarchSegment(value: number) {
-    value = clamp(value, 4, 10);
-    let setting = Engine3D.setting.render.postProcessing.gtao;
-    setting.rayMarchSegment = value;
+      value = clamp(value, 4, 10);
+      let setting = Engine3D.setting.render.postProcessing.gtao;
+      setting.rayMarchSegment = value;
   }
 
   public get multiBounce() {
-    let setting = Engine3D.setting.render.postProcessing.gtao;
-    return setting.multiBounce;
+      let setting = Engine3D.setting.render.postProcessing.gtao;
+      return setting.multiBounce;
   }
 
   public set multiBounce(value: boolean) {
-    let setting = Engine3D.setting.render.postProcessing.gtao;
-    setting.multiBounce = value;
+      let setting = Engine3D.setting.render.postProcessing.gtao;
+      setting.multiBounce = value;
   }
 
   public get blendColor() {
-    let setting = Engine3D.setting.render.postProcessing.gtao;
-    return setting.blendColor;
+      let setting = Engine3D.setting.render.postProcessing.gtao;
+      return setting.blendColor;
   }
 
   public set blendColor(value: boolean) {
-    let setting = Engine3D.setting.render.postProcessing.gtao;
-    setting.blendColor = value;
+      let setting = Engine3D.setting.render.postProcessing.gtao;
+      setting.blendColor = value;
   }
 
   public get usePosFloat32() {
-    let setting = Engine3D.setting.render.postProcessing.gtao;
-    return setting.usePosFloat32;
+      let setting = Engine3D.setting.render.postProcessing.gtao;
+      return setting.usePosFloat32;
   }
 
   public set usePosFloat32(value: boolean) {
-    let setting = Engine3D.setting.render.postProcessing.gtao;
-    setting.usePosFloat32 = value;
+      let setting = Engine3D.setting.render.postProcessing.gtao;
+      setting.usePosFloat32 = value;
   }
 
   private createCompute() {
-    this.gtaoCompute = new ComputeShader(GTAO_cs);
+      this.gtaoCompute = new ComputeShader(GTAO_cs);
 
-    let gtaoSetting: UniformGPUBuffer = new UniformGPUBuffer(4 * 2);
-    this.gtaoCompute.setUniformBuffer("gtaoData", gtaoSetting);
+      let gtaoSetting: UniformGPUBuffer = new UniformGPUBuffer(4 * 2); //vector4 * 2
+      this.gtaoCompute.setUniformBuffer('gtaoData', gtaoSetting);
 
-    this.directionsArray = new Float32Array(8 * 2);
-    this.directionsBuffer = new StorageGPUBuffer(8 * 2);
+      this.directionsArray = new Float32Array(8 * 2);
+      this.directionsBuffer = new StorageGPUBuffer(8 * 2);
 
-    this.directionsBuffer.setFloat32Array("array", this.randomDirection());
-    this.directionsBuffer.apply();
-    this.gtaoCompute.setStorageBuffer("directions", this.directionsBuffer);
+      this.directionsBuffer.setFloat32Array('array', this.randomDirection());
+      this.directionsBuffer.apply();
+      this.gtaoCompute.setStorageBuffer('directions', this.directionsBuffer);
 
-    this.aoBuffer = new StorageGPUBuffer(
-      this.gtaoTexture.width * this.gtaoTexture.height
-    );
-    this.gtaoCompute.setStorageBuffer("aoBuffer", this.aoBuffer);
-    let rtFrame = GBufferFrame.getGBufferFrame(GBufferFrame.colorPass_GBuffer);
-    this.gtaoCompute.setSamplerTexture(
-      `gBufferTexture`,
-      rtFrame.getCompressGBufferTexture()
-    );
-    this.autoSetColorTexture("inTex", this.gtaoCompute);
-    this.gtaoCompute.setStorageTexture(`outTex`, this.gtaoTexture);
+      this.aoBuffer = new StorageGPUBuffer(this.gtaoTexture.width * this.gtaoTexture.height);
+      this.gtaoCompute.setStorageBuffer('aoBuffer', this.aoBuffer);
+      let rtFrame = GBufferFrame.getGBufferFrame(GBufferFrame.colorPass_GBuffer);
+      this.gtaoCompute.setSamplerTexture(`gBufferTexture`, rtFrame.getCompressGBufferTexture());
+      this.gtaoCompute.setSamplerTexture('inTex', this.getLastRenderTexture());
+      this.gtaoCompute.setStorageTexture(`outTex`, this.gtaoTexture);
 
-    this.gtaoSetting = gtaoSetting;
+      this.gtaoSetting = gtaoSetting;
   }
 
   private createResource() {
-    let [w, h] = webGPUContext.presentationSize;
-    this.gtaoTexture = new VirtualTexture(
-      w,
-      h,
-      GPUTextureFormat.rgba16float,
-      false,
-      GPUTextureUsage.STORAGE_BINDING |
-        GPUTextureUsage.COPY_DST |
-        GPUTextureUsage.COPY_SRC |
-        GPUTextureUsage.TEXTURE_BINDING
-    );
-    this.gtaoTexture.name = "gtaoTex";
-    let gtaoDec = new RTDescriptor();
-    gtaoDec.loadOp = `load`;
-    this.rtFrame = new RTFrame([this.gtaoTexture], [gtaoDec]);
+      let [w, h] = webGPUContext.presentationSize;
+      this.gtaoTexture = new VirtualTexture(w, h, GPUTextureFormat.rgba16float, false, GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.COPY_SRC | GPUTextureUsage.TEXTURE_BINDING);
+      this.gtaoTexture.name = 'gtaoTex';
+      let gtaoDec = new RTDescriptor();
+      gtaoDec.loadOp = `load`;
+      this.rtFrame = new RTFrame([this.gtaoTexture], [gtaoDec]);
   }
 
   private randomCount: number = 0;
   private randomDirection(): Float32Array {
-    this.randomCount = 0;
-    let offsetAngle = (Math.PI * 2 * this.randomCount) / 16;
-    let angleSegment = (Math.PI * 2) / 8;
-    for (let i = 0; i < 8; i++) {
-      let angle = offsetAngle + i * angleSegment;
-      this.directionsArray[i * 2] = Math.sin(angle);
-      this.directionsArray[i * 2 + 1] = Math.cos(angle);
-    }
-    return this.directionsArray;
+      // this.randomCount++;
+      // if (this.randomCount > 1) this.randomCount = 0;
+      this.randomCount = 0;
+      let offsetAngle = (Math.PI * 2 * this.randomCount) / 16;
+      let angleSegment = (Math.PI * 2) / 8;
+      for (let i = 0; i < 8; i++) {
+          let angle = offsetAngle + i * angleSegment;
+          this.directionsArray[i * 2] = Math.sin(angle);
+          this.directionsArray[i * 2 + 1] = Math.cos(angle);
+      }
+      return this.directionsArray;
   }
-
+  /**
+   * @internal
+   */
   render(view: View3D, command: GPUCommandEncoder) {
-    if (!this.gtaoCompute) {
-      this.createResource();
-      this.createCompute();
-      this.onResize();
+      if (!this.gtaoCompute) {
+          this.createResource();
+          this.createCompute();
+          this.onResize();
 
-      this.rendererPassState = WebGPUDescriptorCreator.createRendererPassState(
-        this.rtFrame,
-        null
-      );
-      this.rendererPassState.label = "GTAO";
+          this.rendererPassState = WebGPUDescriptorCreator.createRendererPassState(this.rtFrame, null);
+          this.rendererPassState.label = "GTAO";
 
-      let globalUniform = GlobalBindGroup.getCameraGroup(view.camera);
-      this.gtaoCompute.setUniformBuffer(
-        "globalUniform",
-        globalUniform.uniformGPUBuffer
-      );
-    }
-    let cfg = Engine3D.setting.render.postProcessing.gtao;
+          let globalUniform = GlobalBindGroup.getCameraGroup(view.camera);
+          this.gtaoCompute.setUniformBuffer('globalUniform', globalUniform.uniformGPUBuffer);
+      }
+      let cfg = Engine3D.setting.render.postProcessing.gtao;
 
-    this.directionsBuffer.setFloat32Array("array", this.randomDirection());
-    this.directionsBuffer.apply();
-    let scaleFactor = 1 - 0.2 * (Time.frame % 2);
-    let maxDistance = cfg.maxDistance * scaleFactor;
-    let maxPixel = cfg.maxPixel * scaleFactor;
-    this.gtaoSetting.setFloat("maxDistance", maxDistance);
-    this.gtaoSetting.setFloat("maxPixel", maxPixel);
-    this.gtaoSetting.setFloat("darkFactor", cfg.darkFactor);
-    this.gtaoSetting.setFloat("rayMarchSegment", cfg.rayMarchSegment);
+      this.directionsBuffer.setFloat32Array('array', this.randomDirection());
+      this.directionsBuffer.apply();
+      let scaleFactor = 1 - 0.2 * (Time.frame % 2);
+      let maxDistance = cfg.maxDistance * scaleFactor;
+      let maxPixel = cfg.maxPixel * scaleFactor;
+      this.gtaoSetting.setFloat('maxDistance', maxDistance);
+      this.gtaoSetting.setFloat('maxPixel', maxPixel);
+      this.gtaoSetting.setFloat('darkFactor', cfg.darkFactor);
+      this.gtaoSetting.setFloat('rayMarchSegment', cfg.rayMarchSegment);
 
-    let camera = view.camera;
-    this.gtaoSetting.setFloat("cameraNear", camera.near);
-    this.gtaoSetting.setFloat("cameraFar", camera.far);
-    this.gtaoSetting.setFloat("multiBounce", cfg.multiBounce ? 1 : 0);
-    this.gtaoSetting.setFloat("blendColor", cfg.blendColor ? 1 : 0);
+      let camera = view.camera;
+      this.gtaoSetting.setFloat('cameraNear', camera.near);
+      this.gtaoSetting.setFloat('cameraFar', camera.far);
+      this.gtaoSetting.setFloat('multiBounce', cfg.multiBounce ? 1 : 0);
+      this.gtaoSetting.setFloat('blendColor', cfg.blendColor ? 1 : 0);
 
-    this.gtaoSetting.apply();
+      this.gtaoSetting.apply();
 
-    GPUContext.computeCommand(command, [this.gtaoCompute]);
-    GPUContext.lastRenderPassState = this.rendererPassState;
+      GPUContext.computeCommand(command, [this.gtaoCompute]);
+      GPUContext.lastRenderPassState = this.rendererPassState;
   }
 
   public onResize() {
-    let [w, h] = webGPUContext.presentationSize;
-    this.gtaoTexture.resize(w, h);
-    this.gtaoCompute.workerSizeX = Math.ceil(this.gtaoTexture.width / 8);
-    this.gtaoCompute.workerSizeY = Math.ceil(this.gtaoTexture.height / 8);
-    this.gtaoCompute.workerSizeZ = 1;
+      let [w, h] = webGPUContext.presentationSize;
+      this.gtaoTexture.resize(w, h);
+      this.gtaoCompute.workerSizeX = Math.ceil(this.gtaoTexture.width / 8);
+      this.gtaoCompute.workerSizeY = Math.ceil(this.gtaoTexture.height / 8);
+      this.gtaoCompute.workerSizeZ = 1;
   }
 }

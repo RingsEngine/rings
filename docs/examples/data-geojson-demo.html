@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings — 数据处理：GeoJSON</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; }
+    #canvas { display: block; width: 100% !important; height: 100% !important; }
+    .hud { position: absolute; left: 8px; top: 8px; right: 8px; font: 11px ui-monospace, monospace; color: #e6edf3; text-shadow: 0 1px 3px #000; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <p id="hud" class="hud">loading GeoJSON...</p>
+  <script type="module">
+    import {
+      Engine3D, Scene3D, Object3D, Camera3D, View3D,
+      AtmosphericComponent, DirectLight, HoverCameraController,
+      PlaneGeometry, MeshRenderer, LitMaterial, Color,
+      GeoJsonParser, GeoType, PointCloudRenderer,
+    } from '../../src/index.ts';
+
+    const GEOJSON_URL =
+      'https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_populated_places_simple.geojson';
+
+    /** 经纬度 → 场景平面（lon→X，lat→Z） */
+    const GEO_SCALE = 0.05;
+
+    function collectPoints(geoData) {
+      const pos = [];
+      const col = [];
+      for (let i = 0; i < geoData.features.length; i++) {
+        const geom = geoData.features[i].geometry;
+        if (!geom || geom.type !== GeoType.Point) continue;
+        const c = geom.coordinates;
+        const lon = c[0];
+        const lat = c[1];
+        pos.push(lon * GEO_SCALE, 0.12, lat * GEO_SCALE);
+        col.push(255, 210, 90, 255);
+      }
+      const count = pos.length / 3;
+      return {
+        positions: new Float32Array(pos),
+        colors: new Uint8Array(col),
+        count,
+      };
+    }
+
+    async function main() {
+      const canvas = document.getElementById('canvas');
+      const hud = document.getElementById('hud');
+      await Engine3D.init({ canvasConfig: { canvas } });
+      const scene = new Scene3D();
+      scene.addComponent(AtmosphericComponent);
+      const camObj = new Object3D();
+      const camera = camObj.addComponent(Camera3D);
+      camera.perspective(55, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0, 9999);
+      camObj.addComponent(HoverCameraController).setCamera(-35, -55, 22);
+      scene.addChild(camObj);
+      const sun = new Object3D();
+      sun.addComponent(DirectLight).intensity = 2;
+      sun.transform.rotationX = -45;
+      scene.addChild(sun);
+
+      hud.textContent = 'fetching ' + GEOJSON_URL.split('/').pop() + '...';
+      const res = await fetch(GEOJSON_URL);
+      if (!res.ok) throw new Error('GeoJSON fetch failed: ' + res.status);
+      const parser = new GeoJsonParser();
+      await parser.parseString(await res.text());
+
+      const { positions, colors, count } = collectPoints(parser.data);
+      if (count === 0) throw new Error('No Point features in GeoJSON');
+
+      const pcRoot = new Object3D();
+      pcRoot.name = 'PopulatedPlaces';
+      const pcInner = new Object3D();
+      pcRoot.addChild(pcInner);
+      const renderer = pcInner.addComponent(PointCloudRenderer);
+      renderer.initFromData(positions, colors, count);
+      renderer.setPointShape('circle');
+      renderer.setPointSize(5);
+      scene.addChild(pcRoot);
+
+      hud.textContent =
+        'GeoJsonParser Point | features ' + parser.data.features.length + ' | points ' + count;
+      const view = new View3D();
+      view.scene = scene;
+      view.camera = camera;
+      Engine3D.startRenderView(view);
+    }
+    main().catch((e) => {
+      document.body.innerHTML = '<p style="padding:1rem">' + e.message + '</p>';
+      console.error(e);
+    });
+  </script>
+</body>
+</html>

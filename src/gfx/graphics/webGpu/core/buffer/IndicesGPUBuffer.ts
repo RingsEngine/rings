@@ -18,9 +18,9 @@ export class IndicesGPUBuffer extends GPUBufferBase {
     this.bufferType = GPUBufferType.IndicesGPUBuffer; // 设置缓冲区类型为索引缓冲区
     this.createIndicesBuffer(
       GPUBufferUsage.STORAGE |
-        GPUBufferUsage.COPY_DST |
-        GPUBufferUsage.INDEX |
-        GPUBufferUsage.INDIRECT,
+      GPUBufferUsage.COPY_DST |
+      GPUBufferUsage.INDEX |
+      GPUBufferUsage.INDIRECT,
       data
     );
   }
@@ -48,8 +48,7 @@ export class IndicesGPUBuffer extends GPUBufferBase {
     if (data) {
       // 分配内存节点并设置数据
       this.indicesNode = this.memory.allocation_node(data.length * 4);
-      const buffer = data.buffer instanceof ArrayBuffer ? data.buffer : new Uint8Array(data.buffer).buffer;
-      this.indicesNode.setArrayBuffer(0, buffer as ArrayBuffer);
+      this.indicesNode.setArrayBuffer(0, data);
       this.apply();
     }
   }

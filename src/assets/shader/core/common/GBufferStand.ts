@@ -49,7 +49,7 @@ export let GBufferStand = `
         let octUV = zChannel.xy * 2.0 - 1.0;
         gBuffer.viewNormal = octDecode(octUV.xy);
 
-        let wChannel = floatVec3f(gBufferTexture.w);
+        let wChannel = floatToVec3f(gBufferTexture.w);
         gBuffer.abldeoColor = wChannel.xyz;
 
         gBuffer.roughness = zChannel.z;
@@ -126,7 +126,7 @@ export let GBufferStand = `
     }
 
     fn getRGBMColorFromGBuffer(gBuffer:GBuffer) -> vec3f {
-        let rbg = unpack4x8unorm(u32(gBuffer.z)).rgb;
+        let rgb = unpack4x8unorm(u32(gBuffer.z)).rgb;
         let m = unpack4x8unorm(u32(gBuffer.w)).z;
         return DecodeRGBM(vec4f(rgb,m));
     }

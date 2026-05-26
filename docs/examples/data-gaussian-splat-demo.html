@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings — 数据处理：3DGS PLY</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; }
+    #canvas { display: block; width: 100% !important; height: 100% !important; }
+    .hud { position: absolute; left: 8px; top: 8px; font: 11px ui-monospace, monospace; color: #e6edf3; text-shadow: 0 1px 3px #000; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <p id="hud" class="hud">loading massa.ply...</p>
+  <script type="module">
+    import {
+      Engine3D, Scene3D, Object3D, Camera3D, View3D,
+      AtmosphericComponent, HoverCameraController,
+      FileLoader, PlyParser,
+    } from '../../src/index.ts';
+
+    const PLY_URL =
+      'https://cdn.jsdelivr.net/gh/RingsEngine/rings-resource@resources-0.0.3/gs/ply/massa.ply';
+
+    async function main() {
+      const canvas = document.getElementById('canvas');
+      const hud = document.getElementById('hud');
+      await Engine3D.init({ canvasConfig: { canvas } });
+      const scene = new Scene3D();
+      scene.addComponent(AtmosphericComponent);
+      const camObj = new Object3D();
+      const camera = camObj.addComponent(Camera3D);
+      camera.perspective(55, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0, 9999);
+      camObj.addComponent(HoverCameraController).setCamera(-30, -18, 12);
+      scene.addChild(camObj);
+
+      hud.textContent = 'loading massa.ply...';
+      const loader = new FileLoader();
+      const slash = PLY_URL.lastIndexOf('/');
+      loader.baseUrl = slash >= 0 ? PLY_URL.slice(0, slash + 1) : '';
+      const parser = await loader.load(PLY_URL, PlyParser);
+      const root = parser.data;
+      root.transform.scaleY = -1;
+      scene.addChild(root);
+      hud.textContent = 'PlyParser Splat | massa.ply | ' + root.name;
+      const view = new View3D();
+      view.scene = scene;
+      view.camera = camera;
+      Engine3D.startRenderView(view);
+    }
+    main().catch((e) => {
+      document.body.innerHTML = '<p style="padding:1rem">' + e.message + '</p>';
+      console.error(e);
+    });
+  </script>
+</body>
+</html>

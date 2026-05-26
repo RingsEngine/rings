@@ -17,71 +17,65 @@ export class PostRenderer extends RendererBase {
   public finalQuadView: ViewQuad;
   public postList: Map<string, PostBase>;
   constructor() {
-    super();
+      super();
 
-    this._rendererType = PassType.POST;
+      this._rendererType = PassType.POST;
 
-    this.postList = new Map<string, PostBase>();
+      this.postList = new Map<string, PostBase>();
 
-    this.initRenderer();
+      this.initRenderer();
   }
 
   public initRenderer() {
-    ShaderLib.register("FullQuad_vert_wgsl", FullQuad_vert_wgsl);
-    this.finalQuadView = new ViewQuad(
-      `Quad_vert_wgsl`,
-      `Quad_frag_wgsl`,
-      new RTFrame([], []),
-      0,
-      false
-    );
+      ShaderLib.register("FullQuad_vert_wgsl", FullQuad_vert_wgsl);
+      this.finalQuadView = new ViewQuad(`Quad_vert_wgsl`, `Quad_frag_wgsl`, new RTFrame([], []), 0, false);
   }
 
   public attachPost(view: View3D, post: PostBase) {
-    post.postRenderer = this;
-    let clsName = post.constructor.name;
-    let has = this.postList.get(clsName);
-    if (!has) {
-      this.postList.set(clsName, post);
-      post.onAttach(view);
-    }
+      post.postRenderer = this;
+      let clsName = post.constructor.name;
+      let has = this.postList.get(clsName);
+      if (!has) {
+          this.postList.set(clsName, post);
+          post.onAttach(view);
+      }
   }
 
   public detachPost(view: View3D, post: PostBase): boolean {
-    let clsName = post.constructor.name;
-    let has = this.postList.get(clsName);
-    if (has) {
-      this.postList.delete(clsName);
-      post.onDetach(view);
-      post.postRenderer = null;
-    }
-    return has != null;
+      let clsName = post.constructor.name;
+      let has = this.postList.get(clsName);
+      if (has) {
+          this.postList.delete(clsName);
+          post.onDetach(view);
+          post.postRenderer = null;
+      }
+      return has != null;
   }
 
   public render(view: View3D) {
-    this.postList.forEach((v) => {
-      if (v.enable) {
-        v.compute(view);
-      }
-    });
 
-    let command = GPUContext.beginCommandEncoder();
-    this.postList.forEach((v) => {
-      if (v.enable) {
-        v.render(view, command);
-      }
-    });
-    GPUContext.endCommandEncoder(command);
+      this.postList.forEach((v) => {
+          if (v.enable) {
+              v.compute(view);
+          }
+      });
+
+      let command = GPUContext.beginCommandEncoder();
+      this.postList.forEach((v) => {
+          if (v.enable) {
+              v.render(view, command);
+              if (v.rendererPassState) {
+                  GPUContext.lastRenderPassState = v.rendererPassState;
+              }
+          }
+      });
+      GPUContext.endCommandEncoder(command);
   }
 
   public presentContent(view: View3D, texture: Texture) {
-    let command = GPUContext.beginCommandEncoder();
-    this.finalQuadView.renderToViewQuad(
-      view,
-      this.finalQuadView,
-      command,
-      texture
-    );
-    GPUContext.endCommandEncoder(command);
+      let command = GPUContext.beginCommandEncoder();
+      this.finalQuadView.renderToViewQuad(view, this.finalQuadView, command, texture);
+      GPUContext.endCommandEncoder(command);
   }
+
 }

@@ -230,27 +230,23 @@ export class GPUContext {
     computePass.end();
   }
 
-  public static copyTexture(
-    command: GPUCommandEncoder,
-    source: Texture,
-    dest: Texture
-  ) {
+  public static copyTexture(command: GPUCommandEncoder, source: Texture, dest: Texture) {
     command.copyTextureToTexture(
-      {
-        texture: source.getGPUTexture(),
-        mipLevel: 0,
-        origin: { x: 0, y: 0, z: 0 },
-      },
-      {
-        texture: dest.getGPUTexture(),
-        mipLevel: 0,
-        origin: { x: 0, y: 0, z: 0 },
-      },
-      {
-        width: dest.width,
-        height: dest.height,
-        depthOrArrayLayers: 1,
-      }
+        {
+            texture: source.getGPUTexture(),
+            mipLevel: 0,
+            origin: { x: 0, y: 0, z: 0 },
+        },
+        {
+            texture: dest.getGPUTexture(),
+            mipLevel: 0,
+            origin: { x: 0, y: 0, z: 0 },
+        },
+        {
+            width: dest.width,
+            height: dest.height,
+            depthOrArrayLayers: 1,
+        },
     );
-  }
+}
 }

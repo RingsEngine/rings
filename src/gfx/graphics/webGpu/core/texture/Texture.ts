@@ -250,12 +250,10 @@ export class Texture implements GPUSamplerDescriptor {
 
   public getGPUTexture() {
     if (!this.gpuTexture) {
-      this.gpuTexture = webGPUContext.device.createTexture(
-        this.textureDescriptor
-      );
+        this.gpuTexture = webGPUContext.device.createTexture(this.textureDescriptor);
     }
     return this.gpuTexture;
-  }
+}
 
   public getGPUView(index: number = 0): GPUTextureView | GPUExternalTexture {
     if (!this.view) {

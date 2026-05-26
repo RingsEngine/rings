@@ -176,7 +176,7 @@ fn CsMain(@builtin(workgroup_id) workgroup_id: vec3<u32>, @builtin(global_invoca
     var color = textureLoad(_MainTex, fragCoord, 0);
     let uv = vec2<f32>(f32(fragCoord.x), f32(fragCoord.y)) / vec2<f32>(f32(texSize.x - 1), f32(texSize.y - 1));
     var bloom = textureSampleLevel(_BloomTex, _BloomTexSampler, uv, 0.0).xyz * bloomCfg.bloomIntensity;
-    bloom = ACEToneMapping(bloom, 1.0);
+    bloom = ACESToneMapping(bloom, 1.0);
     let g = 1.0 / 2.2;
     bloom = saturate(pow(bloom, vec3<f32>(g)));
     color = vec4<f32>(color.xyz + bloom.xyz, color.w);

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings ? ?????????</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; }
+    #canvas { display: block; width: 100% !important; height: 100% !important; }
+    .hud {
+      position: absolute; left: 8px; top: 8px; right: 8px; pointer-events: none;
+      font: 11px/1.45 ui-monospace, monospace; color: #e6edf3; text-shadow: 0 1px 3px #000;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <p id="hud" class="hud">loading glTF...</p>
+  <script type="module">
+    import {
+      Engine3D, Scene3D, Object3D, Camera3D, View3D, Color,
+      AtmosphericComponent, DirectLight, HoverCameraController,
+      PlaneGeometry, MeshRenderer, LitMaterial,
+    } from '../../src/index.ts';
+
+    const GLB = 'https://cdn.jsdelivr.net/gh/RingsEngine/rings-resource@resources-0.0.3/glb/eva_unit_01_rigged.glb';
+
+    async function main() {
+      const canvas = document.getElementById('canvas');
+      const hud = document.getElementById('hud');
+      await Engine3D.init({ canvasConfig: { canvas } });
+      const scene = new Scene3D();
+      scene.addComponent(AtmosphericComponent);
+      const camObj = new Object3D();
+      const camera = camObj.addComponent(Camera3D);
+      camera.perspective(50, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0, 9999);
+      camObj.addComponent(HoverCameraController).setCamera(-20, -15, 8);
+      scene.addChild(camObj);
+      const sun = new Object3D();
+      sun.addComponent(DirectLight).intensity = 2.2;
+      sun.transform.rotationX = -50;
+      sun.transform.rotationY = 40;
+      scene.addChild(sun);
+      const root = await Engine3D.res.loadGltf(GLB);
+      root.transform.scaleX = 0.01;
+      root.transform.scaleY = 0.01;
+      root.transform.scaleZ = 0.01;
+      scene.addChild(root);
+      hud.textContent = 'loadGltf OK | children ' + root.numChildren;
+      const view = new View3D();
+      view.scene = scene;
+      view.camera = camera;
+      Engine3D.startRenderView(view);
+    }
+    main().catch((e) => {
+      document.body.innerHTML = '<p style="padding:1rem">Error: ' + e.message + '</p>';
+      console.error(e);
+    });
+  </script>
+</body>
+</html>

@@ -75,7 +75,7 @@ export let DepthOfView_cs: string = `
         ob += textureSampleLevel(inTex, inTexSampler, uv1, 0.0);
         ob += textureSampleLevel(inTex, inTexSampler, uv2, 0.0);
         ob += textureSampleLevel(inTex, inTexSampler, uv3, 0.0);
-        return mix(originColor, ob * 0.25, scale);
+        return mix(orginColor, ob * 0.25, scale);
     }
 
     fn processUVEdge(v: f32) -> f32{

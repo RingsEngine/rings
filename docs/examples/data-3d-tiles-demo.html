@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings — 数据处理：3D Tiles</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; }
+    #canvas { display: block; width: 100% !important; height: 100% !important; }
+    .hud { position: absolute; left: 8px; top: 8px; right: 8px; font: 11px ui-monospace, monospace; color: #e6edf3; text-shadow: 0 1px 3px #000; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <p id="hud" class="hud">3D Tiles loading...</p>
+  <script type="module">
+    import {
+      Engine3D, Scene3D, Object3D, Camera3D, View3D, Vector3,
+      AtmosphericComponent, HoverCameraController, webGPUContext, TilesRenderer,
+    } from 'https://unpkg.com/@rings-webgpu/core@1.0.56/dist/rings.es.js';
+
+    const TILE_ROOT = 'https://bertt.github.io/mapbox_3dtiles_samples/samples/b3dm';
+
+    let tilesRenderer = null;
+
+    async function main() {
+      const canvas = document.getElementById('canvas');
+      const hud = document.getElementById('hud');
+      await Engine3D.init({
+        canvasConfig: { canvas },
+        renderLoop: () => { if (tilesRenderer) tilesRenderer.update(); },
+      });
+      const scene = new Scene3D();
+      scene.addComponent(AtmosphericComponent);
+      const camObj = new Object3D();
+      const camera = camObj.addComponent(Camera3D);
+      camera.perspective(60, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 1e7);
+      const ctrl = camObj.addComponent(HoverCameraController);
+      ctrl.setCamera(0, -20, 50);
+      scene.addChild(camObj);
+
+      tilesRenderer = new TilesRenderer();
+      tilesRenderer.onRootTileLoaded = ({ center, radius, rtcOffset }) => {
+        const target = new Vector3(center.x + rtcOffset.x, center.y + rtcOffset.y, center.z + rtcOffset.z);
+        ctrl.setCamera(0, -30, radius * 1.5, target);
+        camera.far = Math.max(1e6, radius * 12);
+      };
+      try {
+        await tilesRenderer.loadTileSet(TILE_ROOT, 'tileset.json');
+        const [w, h] = webGPUContext.presentationSize;
+        tilesRenderer.setCamera(camera, w, h);
+        scene.addChild(tilesRenderer.group);
+        hud.textContent = 'TilesRenderer | tileset.json (network)';
+      } catch (err) {
+        hud.textContent = 'Tileset load failed: ' + err.message;
+        console.error(err);
+      }
+      const view = new View3D();
+      view.scene = scene;
+      view.camera = camera;
+      Engine3D.startRenderView(view);
+      window.addEventListener('resize', () => {
+        const [rw, rh] = webGPUContext.presentationSize;
+        tilesRenderer?.setCamera(camera, rw, rh);
+      });
+    }
+    main().catch((e) => { document.body.innerHTML = '<p style="padding:1rem">' + e.message + '</p>'; });
+  </script>
+</body>
+</html>

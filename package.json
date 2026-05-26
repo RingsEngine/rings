@@ -34,6 +34,7 @@
     "build:types": "tsc --emitDeclarationOnly -p tsconfig.build.json && node scripts/build-types.js",
     "minify": "node scripts/minify.js",
     "docs": "typedoc --skipErrorChecking",
+    "docs:serve": "npx --yes serve docs -l 5174",
     "publish": "npm publish --access public",
     "publish:packages": "npm run publish:ammo && npm run publish:physics"
   },

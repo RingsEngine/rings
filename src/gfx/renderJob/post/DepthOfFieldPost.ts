@@ -28,10 +28,6 @@ export class DepthOfFieldPost extends PostBase {
   /**
    * @internal
    */
-  rendererPassState: RendererPassState;
-  /**
-   * @internal
-   */
   blurComputes: ComputeShader[];
   /**
    * @internal
@@ -44,180 +40,157 @@ export class DepthOfFieldPost extends PostBase {
   rtFrame: RTFrame;
 
   constructor() {
-    super();
+      super();
   }
   /**
    * @internal
    */
-  onAttach(view: View3D) {
-    Engine3D.setting.render.postProcessing.depthOfView.enable = true;
+  public onAttach(view: View3D,) {
+      Engine3D.setting.render.postProcessing.depthOfView.enable = true;
   }
   /**
    * @internal
    */
-  onDetach(view: View3D) {
-    Engine3D.setting.render.postProcessing.depthOfView.enable = false;
+  public onDetach(view: View3D,) {
+      Engine3D.setting.render.postProcessing.depthOfView.enable = false;
   }
 
   public get pixelOffset() {
-    let setting = Engine3D.setting.render.postProcessing.depthOfView;
-    return setting.pixelOffset;
+      let setting = Engine3D.setting.render.postProcessing.depthOfView;
+      return setting.pixelOffset;
   }
 
   public set pixelOffset(value: number) {
-    value = Math.max(0, value);
-    let setting = Engine3D.setting.render.postProcessing.depthOfView;
-    setting.pixelOffset = value;
+      value = Math.max(0, value);
+      let setting = Engine3D.setting.render.postProcessing.depthOfView;
+      setting.pixelOffset = value;
   }
 
   public get near() {
-    let setting = Engine3D.setting.render.postProcessing.depthOfView;
-    return setting.near;
+      let setting = Engine3D.setting.render.postProcessing.depthOfView;
+      return setting.near;
   }
 
   public set near(value: number) {
-    value = Math.max(0, value);
-    let setting = Engine3D.setting.render.postProcessing.depthOfView;
-    setting.near = value;
+      value = Math.max(0, value);
+      let setting = Engine3D.setting.render.postProcessing.depthOfView;
+      setting.near = value;
   }
 
   public get far() {
-    let setting = Engine3D.setting.render.postProcessing.depthOfView;
-    return setting.far;
+      let setting = Engine3D.setting.render.postProcessing.depthOfView;
+      return setting.far;
   }
 
   public set far(value: number) {
-    value = Math.max(0, value);
-    let setting = Engine3D.setting.render.postProcessing.depthOfView;
-    setting.far = value;
+      value = Math.max(0, value);
+      let setting = Engine3D.setting.render.postProcessing.depthOfView;
+      setting.far = value;
   }
 
   private createBlurCompute() {
-    this.blurSettings = [];
-    this.blurComputes = [];
-    let cfg = Engine3D.setting.render.postProcessing.depthOfView;
+      this.blurSettings = [];
+      this.blurComputes = [];
+      let cfg = Engine3D.setting.render.postProcessing.depthOfView;
 
-    for (let i = 0; i < cfg.iterationCount; i++) {
-      let blurSetting: UniformGPUBuffer = new UniformGPUBuffer(4);
-      let blurCompute = new ComputeShader(DepthOfView_cs);
-      this.blurComputes.push(blurCompute);
-      this.blurSettings.push(blurSetting);
+      for (let i = 0; i < cfg.iterationCount; i++) {
+          let blurSetting: UniformGPUBuffer = new UniformGPUBuffer(4);
+          let blurCompute = new ComputeShader(DepthOfView_cs);
+          this.blurComputes.push(blurCompute);
+          this.blurSettings.push(blurSetting);
 
-      blurCompute.setUniformBuffer("blurSetting", blurSetting);
-      let rtFrame = GBufferFrame.getGBufferFrame(
-        GBufferFrame.colorPass_GBuffer
-      );
-      blurCompute.setSamplerTexture(
-        `gBufferTexture`,
-        rtFrame.getCompressGBufferTexture()
-      );
+          blurCompute.setUniformBuffer('blurSetting', blurSetting);
+          let rtFrame = GBufferFrame.getGBufferFrame(GBufferFrame.colorPass_GBuffer);
+          blurCompute.setSamplerTexture(`gBufferTexture`, rtFrame.getCompressGBufferTexture());
 
-      let input = i % 2 == 0 ? this.blurTexture1 : this.blurTexture2;
-      let output = i % 2 == 1 ? this.blurTexture1 : this.blurTexture2;
-      blurCompute.setSamplerTexture("inTex", input);
-      blurCompute.setStorageTexture(`outTex`, output);
+          let input = i % 2 == 0 ? this.blurTexture1 : this.blurTexture2;
+          let output = i % 2 == 1 ? this.blurTexture1 : this.blurTexture2;
+          blurCompute.setSamplerTexture('inTex', input);
+          blurCompute.setStorageTexture(`outTex`, output);
 
-      blurCompute.workerSizeX = Math.ceil(this.blurTexture1.width / 8);
-      blurCompute.workerSizeY = Math.ceil(this.blurTexture1.height / 8);
-      blurCompute.workerSizeZ = 1;
+          blurCompute.workerSizeX = Math.ceil(this.blurTexture1.width / 8);
+          blurCompute.workerSizeY = Math.ceil(this.blurTexture1.height / 8);
+          blurCompute.workerSizeZ = 1;
 
-      this.outTexture = output;
-    }
+          this.outTexture = output;
+      }
+
+      // set first input texture
+      this.blurComputes[0].setSamplerTexture('inTex', this.getLastRenderTexture());
   }
 
   private createResource() {
-    let presentationSize = webGPUContext.presentationSize;
-    let w = presentationSize[0];
-    let h = presentationSize[1];
+      let presentationSize = webGPUContext.presentationSize;
+      let w = presentationSize[0];
+      let h = presentationSize[1];
 
-    this.blurTexture1 = new VirtualTexture(
-      w,
-      h,
-      GPUTextureFormat.rgba16float,
-      false,
-      GPUTextureUsage.STORAGE_BINDING |
-        GPUTextureUsage.COPY_DST |
-        GPUTextureUsage.COPY_SRC |
-        GPUTextureUsage.TEXTURE_BINDING
-    );
-    this.blurTexture1.name = "dof1";
-    let blur1Dec = new RTDescriptor();
-    blur1Dec.clearValue = [0, 0, 0, 1];
-    blur1Dec.loadOp = `clear`;
+      this.blurTexture1 = new VirtualTexture(w, h, GPUTextureFormat.rgba16float, false, GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.COPY_SRC | GPUTextureUsage.TEXTURE_BINDING);
+      this.blurTexture1.name = 'dof1';
+      let blur1Dec = new RTDescriptor();
+      blur1Dec.clearValue = [0, 0, 0, 1];
+      blur1Dec.loadOp = `clear`;
 
-    this.blurTexture2 = new VirtualTexture(
-      w,
-      h,
-      GPUTextureFormat.rgba16float,
-      false,
-      GPUTextureUsage.STORAGE_BINDING |
-        GPUTextureUsage.COPY_DST |
-        GPUTextureUsage.COPY_SRC |
-        GPUTextureUsage.TEXTURE_BINDING
-    );
-    this.blurTexture2.name = "dof2";
-    let blur2Dec = new RTDescriptor();
-    blur2Dec.clearValue = [0, 0, 0, 1];
-    blur2Dec.loadOp = `clear`;
+      this.blurTexture2 = new VirtualTexture(w, h, GPUTextureFormat.rgba16float, false, GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.COPY_SRC | GPUTextureUsage.TEXTURE_BINDING);
+      this.blurTexture2.name = 'dof2';
+      let blur2Dec = new RTDescriptor();
+      blur2Dec.clearValue = [0, 0, 0, 1];
+      blur2Dec.loadOp = `clear`;
 
-    this.rtFrame = new RTFrame(
-      [this.blurTexture1, this.blurTexture2],
-      [blur1Dec, blur2Dec]
-    );
+      this.rtFrame = new RTFrame([
+          this.blurTexture1,
+          this.blurTexture2
+      ], [
+          blur1Dec,
+          blur2Dec
+      ]);
   }
 
   /**
    * @internal
    */
-  render(view: View3D, command: GPUCommandEncoder) {
-    if (!this.blurComputes) {
-      this.createResource();
-      this.createBlurCompute();
-      let standUniform = GlobalBindGroup.getCameraGroup(view.camera);
-      for (let i = 0; i < this.blurComputes.length; i++) {
-        const blurCompute = this.blurComputes[i];
-        blurCompute.setUniformBuffer(
-          "globalUniform",
-          standUniform.uniformGPUBuffer
-        );
+  public render(view: View3D, command: GPUCommandEncoder) {
+      if (!this.blurComputes) {
+          this.createResource();
+          this.createBlurCompute();
+          let standUniform = GlobalBindGroup.getCameraGroup(view.camera);
+          for (let i = 0; i < this.blurComputes.length; i++) {
+              const blurCompute = this.blurComputes[i];
+              blurCompute.setUniformBuffer('globalUniform', standUniform.uniformGPUBuffer);
+          }
+          this.rendererPassState = WebGPUDescriptorCreator.createRendererPassState(this.rtFrame, null);
       }
-      this.rendererPassState = WebGPUDescriptorCreator.createRendererPassState(
-        this.rtFrame,
-        null
-      );
-    }
-    this.autoSetColorTexture("inTex", this.blurComputes[0]);
+      
 
-    let cfg = Engine3D.setting.render.postProcessing.depthOfView;
-    cfg.far = Math.max(cfg.near, cfg.far) + 0.0001;
-    for (let i = 0; i < cfg.iterationCount; i++) {
-      let blurCompute = this.blurComputes[i];
-      let blurSetting = this.blurSettings[i];
-      blurSetting.setFloat("near", cfg.near);
-      blurSetting.setFloat("far", cfg.far);
-      blurSetting.setFloat("pixelOffset", (i + 1) * cfg.pixelOffset);
-      blurSetting.apply();
-      blurCompute.setStorageBuffer("blurSetting", blurSetting);
-    }
-    GPUContext.computeCommand(command, this.blurComputes);
-    GPUContext.lastRenderPassState = this.rendererPassState;
+      let cfg = Engine3D.setting.render.postProcessing.depthOfView;
+      cfg.far = Math.max(cfg.near, cfg.far) + 0.0001;
+      for (let i = 0; i < cfg.iterationCount; i++) {
+          let blurCompute = this.blurComputes[i];
+          let blurSetting = this.blurSettings[i];
+          blurSetting.setFloat('near', cfg.near);
+          blurSetting.setFloat('far', cfg.far);
+          blurSetting.setFloat('pixelOffset', (i + 1) * cfg.pixelOffset);
+          blurSetting.apply();
+          blurCompute.setStorageBuffer('blurSetting', blurSetting);
+      }
+      GPUContext.computeCommand(command, this.blurComputes);
+      GPUContext.lastRenderPassState = this.rendererPassState;
   }
 
   public onResize(): void {
-    let presentationSize = webGPUContext.presentationSize;
-    let w = presentationSize[0];
-    let h = presentationSize[1];
-    let cfg = Engine3D.setting.render.postProcessing.depthOfView;
-    cfg.far = Math.max(cfg.near, cfg.far) + 0.0001;
+      let presentationSize = webGPUContext.presentationSize;
+      let w = presentationSize[0];
+      let h = presentationSize[1];
+      let cfg = Engine3D.setting.render.postProcessing.depthOfView;
+      cfg.far = Math.max(cfg.near, cfg.far) + 0.0001;
 
-    this.blurTexture1.resize(w, h);
-    this.blurTexture2.resize(w, h);
+      this.blurTexture1.resize(w, h);
+      this.blurTexture2.resize(w, h);
 
-    for (let i = 0; i < cfg.iterationCount; i++) {
-      let compute = this.blurComputes[i];
-      compute.workerSizeX = Math.ceil(this.blurTexture1.width / 8);
-      compute.workerSizeY = Math.ceil(this.blurTexture1.height / 8);
-      compute.workerSizeZ = 1;
-    }
+      for (let i = 0; i < cfg.iterationCount; i++) {
+          let compute = this.blurComputes[i];
+          compute.workerSizeX = Math.ceil(this.blurTexture1.width / 8);
+          compute.workerSizeY = Math.ceil(this.blurTexture1.height / 8);
+          compute.workerSizeZ = 1;
+      }
   }
 }

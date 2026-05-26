@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rings — 数据处理：字体与 GUI 图集</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; }
+    body { position: relative; font-family: system-ui, "Segoe UI", sans-serif; }
+    #canvas { display: block; width: 100% !important; height: 100% !important; }
+    .hud {
+      position: absolute; left: 8px; top: 8px; right: 260px; pointer-events: none;
+      font: 11px/1.45 ui-monospace, monospace; color: #e6edf3; text-shadow: 0 1px 3px #000;
+    }
+    .controls {
+      position: absolute; top: 0; right: 0; bottom: 0; width: 240px; padding: 10px;
+      overflow: auto; background: rgba(15, 20, 25, 0.92); color: #e6edf3;
+      font-size: 0.72rem; border-left: 1px solid #2d3a4d;
+    }
+    .controls h3 { margin: 12px 0 6px; font-size: 0.75rem; color: #8b9cb3; font-weight: 600; }
+    .controls h3:first-child { margin-top: 0; }
+    .row { margin-bottom: 8px; }
+    .row label { display: block; margin-bottom: 4px; color: #8b9cb3; }
+    .row input[type="text"], .row select {
+      width: 100%; box-sizing: border-box; padding: 6px 8px;
+      background: #1e293b; color: #e6edf3; border: 1px solid #334155; border-radius: 4px;
+    }
+    .row input[type="checkbox"] { margin-right: 6px; vertical-align: middle; }
+    .atlas-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+    .atlas-btns button {
+      padding: 5px 8px; cursor: pointer; border: 1px solid #475569;
+      background: #1e293b; color: #e6edf3; border-radius: 4px; font-size: 0.7rem;
+    }
+    .atlas-btns button.active { background: #0ea5e9; border-color: #0284c7; }
+    .note { margin-top: 10px; color: #8b9cb3; line-height: 1.45; font-size: 0.68rem; }
+    @media (max-width: 560px) {
+      .hud { right: 8px; }
+      .controls { width: 100%; max-height: 42%; top: auto; left: 0; border-left: none; border-top: 1px solid #2d3a4d; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <p id="hud" class="hud">loading…</p>
+  <aside class="controls">
+    <h3>场景面板（固定 POI）</h3>
+    <div class="row">
+      <label for="textInput">UITextField 文本</label>
+      <input type="text" id="textInput" maxlength="48" placeholder="Hello, Rings" />
+    </div>
+    <h3>绑定面板（跟随模型）</h3>
+    <div class="row">
+      <label for="billboard">billboard</label>
+      <select id="billboard">
+        <option value="10" selected>BillboardXYZ</option>
+        <option value="9">BillboardY</option>
+        <option value="0">None</option>
+      </select>
+    </div>
+    <div class="row">
+      <label><input type="checkbox" id="depthTest" checked /> depthTest</label>
+    </div>
+    <h3>图集精灵（Sheet_atlas）</h3>
+    <div class="atlas-btns" id="atlasBtns"></div>
+    <p class="note" id="ringsStatus"><code>WorldPanel</code> + <code>loadFont</code> / <code>loadAtlas</code>。</p>
+  </aside>
+
+  <script type="module">
+    import {
+      Engine3D, Scene3D, Object3D, Camera3D, View3D, Vector3, Color,
+      AtmosphericComponent, DirectLight, HoverCameraController, Object3DUtil,
+      WorldPanel, UIImage, UITextField, UIShadow, BillboardType, TextAnchor,
+      ImageType,
+    } from '../../src/index.ts';
+    import { GPUCullMode } from '../../src/gfx/graphics/webGpu/WebGPUConst.ts';
+
+    const FONT_URL =
+      'https://cdn.jsdelivr.net/gh/RingsEngine/rings-resource@resources-0.0.6/fnt/0.fnt';
+    const ATLAS_URL =
+      'https://cdn.jsdelivr.net/gh/RingsEngine/rings-resource@resources-0.0.6/atlas/Sheet_atlas.json';
+    const MODEL_URL =
+      'https://cdn.jsdelivr.net/gh/RingsEngine/rings-resource@resource-0.0.5/glb/skeleton_warrior.glb';
+    const ATLAS_SPRITES = ['00065', '00070', '00075', '00077'];
+
+    async function main() {
+      const canvas = document.getElementById('canvas');
+      const hud = document.getElementById('hud');
+      const status = document.getElementById('ringsStatus');
+      const textInput = document.getElementById('textInput');
+      const billboardSel = document.getElementById('billboard');
+      const depthTestCb = document.getElementById('depthTest');
+
+      let view;
+      let sceneText;
+      let duckPanel;
+      let duckIcon;
+      let modelContainer;
+      const followPos = new Vector3();
+      let iconFrame = 0;
+      let iconSpriteIdx = 0;
+
+      await Engine3D.init({
+        canvasConfig: { canvas },
+        renderLoop: () => {
+          if (duckPanel && modelContainer) {
+            followPos.copyFrom(modelContainer.transform.worldPosition);
+            followPos.y += 2.2;
+            duckPanel.object3D.localPosition = followPos;
+          }
+          if (duckIcon) {
+            iconFrame++;
+            const idx = Math.floor(iconFrame * 0.08) % ATLAS_SPRITES.length;
+            if (idx !== iconSpriteIdx) {
+              iconSpriteIdx = idx;
+              duckIcon.sprite = Engine3D.res.getGUISprite(ATLAS_SPRITES[idx]);
+            }
+          }
+        },
+      });
+
+      const scene = new Scene3D();
+      scene.addComponent(AtmosphericComponent);
+      const camObj = new Object3D();
+      const camera = camObj.addComponent(Camera3D);
+      camera.perspective(60, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 1, 5000);
+      camObj.addComponent(HoverCameraController).setCamera(0, -20, 15);
+      scene.addChild(camObj);
+      const lightObj = new Object3D();
+      lightObj.rotationX = 45;
+      const dl = lightObj.addComponent(DirectLight);
+      dl.intensity = 2;
+      dl.castShadow = true;
+      scene.addChild(lightObj);
+
+      scene.addChild(Object3DUtil.GetSingleCube(16, 0.1, 16, 0.25, 0.28, 0.32));
+
+      hud.textContent = 'loadFont / loadAtlas …';
+      const fontInfo = await Engine3D.res.loadFont(FONT_URL);
+      await Engine3D.res.loadAtlas(ATLAS_URL);
+
+      const model = await Engine3D.res.loadGltf(MODEL_URL);
+      model.rotationY = 180;
+      modelContainer = new Object3D();
+      modelContainer.addChild(model);
+      model.scaleX = model.scaleY = model.scaleZ = 0.05;
+      scene.addChild(modelContainer);
+
+      view = new View3D();
+      view.scene = scene;
+      view.camera = camera;
+      Engine3D.startRenderView(view);
+
+      const uiCanvas = view.enableUICanvas();
+
+      const scenePanel = new Object3D().addComponent(WorldPanel);
+      scenePanel.cullMode = GPUCullMode.none;
+      uiCanvas.addChild(scenePanel.object3D);
+      scenePanel.object3D.localScale = new Vector3(0.1, 0.1, 0.1);
+      scenePanel.transform.rotationX = -30;
+      scenePanel.transform.y = 3.1;
+      scenePanel.transform.x = 1;
+
+      const scenePanelRoot = new Object3D();
+      scenePanel.object3D.addChild(scenePanelRoot);
+      sceneText = scenePanelRoot.addComponent(UITextField);
+      sceneText.uiTransform.resize(80, 16);
+      sceneText.font = fontInfo.face;
+      // sceneText.originSize = fontInfo.size;
+      sceneText.text = 'Hello, Rings';
+      sceneText.fontSize = 10;
+      sceneText.color = new Color(0.5, 1, 0.5, 1);
+      sceneText.alignment = TextAnchor.MiddleLeft;
+      const sceneShadow = scenePanelRoot.addComponent(UIShadow);
+      sceneShadow.shadowOffset.x = 1;
+      sceneShadow.shadowOffset.y = -1;
+
+      duckPanel = new Object3D().addComponent(WorldPanel);
+      duckPanel.billboard = BillboardType.BillboardXYZ;
+      duckPanel.depthTest = depthTestCb.checked;
+      uiCanvas.addChild(duckPanel.object3D);
+      duckPanel.object3D.localScale = new Vector3(0.1, 0.1, 0.1);
+
+      const duckPanelRoot = new Object3D();
+      duckPanel.object3D.addChild(duckPanelRoot);
+
+      const bg = duckPanelRoot.addComponent(UIImage);
+      bg.uiTransform.resize(32, 6);
+      bg.uiTransform.setXY(20, 20);
+      bg.color = new Color(1, 1, 1, 0.5);
+      bg.isShadowless = true;
+
+      const duckLabel = duckPanelRoot.addComponent(UITextField);
+      duckLabel.text = 'Skeleton Warrior';
+      duckLabel.font = fontInfo.face;
+      // duckLabel.originSize = fontInfo.size;
+      duckLabel.fontSize = 4;
+      duckLabel.color = new Color(0, 0, 0, 1);
+      duckLabel.alignment = TextAnchor.MiddleCenter;
+
+      const iconNode = duckPanelRoot.addChild(new Object3D());
+      duckIcon = iconNode.addComponent(UIImage);
+      duckIcon.uiTransform.resize(10, 10);
+      duckIcon.uiTransform.setXY(-2, 2);
+      duckIcon.imageType = ImageType.Simple;
+      duckIcon.sprite = Engine3D.res.getGUISprite(ATLAS_SPRITES[0]);
+
+      const atlasBtns = document.getElementById('atlasBtns');
+      for (const id of ATLAS_SPRITES) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = id;
+        b.addEventListener('click', () => {
+          atlasBtns.querySelectorAll('button').forEach((x) => x.classList.remove('active'));
+          b.classList.add('active');
+          duckIcon.sprite = Engine3D.res.getGUISprite(id);
+          iconSpriteIdx = ATLAS_SPRITES.indexOf(id);
+        });
+        atlasBtns.appendChild(b);
+      }
+      atlasBtns.querySelector('button').classList.add('active');
+
+      textInput.value = sceneText.text;
+      textInput.addEventListener('input', () => {
+        sceneText.text = textInput.value || ' ';
+      });
+
+      billboardSel.addEventListener('change', () => {
+        duckPanel.billboard = Number(billboardSel.value);
+      });
+      depthTestCb.addEventListener('change', () => {
+        duckPanel.depthTest = depthTestCb.checked;
+      });
+
+      status.innerHTML =
+        'loadFont: <code>' + fontInfo.face + '</code> size ' + fontInfo.size +
+        ' | model: skeleton_warrior.glb';
+      hud.textContent =
+        'WorldPanel ×2 | ' + FONT_URL.split('/').pop() + ' | skeleton_warrior POI';
+
+      textInput.addEventListener('input', () => {
+        hud.textContent = 'scene: "' + sceneText.text + '" | sprite: ' + ATLAS_SPRITES[iconSpriteIdx];
+      });
+    }
+
+    main().catch((e) => {
+      document.body.innerHTML = '<p style="padding:1rem;color:#e6edf3">' + e.message + '</p>';
+      console.error(e);
+    });
+  </script>
+</body>
+</html>
