@@ -1,4 +1,4 @@
-<!-- docs/_sidebar.md -->
+<!-- docs/sidebar.md -->
 
 - [首页](/)
 - [快速入门](/quick-start)

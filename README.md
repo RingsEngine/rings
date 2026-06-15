@@ -1,5 +1,7 @@
 # Rings Engine - 基于WebGPU的现代3D渲染引擎
 
+[官方文档](https://ringsengine.github.io/rings/docs)
+
 ## 🚀 项目简介
 
 Rings Engine 是一个基于WebGPU的高性能3D渲染引擎，专为现代Web应用设计。采用组件-实体系统(ECS)架构，提供完整的3D渲染解决方案，支持PBR材质、动态光照、阴影、后处理等高级渲染特性。
@@ -271,7 +273,7 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 
 ## 🔗 相关链接
 
-- [官方文档](https://rings-engine.github.io/docs)
-- [示例项目](https://github.com/rings-engine/examples)
-- [API参考](https://rings-engine.github.io/api)
-- [讨论社区](https://github.com/rings-engine/rings/discussions)
+- [官方文档](https://ringsengine.github.io/rings/docs)
+- [示例项目](https://ringsengine.github.io/rings/docs)
+- [API参考](https://rings-engine.github.io/rings/docs/api/core/Engine3D)
+- [讨论社区](https://github.com/RingsEngine/rings/issues)

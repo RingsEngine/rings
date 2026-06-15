@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 
 const readmePath = path.join(__dirname, "../docs/动画组件系统/README.md");
-const fragPath = path.join(__dirname, "../docs/动画组件系统/_anim-demos-fragment.md");
+const fragPath = path.join(__dirname, "../docs/动画组件系统/anim-demos-fragment.md");
 
 const readme = fs.readFileSync(readmePath, "utf8");
 const frag = fs.readFileSync(fragPath, "utf8").trim();

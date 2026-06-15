@@ -71,6 +71,6 @@ function block(d) {
 const intro =
   "文档站需以 **HTTP(S)** 打开；`iframe` 与示例页依赖 **unpkg**、**WebGPU** 与网络。**Animator** 示例从 jsDelivr 加载 **`camcopter_s_100.glb`**、**`car.glb`**（RingsEngine/rings-resource）；**骨骼** 示例从 CDN 拉取 glTF。每个块顶栏 **示例** / **代码** 为 **Tab 切换**。运行说明见 [`animation-demos-README.md`](../examples/animation-demos-README.md)。更新 `docs/examples/animation-*.html` 后执行 `node scripts/build-anim-demos-fragment.cjs` 与 `node scripts/merge-anim-readme.cjs`。\n\n";
 
-const out = path.join(__dirname, "../docs/动画组件系统/_anim-demos-fragment.md");
+const out = path.join(__dirname, "../docs/动画组件系统/anim-demos-fragment.md");
 fs.writeFileSync(out, intro + demos.map(block).join(""), "utf8");
 console.log("Wrote", out);
