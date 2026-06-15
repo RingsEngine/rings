@@ -91,117 +91,10 @@
   color: var(--rings-doc-muted);
 }
 
-/* 侧栏顶级分组：标题+三角同一行（rings-sidebar-row），子 ul 在下方，避免 flex+order 与 Docsify 注入冲突导致整段沉底 */
+/* 侧栏可折叠分组：点击标题展开/收起 */
 .sidebar-nav li.rings-sidebar-group {
   display: block;
   list-style: none;
-}
-
-.sidebar-nav li.rings-sidebar-group > .rings-sidebar-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-rows: auto auto;
-  align-items: start;
-  width: 100%;
-  min-width: 0;
-  column-gap: 0;
-  row-gap: 0;
-}
-
-/* 标题占第一行左格；TOC 若误留在 row 内则占第二行整宽，不把按钮挤到竖直中间 */
-.sidebar-nav li.rings-sidebar-group > .rings-sidebar-row > a {
-  grid-column: 1;
-  grid-row: 1;
-  min-width: 0;
-  font-size: 0.95rem;
-  font-weight: 500;
-}
-
-.sidebar-nav li.rings-sidebar-group > .rings-sidebar-row > p {
-  grid-column: 1;
-  grid-row: 1;
-  min-width: 0;
-  margin: 0;
-  font-size: 0.95rem;
-  font-weight: 500;
-}
-
-.sidebar-nav li.rings-sidebar-group > .rings-sidebar-row > span:not(.rings-sidebar-caret-btn),
-.sidebar-nav li.rings-sidebar-group > .rings-sidebar-row > strong,
-.sidebar-nav li.rings-sidebar-group > .rings-sidebar-row > h3,
-.sidebar-nav li.rings-sidebar-group > .rings-sidebar-row > h4 {
-  grid-column: 1;
-  grid-row: 1;
-  min-width: 0;
-  margin: 0;
-  font-size: 0.95rem;
-  font-weight: 500;
-}
-
-.sidebar-nav li.rings-sidebar-group > .rings-sidebar-row > .rings-sidebar-caret-btn {
-  grid-column: 2;
-  grid-row: 1;
-  flex: 0 0 auto;
-  margin: 0;
-  align-self: start;
-  padding: 4px;
-  margin-right: -2px;
-  width: auto;
-  height: auto;
-  min-width: 1.5rem;
-  min-height: 1.5rem;
-  border: none;
-  border-radius: 3px;
-  background: transparent;
-  line-height: 1;
-  font-size: 0.875rem;
-  color: #7a8794;
-  cursor: pointer;
-  position: relative;
-  z-index: 2;
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.sidebar-nav li.rings-sidebar-group > .rings-sidebar-row > ul {
-  grid-column: 1 / -1;
-  grid-row: 2;
-  width: 100%;
-  margin: 0;
-}
-
-.sidebar-nav li.rings-sidebar-group > .rings-sidebar-row > .rings-sidebar-caret-btn:hover {
-  color: #364149;
-  background: rgba(0, 0, 0, 0.06);
-}
-
-.sidebar-nav li.rings-sidebar-group > .rings-sidebar-row > .rings-sidebar-caret-btn:focus-visible {
-  outline: 2px solid #42b983;
-  outline-offset: 1px;
-}
-
-/* 无标题行包裹时的兜底（极少：无 link 仅有子 ul） */
-.sidebar-nav li.rings-sidebar-group > .rings-sidebar-caret-btn {
-  flex: 0 0 auto;
-  margin: 0 0 0 auto;
-  padding: 4px;
-  margin-right: -2px;
-  min-width: 1.5rem;
-  min-height: 1.5rem;
-  border: none;
-  border-radius: 3px;
-  background: transparent;
-  line-height: 1;
-  font-size: 0.875rem;
-  color: #7a8794;
-  cursor: pointer;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .sidebar-nav li.rings-sidebar-group > ul {
@@ -209,19 +102,42 @@
   margin-top: 0;
 }
 
+.sidebar-nav .rings-sidebar-title-toggle,
+.sidebar-nav li.rings-sidebar-group > a,
+.sidebar-nav li.rings-sidebar-group > p,
+.sidebar-nav li.rings-sidebar-group > strong {
+  cursor: pointer;
+}
+
 .sidebar-nav li.rings-sidebar-group.rings-sidebar-folded > ul {
   display: none !important;
+}
+
+/* 折叠时隐藏该一级项下所有子 ul */
+.sidebar-nav li.rings-sidebar-group.rings-sidebar-folded > ul,
+.sidebar-nav > ul > li.rings-sidebar-group.rings-sidebar-folded > ul,
+.sidebar-nav > ul > li.rings-sidebar-group.rings-sidebar-folded ul,
+.sidebar-nav > ul > li.rings-doc-fold-default ul {
+  display: none !important;
+}
+
+/* 由 JS 打上 data-rings-default-fold，避免 app-name 占位导致 nth-child 错位 */
+.sidebar-nav li[data-rings-default-fold="1"]:not(.rings-sidebar-host-open):not(
+    .rings-sidebar-user-open
+  )
+  ul {
+  display: none !important;
+}
+
+.sidebar-nav li[data-rings-default-fold="1"].rings-sidebar-host-open ul,
+.sidebar-nav li[data-rings-default-fold="1"].rings-sidebar-user-open ul,
+.sidebar-nav li.rings-sidebar-user-open ul {
+  display: block !important;
 }
 
 /* subMaxLevel 注入的 ul 可能不是 li 直接子级：用类控制隐藏 */
 .sidebar-nav ul.rings-sidebar-sub-folded {
   display: none !important;
-}
-
-/* 子菜单 ul 包在 div 内时占满宽 */
-.sidebar-nav li.rings-sidebar-group > div:has(> ul) {
-  width: 100%;
-  margin-top: 0;
 }
 
 /* 代码块与列表：避免被标题衬得过小 */

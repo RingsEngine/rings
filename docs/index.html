@@ -49,95 +49,44 @@
                 });
             });
           },
-          /** 侧栏顶级分组可折叠：显式按钮 + 正确解析根 ul（勿用 querySelector('ul') 误命中嵌套列表） */
+          /** 侧栏顶级分组：点击标题展开/收起（无三角按钮） */
           function sidebarGroupCollapsePlugin(hook) {
+            /** Docsify 侧栏常有多个 ul：第一个是站点名，真正导航在 li 最多的那个 ul */
             function sidebarRootUl() {
               var nav = document.querySelector(".sidebar-nav");
               if (!nav) return null;
-              var i, ch, k, kid;
+              var best = null;
+              var bestN = 0;
+              var i, ul, j, li, n;
               for (i = 0; i < nav.children.length; i++) {
-                ch = nav.children[i];
-                if (ch && ch.tagName === "UL") return ch;
-              }
-              for (i = 0; i < nav.children.length; i++) {
-                ch = nav.children[i];
-                if (!ch || (ch.tagName !== "DIV" && ch.tagName !== "SECTION"))
-                  continue;
-                for (k = 0; k < ch.children.length; k++) {
-                  kid = ch.children[k];
-                  if (kid && kid.tagName === "UL") return kid;
+                ul = nav.children[i];
+                if (!ul || ul.tagName !== "UL") continue;
+                n = 0;
+                for (j = 0; j < ul.children.length; j++) {
+                  li = ul.children[j];
+                  if (li && li.tagName === "LI") n++;
+                }
+                if (n > bestN) {
+                  bestN = n;
+                  best = ul;
                 }
               }
-              return null;
+              return best;
             }
-            /** 一级 li 下的「页面 TOC / 子侧栏」ul：含直接子 ul 或包在 div 等内的 ul（Docsify subMaxLevel 异步注入） */
-            function firstSubmenuUl(li) {
-              var i, ch, u;
-              for (i = 0; i < li.children.length; i++) {
-                ch = li.children[i];
-                if (!ch) continue;
-                if (
-                  ch.classList &&
-                  (ch.classList.contains("rings-sidebar-caret-btn") ||
-                    ch.classList.contains("rings-sidebar-row"))
-                )
-                  continue;
-                if (ch.tagName === "UL") return ch;
-              }
-              for (i = 0; i < li.children.length; i++) {
-                ch = li.children[i];
-                if (!ch || ch.tagName === "UL") continue;
-                if (
-                  ch.classList &&
-                  (ch.classList.contains("rings-sidebar-caret-btn") ||
-                    ch.classList.contains("rings-sidebar-row"))
-                )
-                  continue;
-                if (ch.querySelector) {
-                  u = ch.querySelector("ul");
-                  if (u) return u;
-                }
-              }
-              u = li.querySelector("ul.app-sub-sidebar");
-              if (u) return u;
-              return null;
-            }
-            function stripSidebarCaret(li) {
-              var uls = li.querySelectorAll("ul.rings-sidebar-sub-folded");
-              var k;
-              for (k = 0; k < uls.length; k++)
-                uls[k].classList.remove("rings-sidebar-sub-folded");
-              var b = findCaretBtn(li);
-              if (b) b.remove();
-              unwrapTitleRow(li);
-              li.classList.remove(
-                "rings-sidebar-group",
-                "rings-sidebar-leaf",
-                "rings-sidebar-folded"
-              );
-              delete li.dataset.ringsSidebarCaret;
-            }
-            /** Docsify 会重写侧栏 innerHTML：可能留下 data 但按钮已丢，或 TOC 晚注入后仍带 leaf/disabled */
-            function resetStaleSidebarCarets(topLis) {
-              var j, li, btn, sub;
-              for (j = 0; j < topLis.length; j++) {
-                li = topLis[j];
+            function cleanupLegacyCarets(root) {
+              var btns = root.querySelectorAll(".rings-sidebar-caret-btn");
+              var i, b, row, li;
+              for (i = 0; i < btns.length; i++) btns[i].remove();
+              var rows = root.querySelectorAll("li > .rings-sidebar-row");
+              for (i = 0; i < rows.length; i++) {
+                row = rows[i];
+                li = row.parentNode;
                 if (!li || li.tagName !== "LI") continue;
-                if (li.dataset.ringsSidebarCaret !== "1") continue;
-                btn = findCaretBtn(li);
-                sub = firstSubmenuUl(li);
-                if (!btn) {
-                  stripSidebarCaret(li);
-                  continue;
-                }
-                if (
-                  sub &&
-                  (li.classList.contains("rings-sidebar-leaf") || btn.disabled)
-                )
-                  stripSidebarCaret(li);
+                while (row.firstChild) li.insertBefore(row.firstChild, row);
+                row.remove();
               }
             }
-            /** 无链接的一级标题（如「API」「类」）：Docsify 常为 p/span，无 <a> */
+            /** 无链接的一级标题（如「API」「类」） */
             function plainTitleBlock(li) {
               var i, ch, tn;
               for (i = 0; i < li.children.length; i++) {
@@ -145,12 +94,6 @@
                 if (!ch || ch.nodeType !== 1) continue;
                 tn = ch.tagName;
                 if (tn === "UL") break;
-                if (
-                  ch.classList &&
-                  (ch.classList.contains("rings-sidebar-caret-btn") ||
-                    ch.classList.contains("rings-sidebar-row"))
-                )
-                  continue;
                 if (tn === "A") continue;
                 if (ch.querySelector && ch.querySelector("a")) continue;
                 if (
@@ -164,166 +107,40 @@
               }
               return null;
             }
-            /** 一级标题 DOM 块：有链接用 link 块，否则纯文本块 */
-            function titleRowBlock(li) {
-              var link = firstNavLink(li);
-              if (link) return titleBlockForNavLink(li, link);
-              return plainTitleBlock(li);
-            }
-            /** 一级侧栏标题块：从 link 向上直到 li，遇 rings-sidebar-row 则停 */
-            function titleBlockForNavLink(li, link) {
-              if (!link) return null;
-              var el = link;
-              while (el.parentNode && el.parentNode !== li) {
-                if (
-                  el.parentNode.classList &&
-                  el.parentNode.classList.contains("rings-sidebar-row")
-                )
-                  break;
-                el = el.parentNode;
-              }
-              return el;
-            }
-            function findTitleRow(li) {
-              var i, ch;
-              for (i = 0; i < li.children.length; i++) {
-                ch = li.children[i];
-                if (
-                  ch &&
-                  ch.tagName === "SPAN" &&
-                  ch.classList &&
-                  ch.classList.contains("rings-sidebar-row")
-                )
-                  return ch;
-              }
-              return null;
-            }
-            function unwrapTitleRow(li) {
-              var row = findTitleRow(li);
-              if (!row) return;
-              while (row.firstChild) li.insertBefore(row.firstChild, row);
-              row.remove();
-            }
-            /** 标题 + 三角包进同一行，子菜单始终在 li 下、行外，避免展开后整段沉到侧栏底部 */
-            function ensureTitleRow(li) {
-              var block = titleRowBlock(li);
-              var btn = findCaretBtn(li);
-              if (!block || !btn) return;
-              var row = findTitleRow(li);
-              if (!row) {
-                row = document.createElement("span");
-                row.className = "rings-sidebar-row";
-                li.insertBefore(row, block);
-                row.appendChild(block);
-                row.appendChild(btn);
-              } else {
-                if (block.parentNode !== row) row.insertBefore(block, row.firstChild);
-                if (btn.parentNode !== row) row.appendChild(btn);
-              }
-              var i, ch;
-              for (i = row.children.length - 1; i >= 0; i--) {
-                ch = row.children[i];
-                if (!ch || ch === block || ch === btn) continue;
-                if (ch.contains && block && ch.contains(block)) continue;
-                li.insertBefore(ch, row.nextSibling);
-              }
-              var ulsInRow = row.querySelectorAll(":scope > ul");
-              var ui, ulm;
-              for (ui = 0; ui < ulsInRow.length; ui++) {
-                ulm = ulsInRow[ui];
-                if (ulm && ulm.parentNode === row)
-                  li.insertBefore(ulm, row.nextSibling);
-              }
-            }
-            /** 三角必须为 li 的直接子节点（flex）；ul 在包装层内时插在包装层之前（无可用 link 时兜底） */
-            function placeCaretBeforeSubmenu(li, btn, sub) {
-              if (!sub) {
-                li.appendChild(btn);
-                return;
-              }
-              if (sub.parentNode === li) {
-                li.insertBefore(btn, sub);
-                return;
-              }
-              var anc = sub.parentNode;
-              while (anc && anc !== li) {
-                if (anc.parentNode === li) {
-                  li.insertBefore(btn, anc);
-                  return;
-                }
-                anc = anc.parentNode;
-              }
-              li.appendChild(btn);
-            }
+            /** 一级标题链接（li 直接子级 a 或 p/div 内首个 a） */
             function firstNavLink(li) {
-              var row = findTitleRow(li);
               var i, ch, a;
-              if (row) {
-                a = row.querySelector("a");
-                if (a) return a;
+              for (i = 0; i < li.children.length; i++) {
+                ch = li.children[i];
+                if (ch && ch.tagName === "A") return ch;
               }
               for (i = 0; i < li.children.length; i++) {
                 ch = li.children[i];
-                if (ch.tagName === "A") return ch;
-              }
-              for (i = 0; i < li.children.length; i++) {
-                ch = li.children[i];
-                if (ch.tagName === "P") {
-                  a = ch.querySelector("a");
-                  if (a) return a;
-                }
-              }
-              for (i = 0; i < li.children.length; i++) {
-                ch = li.children[i];
-                if (ch.tagName === "DIV") {
+                if (!ch) continue;
+                if (ch.tagName === "P" || ch.tagName === "DIV") {
                   a = ch.querySelector("a");
                   if (a) return a;
                 }
               }
               return null;
             }
-            function findCaretBtn(li) {
-              var row = findTitleRow(li);
-              var i, ch;
-              if (row) {
-                for (i = 0; i < row.children.length; i++) {
-                  ch = row.children[i];
-                  if (
-                    ch &&
-                    ch.classList &&
-                    ch.classList.contains("rings-sidebar-caret-btn")
-                  )
-                    return ch;
-                }
-              }
-              for (i = 0; i < li.children.length; i++) {
-                ch = li.children[i];
-                if (
-                  ch &&
-                  ch.classList &&
-                  ch.classList.contains("rings-sidebar-caret-btn")
-                )
-                  return ch;
-              }
-              return null;
+            function titleClickTarget(li) {
+              return firstNavLink(li) || plainTitleBlock(li);
             }
             /** 当前路由高亮 a 所在的一级 li（仅根 ul 下） */
             function getHostTopLevelLi(root) {
-              var activeA = root.querySelector("a.active");
-              if (!activeA) return null;
+              var activeA = document.querySelector(".sidebar-nav a.active");
+              if (!activeA || !root) return null;
               var el = activeA;
               while (el && el.parentNode && el.parentNode !== root) {
                 el = el.parentNode;
               }
-              if (
-                !el ||
-                el.tagName !== "LI" ||
-                !el.classList.contains("rings-sidebar-group")
-              )
-                return null;
+              if (!el || el.tagName !== "LI") return null;
               return el;
             }
             function sidebarFoldStorageKey(li) {
+              var label = topLevelGroupLabel(li);
+              if (label) return "ringsDocSbFold:@label:" + label.slice(0, 48);
               var a = firstNavLink(li);
               if (a) {
                 var h = (a.getAttribute("href") || "").trim();
@@ -339,54 +156,189 @@
               }
               return "";
             }
+            var RINGS_SIDEBAR_DEFAULT_FOLDED_LABELS = {
+              "\u7ec4\u4ef6\u7cfb\u7edf": 1,
+              "\u7269\u7406\u5f15\u64ce\u7cfb\u7edf": 1,
+              "\u6570\u636e\u5904\u7406": 1,
+              API: 1,
+              "\u7c7b": 1,
+              "\u679a\u4e3e": 1,
+              "\u63a5\u53e3": 1,
+            };
+            /** 仅取一级标题文字，勿用 firstNavLink（会误取 Engine3D 等子链接） */
+            function topLevelGroupLabel(li) {
+              var t = titleClickTarget(li);
+              if (t) return (t.textContent || "").trim().replace(/\s+/g, " ");
+              return "";
+            }
+            function shouldDefaultFold(root, li) {
+              var label = topLevelGroupLabel(li);
+              return !!RINGS_SIDEBAR_DEFAULT_FOLDED_LABELS[label];
+            }
+            function isDefaultFoldedGroup(li) {
+              var root = sidebarRootUl();
+              return !!(root && shouldDefaultFold(root, li));
+            }
+            function foldDefaultLi(li) {
+              var uls = li.getElementsByTagName("ul");
+              var i;
+              li.dataset.ringsDefaultFold = "1";
+              li.classList.add("rings-doc-fold-default", "rings-sidebar-folded");
+              for (i = 0; i < uls.length; i++)
+                uls[i].classList.add("rings-sidebar-sub-folded");
+            }
+            function unfoldDefaultLi(li) {
+              var uls = li.getElementsByTagName("ul");
+              var i;
+              delete li.dataset.ringsDefaultFold;
+              li.classList.remove(
+                "rings-doc-fold-default",
+                "rings-sidebar-folded"
+              );
+              for (i = 0; i < uls.length; i++)
+                uls[i].classList.remove("rings-sidebar-sub-folded");
+            }
+            /** 用户点击标题手动展开时标记，避免路由回调再次强制收起 */
+            function toggleDefaultFoldByUser(li) {
+              var folded = li.classList.contains("rings-sidebar-folded");
+              if (folded) {
+                li.classList.add("rings-sidebar-user-open");
+                unfoldDefaultLi(li);
+              } else {
+                li.classList.remove("rings-sidebar-user-open");
+                foldDefaultLi(li);
+              }
+            }
             function saveSidebarFoldPreference(li) {
+              if (isDefaultFoldedGroup(li)) return;
               try {
                 var k = sidebarFoldStorageKey(li);
                 if (!k) return;
                 if (li.classList.contains("rings-sidebar-folded"))
                   sessionStorage.setItem(k, "1");
-                else sessionStorage.removeItem(k);
+                else sessionStorage.setItem(k, "0");
               } catch (e) {}
             }
+            function allSubmenuUls(li) {
+              var out = [];
+              var uls = li.querySelectorAll("ul");
+              var i;
+              for (i = 0; i < uls.length; i++) out.push(uls[i]);
+              return out;
+            }
+            function hasCollapsibleSubmenu(li) {
+              return allSubmenuUls(li).length > 0;
+            }
+            function isSidebarGroupFolded(li) {
+              var subs, i, style;
+              if (li.classList.contains("rings-sidebar-folded")) return true;
+              if (
+                li.dataset.ringsDefaultFold === "1" &&
+                !li.classList.contains("rings-sidebar-host-open") &&
+                !li.classList.contains("rings-sidebar-user-open")
+              )
+                return true;
+              subs = allSubmenuUls(li);
+              if (!subs.length) return false;
+              for (i = 0; i < subs.length; i++) {
+                if (subs[i].classList.contains("rings-sidebar-sub-folded"))
+                  return true;
+                style = window.getComputedStyle
+                  ? window.getComputedStyle(subs[i])
+                  : null;
+                if (style && style.display === "none") return true;
+              }
+              return false;
+            }
             function setFoldUi(li, folded) {
-              var sub = firstSubmenuUl(li);
-              var b = findCaretBtn(li);
+              var subs = allSubmenuUls(li);
+              var i;
               if (folded) {
                 li.classList.add("rings-sidebar-folded");
-                if (sub) sub.classList.add("rings-sidebar-sub-folded");
-                if (b) {
-                  b.setAttribute("aria-expanded", "false");
-                  b.textContent = "\u25b8";
-                }
+                for (i = 0; i < subs.length; i++)
+                  subs[i].classList.add("rings-sidebar-sub-folded");
               } else {
                 li.classList.remove("rings-sidebar-folded");
-                if (sub) sub.classList.remove("rings-sidebar-sub-folded");
-                if (b) {
-                  b.setAttribute("aria-expanded", "true");
-                  b.textContent = "\u25be";
-                }
+                for (i = 0; i < subs.length; i++)
+                  subs[i].classList.remove("rings-sidebar-sub-folded");
               }
             }
-            /** 非 host：仅当 session 标记为折叠时才 setFoldUi(true)；绝不主动 setFoldUi(false)，否则 tick 高频会把其它组强行展开 */
-            function applySidebarFoldPersistence() {
+            function toggleSidebarGroup(li) {
+              var rootNav = sidebarRootUl();
+              if (rootNav && shouldDefaultFold(rootNav, li)) {
+                toggleDefaultFoldByUser(li);
+                return;
+              }
+              var folded = !li.classList.contains("rings-sidebar-folded");
+              setFoldUi(li, folded);
+              if (!folded) li.classList.add("rings-sidebar-user-open");
+              else li.classList.remove("rings-sidebar-user-open");
+              saveSidebarFoldPreference(li);
+            }
+            /** 默认收起组：每次刷新强制收起；仅当前页落在该组内时展开（host） */
+            function applyDefaultSidebarFolds() {
               var root = sidebarRootUl();
               if (!root) return;
               var hostLi = getHostTopLevelLi(root);
-              var topLis = root.children;
-              var j, li, k;
-              for (j = 0; j < topLis.length; j++) {
-                li = topLis[j];
-                if (
-                  !li ||
-                  li.tagName !== "LI" ||
-                  !li.classList.contains("rings-sidebar-group")
-                )
-                  continue;
+              var j, li, marked, k;
+              marked = root.querySelectorAll("li.rings-sidebar-host-open");
+              for (k = 0; k < marked.length; k++)
+                marked[k].classList.remove("rings-sidebar-host-open");
+              for (j = 0; j < root.children.length; j++) {
+                li = root.children[j];
+                if (!li || li.tagName !== "LI") continue;
+                if (!shouldDefaultFold(root, li)) continue;
+                if (hostLi && li === hostLi) {
+                  li.classList.add("rings-sidebar-host-open");
+                  unfoldDefaultLi(li);
+                } else if (li.classList.contains("rings-sidebar-user-open")) {
+                  li.classList.remove("rings-sidebar-host-open");
+                  unfoldDefaultLi(li);
+                } else {
+                  li.classList.remove("rings-sidebar-host-open");
+                  li.classList.remove("rings-sidebar-user-open");
+                  foldDefaultLi(li);
+                }
+              }
+            }
+            /** Docsify 换页会重建侧栏；恢复用户手动折叠/展开的非默认分组，避免点单页链接牵连其它分组 */
+            function restoreSidebarFoldPreferences() {
+              var root = sidebarRootUl();
+              if (!root) return;
+              var hostLi = getHostTopLevelLi(root);
+              var j, li, k, stored;
+              for (j = 0; j < root.children.length; j++) {
+                li = root.children[j];
+                if (!li || li.tagName !== "LI") continue;
+                if (!hasCollapsibleSubmenu(li)) continue;
+                if (shouldDefaultFold(root, li)) continue;
+                if (hostLi && li === hostLi) continue;
                 k = sidebarFoldStorageKey(li);
                 if (!k) continue;
-                if (hostLi && li === hostLi) continue;
                 try {
-                  if (sessionStorage.getItem(k) === "1") setFoldUi(li, true);
+                  stored = sessionStorage.getItem(k);
+                  if (stored === "1") setFoldUi(li, true);
+                  else if (stored === "0") setFoldUi(li, false);
+                } catch (e) {}
+              }
+            }
+            /** 点击普通链接前保存当前侧栏状态，防止 Docsify 重建后其它组回到默认展开 */
+            function captureSidebarFoldPreferences() {
+              var root = sidebarRootUl();
+              if (!root) return;
+              var j, li, k;
+              for (j = 0; j < root.children.length; j++) {
+                li = root.children[j];
+                if (!li || li.tagName !== "LI") continue;
+                if (!hasCollapsibleSubmenu(li)) continue;
+                if (shouldDefaultFold(root, li)) continue;
+                k = sidebarFoldStorageKey(li);
+                if (!k) continue;
+                try {
+                  sessionStorage.setItem(
+                    k,
+                    isSidebarGroupFolded(li) ? "1" : "0"
+                  );
                 } catch (e) {}
               }
             }
@@ -407,103 +359,47 @@
                 sessionStorage.setItem(RINGS_SIDEBAR_LAST_HOST_KEY, curKey || last);
               } catch (e2) {}
             }
-            function ensureCarets() {
+            function bindTitleToggle(li) {
+              if (!hasCollapsibleSubmenu(li)) {
+                li.classList.remove("rings-sidebar-group");
+                delete li.dataset.ringsSidebarToggle;
+                return;
+              }
+              li.classList.add("rings-sidebar-group");
+              var target = titleClickTarget(li);
+              if (!target) return;
+              target.classList.add("rings-sidebar-title-toggle");
+              if (li.dataset.ringsSidebarToggle === "1") return;
+              li.dataset.ringsSidebarToggle = "1";
+              (function (liNode, el) {
+                el.addEventListener("click", function (e) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  toggleSidebarGroup(liNode);
+                });
+              })(li, target);
+            }
+            function setupSidebar() {
               var root = sidebarRootUl();
               if (!root) return;
-              var topLis = root.children;
-              var j, li, sub, link, btn;
-              resetStaleSidebarCarets(topLis);
-              for (j = 0; j < topLis.length; j++) {
-                li = topLis[j];
+              cleanupLegacyCarets(root);
+              var j, li;
+              for (j = 0; j < root.children.length; j++) {
+                li = root.children[j];
                 if (!li || li.tagName !== "LI") continue;
-                if (li.dataset.ringsSidebarCaret === "1") continue;
-                sub = firstSubmenuUl(li);
-                link = firstNavLink(li);
-                /* 一级项：有子菜单或有一级链接即显示三角；点击时再判断是否有可折叠 ul（避免 TOC 晚注入时误 disabled） */
-                if (!sub && !link) continue;
-                li.dataset.ringsSidebarCaret = "1";
-                li.classList.add("rings-sidebar-group");
-                var btn = document.createElement("button");
-                btn.type = "button";
-                btn.className = "rings-sidebar-caret-btn";
-                btn.textContent = "\u25be";
-                btn.setAttribute("aria-expanded", "true");
-                btn.setAttribute("aria-label", "折叠或展开子菜单");
-                btn.title = "折叠/展开";
-                /* var 循环闭包：必须用 IIFE 绑定当前 li / btn，否则所有按钮都操作最后一项 */
-                (function (liNode, btnNode) {
-                  btnNode.addEventListener("click", function (e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    function applyFoldToggle(sub) {
-                      var folded = liNode.classList.toggle("rings-sidebar-folded");
-                      sub.classList.toggle("rings-sidebar-sub-folded", folded);
-                      btnNode.setAttribute(
-                        "aria-expanded",
-                        folded ? "false" : "true"
-                      );
-                      btnNode.textContent = folded ? "\u25b8" : "\u25be";
-                      saveSidebarFoldPreference(liNode);
-                    }
-                    function syncExpandedUi(sub) {
-                      liNode.classList.remove("rings-sidebar-folded");
-                      sub.classList.remove("rings-sidebar-sub-folded");
-                      btnNode.setAttribute("aria-expanded", "true");
-                      btnNode.textContent = "\u25be";
-                      saveSidebarFoldPreference(liNode);
-                    }
-                    var subEl = firstSubmenuUl(liNode);
-                    if (subEl) {
-                      applyFoldToggle(subEl);
-                      return;
-                    }
-                    /* subMaxLevel 的 TOC 挂在「当前 active 的 a」的 parent 上；未点过标题时可能尚未注入 */
-                    var le = firstNavLink(liNode);
-                    if (!le) return;
-                    le.click();
-                    var n = 0;
-                    function poll() {
-                      if (!liNode || !liNode.isConnected) return;
-                      subEl = firstSubmenuUl(liNode);
-                      if (subEl) {
-                        syncExpandedUi(subEl);
-                        return;
-                      }
-                      if (++n < 30) setTimeout(poll, 40);
-                    }
-                    setTimeout(poll, 40);
-                  });
-                })(li, btn);
-                li.appendChild(btn);
-                if (titleRowBlock(li)) ensureTitleRow(li);
-                else placeCaretBeforeSubmenu(li, btn, sub);
-              }
-              /* Docsify 可能改写 li；每轮把标题与三角收回 rings-sidebar-row */
-              for (j = 0; j < topLis.length; j++) {
-                li = topLis[j];
-                if (!li || li.tagName !== "LI") continue;
-                if (li.dataset.ringsSidebarCaret !== "1") continue;
-                btn = findCaretBtn(li);
-                if (!btn) continue;
-                if (titleRowBlock(li)) ensureTitleRow(li);
+                bindTitleToggle(li);
               }
             }
-            var ringsFoldApplyMinMs = 100;
-            var ringsFoldApplyLastTs = 0;
             function tick() {
-              ensureCarets();
-              var now = Date.now();
-              if (now - ringsFoldApplyLastTs >= ringsFoldApplyMinMs) {
-                ringsFoldApplyLastTs = now;
-                applySidebarFoldPersistence();
-              }
+              setupSidebar();
+              restoreSidebarFoldPreferences();
             }
-            /** 换页或首屏：当前一级展开 + 按 session 恢复其它一级折叠 */
+            /** 换页或首屏：当前一级展开 + 默认收起 API/类/枚举/接口 */
             function tickAfterRoute() {
-              ensureCarets();
+              setupSidebar();
               expandActiveHostGroup();
-              applySidebarFoldPersistence();
-              ringsFoldApplyLastTs = Date.now();
+              restoreSidebarFoldPreferences();
+              applyDefaultSidebarFolds();
             }
             function observeSidebar() {
               var side =
@@ -511,6 +407,16 @@
                 document.querySelector(".sidebar");
               if (!side || side.dataset.ringsSidebarMo === "1") return;
               side.dataset.ringsSidebarMo = "1";
+              side.addEventListener(
+                "click",
+                function (e) {
+                  var a = e.target && e.target.closest
+                    ? e.target.closest(".sidebar-nav a")
+                    : null;
+                  if (a) captureSidebarFoldPreferences();
+                },
+                true
+              );
               var t = null;
               var mo = new MutationObserver(function () {
                 clearTimeout(t);
