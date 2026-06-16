@@ -25,6 +25,9 @@
         name: "Rings",
         repo: "",
         loadSidebar: "sidebar.md",
+        alias: {
+          "/.*/sidebar.md": "/sidebar.md",
+        },
         subMaxLevel: 2,
         auto2top: true,
         homepage: "README.md",
@@ -44,7 +47,8 @@
                   var s = el.getAttribute("src");
                   if (!s || /^(https?:|\/\/|data:|blob:)/i.test(s)) return;
                   try {
-                    el.src = new URL(s, window.location.href).href;
+                    var resolved = new URL(s, window.location.href).href;
+                    if (el.src !== resolved) el.src = resolved;
                   } catch (e) {}
                 });
             });
@@ -280,7 +284,13 @@
               var root = sidebarRootUl();
               if (!root) return;
               var hostLi = getHostTopLevelLi(root);
-              var j, li, marked, k;
+              var j, li, marked, k, pendingHostLabel;
+              try {
+                pendingHostLabel =
+                  sessionStorage.getItem("ringsDocSbPendingHostLabel") || "";
+              } catch (e) {
+                pendingHostLabel = "";
+              }
               marked = root.querySelectorAll("li.rings-sidebar-host-open");
               for (k = 0; k < marked.length; k++)
                 marked[k].classList.remove("rings-sidebar-host-open");
@@ -288,7 +298,10 @@
                 li = root.children[j];
                 if (!li || li.tagName !== "LI") continue;
                 if (!shouldDefaultFold(root, li)) continue;
-                if (hostLi && li === hostLi) {
+                if (
+                  (hostLi && li === hostLi) ||
+                  (pendingHostLabel && topLevelGroupLabel(li) === pendingHostLabel)
+                ) {
                   li.classList.add("rings-sidebar-host-open");
                   unfoldDefaultLi(li);
                 } else if (li.classList.contains("rings-sidebar-user-open")) {
@@ -323,10 +336,27 @@
               }
             }
             /** 点击普通链接前保存当前侧栏状态，防止 Docsify 重建后其它组回到默认展开 */
-            function captureSidebarFoldPreferences() {
+            function captureSidebarFoldPreferences(clickedLink) {
               var root = sidebarRootUl();
               if (!root) return;
-              var j, li, k;
+              var j, li, k, el, clickedHost, label;
+              if (clickedLink) {
+                el = clickedLink;
+                while (el && el.parentNode && el.parentNode !== root) {
+                  el = el.parentNode;
+                }
+                if (el && el.tagName === "LI") clickedHost = el;
+                if (clickedHost) {
+                  label = topLevelGroupLabel(clickedHost);
+                  try {
+                    if (label)
+                      sessionStorage.setItem(
+                        "ringsDocSbPendingHostLabel",
+                        label
+                      );
+                  } catch (e) {}
+                }
+              }
               for (j = 0; j < root.children.length; j++) {
                 li = root.children[j];
                 if (!li || li.tagName !== "LI") continue;
@@ -413,7 +443,7 @@
                   var a = e.target && e.target.closest
                     ? e.target.closest(".sidebar-nav a")
                     : null;
-                  if (a) captureSidebarFoldPreferences();
+                  if (a) captureSidebarFoldPreferences(a);
                 },
                 true
               );
